@@ -1,0 +1,19 @@
+# dsn: "postgresql://serialt:sugar.tang@127.0.0.1:5432/test"
+dsn: "postgresql://serialt:sugar.tang@127.0.0.1:5432/gops"
+
+log:
+  file: 
+  level: debug
+server:
+    http_port: 9876
+    jwt_secret: "replace-with-a-long-random-secret"
+    # 第一次初始化 admin /  sugar.tang
+    admin_pass: "sugar.tang"
+    
+redis:
+  host: 172.12.78.53
+  port: 6379
+  password: "sugar.tang"
+  db: 5
+  pool_size: 10
+  min_idle_conn: 5

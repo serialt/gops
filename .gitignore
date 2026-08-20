@@ -1,0 +1,7 @@
+.env
+.DS_Store
+.idea/
+.vscode/
+dist/
+web/node_modules/
+web/dist/
