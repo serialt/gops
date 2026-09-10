@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"strconv"
 
 	"gops/internal/data/model"
 	"gops/internal/pkg/casbinx"
@@ -22,12 +21,14 @@ func NewRoleHandler(db *gorm.DB, casbinService *casbinx.Service) *RoleHandler {
 }
 
 type roleRequest struct {
+	ID          uint   `json:"id"`
 	Code        string `json:"code" binding:"required"`
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
 }
 
 type permissionRequest struct {
+	ID          uint                 `json:"id" binding:"required"`
 	Permissions []casbinx.Permission `json:"permissions"`
 }
 
@@ -55,18 +56,17 @@ func (h *RoleHandler) Create(c *gin.Context) {
 }
 
 func (h *RoleHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, 400, "invalid role id")
-		return
-	}
 	var req roleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "invalid role data")
 		return
 	}
 	var role model.Role
-	if err := h.db.First(&role, uint(id)).Error; err != nil {
+	if req.ID == 0 {
+		response.Error(c, 400, "invalid role id")
+		return
+	}
+	if err := h.db.First(&role, req.ID).Error; err != nil {
 		response.Error(c, 404, "role not found")
 		return
 	}
@@ -84,13 +84,15 @@ func (h *RoleHandler) Update(c *gin.Context) {
 }
 
 func (h *RoleHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
+	var req struct {
+		ID uint `json:"id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "invalid role id")
 		return
 	}
 	var role model.Role
-	if err := h.db.First(&role, uint(id)).Error; err != nil {
+	if err := h.db.First(&role, req.ID).Error; err != nil {
 		response.Error(c, 404, "role not found")
 		return
 	}
@@ -120,7 +122,12 @@ func (h *RoleHandler) Catalog(c *gin.Context) {
 }
 
 func (h *RoleHandler) GetPermissions(c *gin.Context) {
-	role, err := h.findRole(c.Param("id"))
+	var req permissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "invalid role id")
+		return
+	}
+	role, err := h.findRole(req.ID)
 	if err != nil {
 		response.Error(c, 404, "role not found")
 		return
@@ -140,18 +147,18 @@ func (h *RoleHandler) GetPermissions(c *gin.Context) {
 }
 
 func (h *RoleHandler) SetPermissions(c *gin.Context) {
-	role, err := h.findRole(c.Param("id"))
+	var req permissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "invalid permission data")
+		return
+	}
+	role, err := h.findRole(req.ID)
 	if err != nil {
 		response.Error(c, 404, "role not found")
 		return
 	}
 	if role.Code == "admin" {
 		response.Error(c, 400, "admin role keeps full access")
-		return
-	}
-	var req permissionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "invalid permission data")
 		return
 	}
 
@@ -181,13 +188,9 @@ func (h *RoleHandler) SetPermissions(c *gin.Context) {
 	response.OK(c, clean)
 }
 
-func (h *RoleHandler) findRole(value string) (*model.Role, error) {
-	id, err := strconv.ParseUint(value, 10, 64)
-	if err != nil {
-		return nil, err
-	}
+func (h *RoleHandler) findRole(id uint) (*model.Role, error) {
 	var role model.Role
-	if err := h.db.First(&role, uint(id)).Error; err != nil {
+	if err := h.db.First(&role, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}

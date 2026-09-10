@@ -24,18 +24,35 @@ func NewUserHandler(db *gorm.DB, casbinService *casbinx.Service) *UserHandler {
 }
 
 type userRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password"`
-	Nickname string `json:"nickname" binding:"required"`
-	Status   *bool  `json:"status" binding:"required"`
-	RoleIDs  []uint `json:"role_ids"`
+	ID              uint   `json:"id"`
+	Username        string `json:"username" binding:"required"`
+	Password        string `json:"password"`
+	Nickname        string `json:"nickname" binding:"required"`
+	Status          *bool  `json:"status" binding:"required"`
+	RoleIDs         []uint `json:"role_ids"`
+	OrganizationIDs []uint `json:"organization_ids"`
+}
+type userListRequest struct {
+	Keyword        string `json:"keyword"`
+	OrganizationID uint   `json:"organization_id"`
+}
+type idRequest struct {
+	ID uint `json:"id" binding:"required"`
 }
 
 func (h *UserHandler) List(c *gin.Context) {
+	var req userListRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "invalid user query")
+		return
+	}
 	var users []model.User
-	query := h.db.Preload("Roles").Order("id DESC")
-	if keyword := c.Query("keyword"); keyword != "" {
-		query = query.Where("username ILIKE ? OR nickname ILIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+	query := h.db.Preload("Roles").Preload("Organizations").Order("id DESC")
+	if req.Keyword != "" {
+		query = query.Where("username ILIKE ? OR nickname ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+	}
+	if req.OrganizationID > 0 {
+		query = query.Joins("JOIN organization_user ON organization_user.user_id = \"user\".id").Where("organization_user.organization_id = ?", req.OrganizationID).Group("\"user\".id")
 	}
 	if err := query.Find(&users).Error; err != nil {
 		response.Error(c, 500, "query users failed")
@@ -58,7 +75,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 	user := model.User{Username: req.Username, PasswordHash: hash, Nickname: req.Nickname, Status: *req.Status}
 
-	if err := h.saveUser(&user, req.RoleIDs, true); err != nil {
+	if err := h.saveUser(&user, req.RoleIDs, req.OrganizationIDs, true); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -66,11 +83,6 @@ func (h *UserHandler) Create(c *gin.Context) {
 }
 
 func (h *UserHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, 400, "invalid user id")
-		return
-	}
 	var req userRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "invalid user data")
@@ -78,7 +90,11 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 
 	var user model.User
-	if err := h.db.First(&user, uint(id)).Error; err != nil {
+	if req.ID == 0 {
+		response.Error(c, 400, "invalid user id")
+		return
+	}
+	if err := h.db.First(&user, req.ID).Error; err != nil {
 		response.Error(c, 404, "user not found")
 		return
 	}
@@ -94,7 +110,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		user.PasswordHash = hash
 	}
 
-	if err := h.saveUser(&user, req.RoleIDs, false); err != nil {
+	if err := h.saveUser(&user, req.RoleIDs, req.OrganizationIDs, false); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -102,11 +118,12 @@ func (h *UserHandler) Update(c *gin.Context) {
 }
 
 func (h *UserHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
+	var req idRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "invalid user id")
 		return
 	}
+	id := uint64(req.ID)
 	currentID, _ := middleware.CurrentUserID(c)
 	if currentID == uint(id) {
 		response.Error(c, 400, "cannot delete current user")
@@ -140,7 +157,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	response.OK(c, nil)
 }
 
-func (h *UserHandler) saveUser(user *model.User, roleIDs []uint, create bool) error {
+func (h *UserHandler) saveUser(user *model.User, roleIDs []uint, organizationIDs []uint, create bool) error {
 	var roles []*model.Role
 	if len(roleIDs) > 0 {
 		if err := h.db.Where("id IN ?", roleIDs).Find(&roles).Error; err != nil {
@@ -149,6 +166,29 @@ func (h *UserHandler) saveUser(user *model.User, roleIDs []uint, create bool) er
 		if len(roles) != len(roleIDs) {
 			return errors.New("one or more roles do not exist")
 		}
+	}
+	var organizations []*model.Organization
+	if len(organizationIDs) > 0 {
+		if err := h.db.Where("id IN ?", organizationIDs).Find(&organizations).Error; err != nil {
+			return err
+		}
+		if len(organizations) != len(organizationIDs) {
+			return errors.New("one or more organizations do not exist")
+		}
+	}
+	var root model.Organization
+	if err := h.db.Where("code = ?", "root").First(&root).Error; err != nil {
+		return errors.New("default root organization not found")
+	}
+	hasRoot := false
+	for _, organization := range organizations {
+		if organization.ID == root.ID {
+			hasRoot = true
+			break
+		}
+	}
+	if !hasRoot {
+		organizations = append(organizations, &root)
 	}
 
 	if err := h.db.Transaction(func(tx *gorm.DB) error {
@@ -159,7 +199,10 @@ func (h *UserHandler) saveUser(user *model.User, roleIDs []uint, create bool) er
 		} else if err := tx.Save(user).Error; err != nil {
 			return err
 		}
-		return tx.Model(user).Association("Roles").Replace(roles)
+		if err := tx.Model(user).Association("Roles").Replace(roles); err != nil {
+			return err
+		}
+		return tx.Model(user).Association("Organizations").Replace(organizations)
 	}); err != nil {
 		return err
 	}
@@ -172,5 +215,6 @@ func (h *UserHandler) saveUser(user *model.User, roleIDs []uint, create bool) er
 		return err
 	}
 	user.Roles = roles
+	user.Organizations = organizations
 	return nil
 }

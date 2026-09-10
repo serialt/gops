@@ -8,9 +8,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/layouts/AdminLayout.vue'),
     redirect: '/dashboard',
     children: [
-      { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '仪表盘', permission: 'GET /api/v1/dashboard/stats' } },
-      { path: 'users', name: 'users', component: () => import('@/views/UsersView.vue'), meta: { title: '用户管理', permission: 'GET /api/v1/users' } },
-      { path: 'roles', name: 'roles', component: () => import('@/views/RolesView.vue'), meta: { title: '角色权限', permission: 'GET /api/v1/roles' } },
+      { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '仪表盘', permission: 'POST /api/v1/dashboard/stats' } },
+      { path: 'users', name: 'users', component: () => import('@/views/UsersView.vue'), meta: { title: '用户管理', permission: 'POST /api/v1/users/list' } },
+      { path: 'roles', name: 'roles', component: () => import('@/views/RolesView.vue'), meta: { title: '角色权限', permission: 'POST /api/v1/roles/list' } },
+      { path: 'organizations', name: 'organizations', component: () => import('@/views/OrganizationsView.vue'), meta: { title: '组织管理', permission: 'POST /api/v1/organizations/list' } },
       { path: '403', name: 'forbidden', component: () => import('@/views/ForbiddenView.vue'), meta: { title: '无权限' } },
     ],
   },

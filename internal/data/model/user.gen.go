@@ -14,15 +14,16 @@ const TableNameUser = "user"
 
 // User mapped from table <user>
 type User struct {
-	ID           int64          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Username     string         `gorm:"column:username;not null" json:"username"`
-	PasswordHash string         `gorm:"column:password_hash;not null" json:"password_hash"`
-	Nickname     string         `gorm:"column:nickname;not null" json:"nickname"`
-	Status       bool           `gorm:"column:status;not null;default:true" json:"status"`
-	CreatedAt    time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt    time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
-	Roles        []*Role        `gorm:"many2many:user_role" json:"roles"`
+	ID            int64           `gorm:"column:id;primaryKey;autoIncrement:true;comment:用户主键" json:"id"`                      // 用户主键
+	Username      string          `gorm:"column:username;not null;comment:登录用户名，系统内唯一" json:"username"`                        // 登录用户名，系统内唯一
+	PasswordHash  string          `gorm:"column:password_hash;not null;comment:密码哈希值" json:"password_hash"`                    // 密码哈希值
+	Nickname      string          `gorm:"column:nickname;not null;comment:用户昵称" json:"nickname"`                               // 用户昵称
+	Status        bool            `gorm:"column:status;not null;default:true;comment:启用状态" json:"status"`                      // 启用状态
+	CreatedAt     time.Time       `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
+	UpdatedAt     time.Time       `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
+	DeletedAt     gorm.DeletedAt  `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	Roles         []*Role         `gorm:"many2many:user_role" json:"roles"`
+	Organizations []*Organization `gorm:"many2many:organization_user" json:"organizations"`
 }
 
 // TableName User's table name

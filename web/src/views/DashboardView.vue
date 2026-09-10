@@ -169,7 +169,7 @@ onMounted(async () => {
 
 .card-title {
   color: var(--text-soft);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -251,7 +251,7 @@ onMounted(async () => {
 
 .panel-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
 }
@@ -260,7 +260,7 @@ onMounted(async () => {
   background: transparent;
   border: 0;
   color: var(--primary);
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   padding: 0;
   font-weight: 500;
@@ -331,7 +331,7 @@ onMounted(async () => {
   border-radius: 6px;
   background: var(--bg-soft);
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .status-row .count {
@@ -387,7 +387,7 @@ onMounted(async () => {
 }
 
 .summary-label {
-  font-size: 13px;
+  font-size: 12px;
   color: #5c6978;
 }
 
@@ -436,7 +436,7 @@ onMounted(async () => {
   gap: 18px;
   margin-top: 18px;
   color: #54657b;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .legend-row span {

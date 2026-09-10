@@ -44,13 +44,13 @@ type role struct {
 	roleDo roleDo
 
 	ALL         field.Asterisk
-	ID          field.Int64
-	Code        field.String
-	Name        field.String
-	Description field.String
-	CreatedAt   field.Time
-	UpdatedAt   field.Time
-	DeletedAt   field.Field
+	ID          field.Int64  // 角色主键
+	Code        field.String // 角色编码，系统内唯一
+	Name        field.String // 角色名称
+	Description field.String // 角色说明
+	CreatedAt   field.Time   // 创建时间
+	UpdatedAt   field.Time   // 更新时间
+	DeletedAt   field.Field  // 软删除时间
 
 	fieldMap map[string]field.Expr
 }

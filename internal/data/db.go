@@ -98,6 +98,7 @@ func GenTable(cfg *config.Config, migrations embed.FS, gooseArgs []string, dir s
 	gooseDB, err := goose.OpenDBWithDriver("postgres", cfg.Dsn)
 	if err != nil {
 		slog.Error("goose: failed to open DB", "err", err)
+		return
 	}
 	defer func() {
 		if err := gooseDB.Close(); err != nil {
@@ -118,5 +119,7 @@ func GenTable(cfg *config.Config, migrations embed.FS, gooseArgs []string, dir s
 
 	if err := goose.RunContext(context.Background(), command, gooseDB, dir, arguments...); err != nil {
 		slog.Error("goose: failed to run", "cmd", command, "err", err)
+		return
 	}
+
 }

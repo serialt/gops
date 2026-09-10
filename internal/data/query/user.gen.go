@@ -41,6 +41,12 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 		RelationField: field.NewRelation("Roles", "model.Role"),
 	}
 
+	_user.Organizations = userHasManyOrganizations{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Organizations", "model.Organization"),
+	}
+
 	_user.fillFieldMap()
 
 	return _user
@@ -50,15 +56,17 @@ type user struct {
 	userDo userDo
 
 	ALL          field.Asterisk
-	ID           field.Int64
-	Username     field.String
-	PasswordHash field.String
-	Nickname     field.String
-	Status       field.Bool
-	CreatedAt    field.Time
-	UpdatedAt    field.Time
-	DeletedAt    field.Field
+	ID           field.Int64  // 用户主键
+	Username     field.String // 登录用户名，系统内唯一
+	PasswordHash field.String // 密码哈希值
+	Nickname     field.String // 用户昵称
+	Status       field.Bool   // 启用状态
+	CreatedAt    field.Time   // 创建时间
+	UpdatedAt    field.Time   // 更新时间
+	DeletedAt    field.Field  // 软删除时间
 	Roles        userHasManyRoles
+
+	Organizations userHasManyOrganizations
 
 	fieldMap map[string]field.Expr
 }
@@ -107,7 +115,7 @@ func (u *user) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (u *user) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 9)
+	u.fieldMap = make(map[string]field.Expr, 10)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["username"] = u.Username
 	u.fieldMap["password_hash"] = u.PasswordHash
@@ -123,12 +131,15 @@ func (u user) clone(db *gorm.DB) user {
 	u.userDo.ReplaceConnPool(db.Statement.ConnPool)
 	u.Roles.db = db.Session(&gorm.Session{Initialized: true})
 	u.Roles.db.Statement.ConnPool = db.Statement.ConnPool
+	u.Organizations.db = db.Session(&gorm.Session{Initialized: true})
+	u.Organizations.db.Statement.ConnPool = db.Statement.ConnPool
 	return u
 }
 
 func (u user) replaceDB(db *gorm.DB) user {
 	u.userDo.ReplaceDB(db)
 	u.Roles.db = db.Session(&gorm.Session{})
+	u.Organizations.db = db.Session(&gorm.Session{})
 	return u
 }
 
@@ -209,6 +220,87 @@ func (a userHasManyRolesTx) Count() int64 {
 }
 
 func (a userHasManyRolesTx) Unscoped() *userHasManyRolesTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
+type userHasManyOrganizations struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a userHasManyOrganizations) Where(conds ...field.Expr) *userHasManyOrganizations {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a userHasManyOrganizations) WithContext(ctx context.Context) *userHasManyOrganizations {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a userHasManyOrganizations) Session(session *gorm.Session) *userHasManyOrganizations {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a userHasManyOrganizations) Model(m *model.User) *userHasManyOrganizationsTx {
+	return &userHasManyOrganizationsTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a userHasManyOrganizations) Unscoped() *userHasManyOrganizations {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type userHasManyOrganizationsTx struct{ tx *gorm.Association }
+
+func (a userHasManyOrganizationsTx) Find() (result []*model.Organization, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a userHasManyOrganizationsTx) Append(values ...*model.Organization) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a userHasManyOrganizationsTx) Replace(values ...*model.Organization) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a userHasManyOrganizationsTx) Delete(values ...*model.Organization) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a userHasManyOrganizationsTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a userHasManyOrganizationsTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a userHasManyOrganizationsTx) Unscoped() *userHasManyOrganizationsTx {
 	a.tx = a.tx.Unscoped()
 	return &a
 }

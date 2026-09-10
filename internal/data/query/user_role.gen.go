@@ -39,8 +39,8 @@ type userRole struct {
 	userRoleDo userRoleDo
 
 	ALL    field.Asterisk
-	UserID field.Int64
-	RoleID field.Int64
+	UserID field.Int64 // 用户主键
+	RoleID field.Int64 // 角色主键
 
 	fieldMap map[string]field.Expr
 }

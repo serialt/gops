@@ -50,10 +50,11 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	dashboardHandler := handler.NewDashboardHandler(db)
 	userHandler := handler.NewUserHandler(db, casbinService)
 	roleHandler := handler.NewRoleHandler(db, casbinService)
+	organizationHandler := handler.NewOrganizationHandler(db)
 
 	r.Use(gin.Logger(), gin.Recovery())
 
-	r.GET("/health", func(c *gin.Context) {
+	r.POST("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
@@ -62,22 +63,27 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 
 	protected := api.Group("")
 	protected.Use(middleware.Auth(jwtManager))
-	protected.GET("/auth/me", authHandler.Me)
+	protected.POST("/auth/me", authHandler.Me)
 
 	authorized := protected.Group("")
 	authorized.Use(middleware.Casbin(casbinService))
-	authorized.GET("/dashboard/stats", dashboardHandler.Stats)
-	authorized.GET("/users", userHandler.List)
-	authorized.POST("/users", userHandler.Create)
-	authorized.PUT("/users/:id", userHandler.Update)
-	authorized.DELETE("/users/:id", userHandler.Delete)
-	authorized.GET("/roles", roleHandler.List)
-	authorized.POST("/roles", roleHandler.Create)
-	authorized.PUT("/roles/:id", roleHandler.Update)
-	authorized.DELETE("/roles/:id", roleHandler.Delete)
-	authorized.GET("/permissions/catalog", roleHandler.Catalog)
-	authorized.GET("/roles/:id/permissions", roleHandler.GetPermissions)
-	authorized.PUT("/roles/:id/permissions", roleHandler.SetPermissions)
+	authorized.POST("/dashboard/stats", dashboardHandler.Stats)
+	authorized.POST("/users/list", userHandler.List)
+	authorized.POST("/users/create", userHandler.Create)
+	authorized.POST("/users/update", userHandler.Update)
+	authorized.POST("/users/delete", userHandler.Delete)
+	authorized.POST("/roles/list", roleHandler.List)
+	authorized.POST("/roles/create", roleHandler.Create)
+	authorized.POST("/roles/update", roleHandler.Update)
+	authorized.POST("/roles/delete", roleHandler.Delete)
+	authorized.POST("/permissions/catalog", roleHandler.Catalog)
+	authorized.POST("/roles/permissions/get", roleHandler.GetPermissions)
+	authorized.POST("/roles/permissions/set", roleHandler.SetPermissions)
+	authorized.POST("/organizations/list", organizationHandler.List)
+	authorized.POST("/organizations/create", organizationHandler.Create)
+	authorized.POST("/organizations/update", organizationHandler.Update)
+	authorized.POST("/organizations/delete", organizationHandler.Delete)
+	authorized.POST("/organizations/move", organizationHandler.Move)
 
 	return r, nil
 }

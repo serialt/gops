@@ -16,14 +16,18 @@ import (
 )
 
 var (
-	Q        = new(Query)
-	Role     *role
-	User     *user
-	UserRole *userRole
+	Q                = new(Query)
+	Organization     *organization
+	OrganizationUser *organizationUser
+	Role             *role
+	User             *user
+	UserRole         *userRole
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
+	Organization = &Q.Organization
+	OrganizationUser = &Q.OrganizationUser
 	Role = &Q.Role
 	User = &Q.User
 	UserRole = &Q.UserRole
@@ -31,19 +35,23 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:       db,
-		Role:     newRole(db, opts...),
-		User:     newUser(db, opts...),
-		UserRole: newUserRole(db, opts...),
+		db:               db,
+		Organization:     newOrganization(db, opts...),
+		OrganizationUser: newOrganizationUser(db, opts...),
+		Role:             newRole(db, opts...),
+		User:             newUser(db, opts...),
+		UserRole:         newUserRole(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	Role     role
-	User     user
-	UserRole userRole
+	Organization     organization
+	OrganizationUser organizationUser
+	Role             role
+	User             user
+	UserRole         userRole
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -52,10 +60,12 @@ func (q *Query) UnderlyingDB() *gorm.DB { return q.db }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:       db,
-		Role:     q.Role.clone(db),
-		User:     q.User.clone(db),
-		UserRole: q.UserRole.clone(db),
+		db:               db,
+		Organization:     q.Organization.clone(db),
+		OrganizationUser: q.OrganizationUser.clone(db),
+		Role:             q.Role.clone(db),
+		User:             q.User.clone(db),
+		UserRole:         q.UserRole.clone(db),
 	}
 }
 
@@ -69,24 +79,30 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:       db,
-		Role:     q.Role.replaceDB(db),
-		User:     q.User.replaceDB(db),
-		UserRole: q.UserRole.replaceDB(db),
+		db:               db,
+		Organization:     q.Organization.replaceDB(db),
+		OrganizationUser: q.OrganizationUser.replaceDB(db),
+		Role:             q.Role.replaceDB(db),
+		User:             q.User.replaceDB(db),
+		UserRole:         q.UserRole.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	Role     *roleDo
-	User     *userDo
-	UserRole *userRoleDo
+	Organization     *organizationDo
+	OrganizationUser *organizationUserDo
+	Role             *roleDo
+	User             *userDo
+	UserRole         *userRoleDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		Role:     q.Role.WithContext(ctx),
-		User:     q.User.WithContext(ctx),
-		UserRole: q.UserRole.WithContext(ctx),
+		Organization:     q.Organization.WithContext(ctx),
+		OrganizationUser: q.OrganizationUser.WithContext(ctx),
+		Role:             q.Role.WithContext(ctx),
+		User:             q.User.WithContext(ctx),
+		UserRole:         q.UserRole.WithContext(ctx),
 	}
 }
 
