@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { ColDef, ICellRendererParams } from 'ag-grid-community'
+import AppDataGrid from '@/components/AppDataGrid.vue'
 import { createOrganization, deleteOrganization, getOrganizations, updateOrganization } from '@/api'
 import type { Organization } from '@/types'
 
@@ -10,6 +13,12 @@ const selectedId = ref<number | null>(null)
 const organizations = ref<Organization[]>([])
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+const treePaneWidth = ref(220)
+const treePaneDragging = ref(false)
+const treePaneStartX = ref(0)
+const treePaneStartWidth = ref(220)
+const currentPage = ref(1)
+const pageSize = ref(10)
 const form = reactive({ parent_id: null as number | null, name: '', code: '', manager: '', status: true })
 
 const treeData = computed(() => {
@@ -30,9 +39,58 @@ const tableData = computed(() => organizations.value.filter(item => {
   const term = keyword.value.trim().toLowerCase()
   return matchesNode && (!term || item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term))
 }))
+const pagedTableData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return tableData.value.slice(start, start + pageSize.value)
+})
+function organizationActionButton(text: string, className: string, onClick: () => void) {
+  const button = document.createElement('button')
+  button.className = `grid-action ${className}`
+  button.textContent = text
+  button.onclick = onClick
+  return button
+}
+const organizationColumnDefs = computed<ColDef[]>(() => [
+  { headerName: '序号', valueGetter: params => String((currentPage.value - 1) * pageSize.value + (params.node?.rowIndex ?? 0) + 1), width: 70 },
+  { field: 'name', headerName: '组织名称' }, { field: 'code', headerName: '组织编码' }, { field: 'manager', headerName: '负责人' },
+  { headerName: '状态', cellRenderer: (params: ICellRendererParams<Organization>) => { const tag = document.createElement('span'); tag.className = `grid-status${params.data?.status ? '' : ' is-disabled'}`; tag.textContent = params.data?.status ? '正常' : '停用'; return tag } },
+  { headerName: '更新时间', valueGetter: params => formatDate(params.data.updated_at) },
+  { headerName: '操作', flex: 1, minWidth: 150, cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(organizationActionButton('编辑', 'edit', () => openEdit(params.data)), organizationActionButton('删除', 'delete', () => remove(params.data))); return wrap } },
+])
+watch([keyword, selectedId], () => { currentPage.value = 1 })
 
 function selectNode(node: { id: number }) {
   selectedId.value = node.id
+}
+
+function formatDate(value: string) {
+  return value ? value.replace('T', ' ').slice(0, 19) : '-'
+}
+
+function startTreePaneDrag(event: PointerEvent) {
+  if (event.button !== 0) return
+  treePaneDragging.value = true
+  treePaneStartX.value = event.clientX
+  treePaneStartWidth.value = treePaneWidth.value
+  document.addEventListener('pointermove', moveTreePane)
+  document.addEventListener('pointerup', stopTreePaneDrag)
+}
+
+function moveTreePane(event: PointerEvent) {
+  if (!treePaneDragging.value) return
+  treePaneWidth.value = Math.max(0, Math.min(360, treePaneStartWidth.value + event.clientX - treePaneStartX.value))
+}
+
+function stopTreePaneDrag() {
+  if (!treePaneDragging.value) return
+  treePaneDragging.value = false
+  if (treePaneWidth.value < 90) treePaneWidth.value = 0
+  document.removeEventListener('pointermove', moveTreePane)
+  document.removeEventListener('pointerup', stopTreePaneDrag)
+}
+
+function toggleTreePane() {
+  treePaneWidth.value = treePaneWidth.value === 0 ? 220 : 0
 }
 
 async function load() { const { data } = await getOrganizations(); organizations.value = data.data }
@@ -41,15 +99,22 @@ function openEdit(row: Organization) { editingId.value = row.id; Object.assign(f
 async function save() { if (!form.name || !form.code) return ElMessage.warning('请填写组织名称和编码'); if (editingId.value) await updateOrganization(editingId.value, form); else await createOrganization(form); ElMessage.success('保存成功'); dialogVisible.value = false; await load() }
 async function remove(row: Organization) { await ElMessageBox.confirm(`确定删除组织 ${row.name}？`, '提示', { type: 'warning' }); await deleteOrganization(row.id); ElMessage.success('删除成功'); if (selectedId.value === row.id) selectedId.value = null; await load() }
 onMounted(load)
+function organizationIndex(index: number) { return (currentPage.value - 1) * pageSize.value + index + 1 }
+function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1 }
 </script>
 
 <template>
   <div class="page-container organization-page">
-    <div class="organization-layout">
+    <div class="organization-layout" :style="{ gridTemplateColumns: `${treePaneWidth}px 2px minmax(0, 1fr)` }">
       <aside class="tree-panel">
         <div class="panel-title"><span>组织架构</span><el-button v-permission="'POST /api/v1/organizations/create'" :icon="Plus" circle text title="新增组织" @click="openCreate" /></div>
         <el-tree :data="treeData" node-key="id" highlight-current default-expand-all :current-node-key="selectedId" :expand-on-click-node="false" @node-click="selectNode" />
       </aside>
+      <div class="content-divider" :class="{ dragging: treePaneDragging }" role="separator" aria-label="调整组织树宽度" @pointerdown="startTreePaneDrag" @dblclick="toggleTreePane">
+        <button class="content-divider-handle" type="button" :aria-label="treePaneWidth ? '收起组织树' : '展开组织树'" @pointerdown.stop @click.stop="toggleTreePane">
+          <el-icon><component :is="treePaneWidth ? ArrowLeft : ArrowRight" /></el-icon>
+        </button>
+      </div>
 
       <section class="organization-content">
         <div class="section-card">
@@ -60,14 +125,17 @@ onMounted(load)
           <div class="list-toolbar">
             <el-input v-model="keyword" placeholder="搜索组织名称或编码" clearable :prefix-icon="Search" />
           </div>
-          <el-table :data="tableData" class="data-table">
-            <el-table-column prop="name" label="组织名称" min-width="150" />
-            <el-table-column prop="code" label="组织编码" min-width="120" />
-            <el-table-column prop="manager" label="负责人" min-width="100" />
-            <el-table-column label="状态" width="90"><template #default="{ row }"><el-tag :type="row.status ? 'success' : 'info'">{{ row.status ? '正常' : '停用' }}</el-tag></template></el-table-column>
-            <el-table-column prop="updated_at" label="更新时间" min-width="150" />
-            <el-table-column label="操作" width="120" fixed="right"><template #default="{ row }"><el-button v-permission="'POST /api/v1/organizations/update'" link type="primary" @click="openEdit(row)">编辑</el-button><el-button v-permission="'POST /api/v1/organizations/delete'" link type="danger" @click="remove(row)">删除</el-button></template></el-table-column>
-          </el-table>
+          <AppDataGrid :row-data="pagedTableData" :column-defs="organizationColumnDefs" />
+          <div class="pagination-bar">
+            <el-pagination
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="tableData.length"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handlePageSizeChange"
+            />
+          </div>
         </div>
       </section>
     </div>
@@ -79,19 +147,35 @@ onMounted(load)
 </template>
 
 <style scoped>
-.organization-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; min-height: 520px; }
+.organization-layout { display: grid; gap: 0; min-height: calc(100vh - 92px); }
 .tree-panel, .section-card { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow); }
-.tree-panel { padding: 12px 8px; }
+.tree-panel { min-width: 0; overflow: hidden; padding: 12px 8px; }
+.content-divider { width: 2px; cursor: col-resize; touch-action: none; position: relative; background: transparent; }
+.content-divider::before { content: ''; position: absolute; z-index: 1; top: 0; bottom: 0; left: -6px; width: 13px; }
+.content-divider::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--line); }
+.content-divider:hover::after, .content-divider.dragging::after { background: var(--primary); }
+.content-divider-handle { position: absolute; z-index: 2; top: 50%; left: 50%; width: 15px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; transform: translate(-50%, -50%); border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #667085; box-shadow: 0 2px 5px rgba(31, 42, 68, 0.12); cursor: pointer; }
+.content-divider-handle:hover { color: var(--primary); border-color: var(--primary); }
+.content-divider-handle :deep(.el-icon) { font-size: 10px; }
 .panel-title { display: flex; align-items: center; justify-content: space-between; padding: 2px 8px 10px; color: var(--text); font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--line); }
 .panel-title :deep(.el-button) { color: var(--primary); }
 .tree-panel :deep(.el-tree) { --el-tree-node-hover-bg-color: var(--primary-soft); background: transparent; padding-top: 8px; font-size: 12px; }
 .tree-panel :deep(.el-tree-node__content) { height: 34px; border-radius: 6px; margin: 1px 0; }
 .tree-panel :deep(.is-current > .el-tree-node__content) { color: var(--primary); font-weight: 700; background: var(--primary-soft); }
-.section-card { padding: 16px; min-width: 0; }
+.section-card { display: flex; flex-direction: column; padding: 16px; min-width: 0; min-height: 100%; }
 .page-toolbar { margin-bottom: 14px; }
 .page-subtitle { margin: 5px 0 0; color: var(--text-soft); font-size: 11px; }
 .list-toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
 .list-toolbar :deep(.el-input) { width: 230px; }
 .data-table { width: 100%; }
-@media (max-width: 900px) { .organization-layout { grid-template-columns: 1fr; } .tree-panel { max-height: 220px; overflow: auto; } }
+:deep(.grid-action-group) { display: flex; align-items: center; justify-content: flex-start; gap: 8px; height: 100%; white-space: nowrap; }
+:deep(.grid-action) { border: 1px solid transparent; border-radius: 6px; padding: 4px 9px; background: #fff; font: inherit; cursor: pointer; line-height: 1.25; }
+:deep(.grid-action.edit) { padding: 4px 9px; border: 1px solid #536fe8; border-radius: 6px; color: #3658c9; background: #eaf0ff; }
+:deep(.grid-action.delete) { border-color: #ffd5d5; color: #ef6262; background: #fff5f5; }
+:deep(.grid-status) { display: inline-flex; padding: 4px 9px; border: 1px solid #d9f0cf; border-radius: 6px; color: #58b83d; background: #f0f9eb; line-height: 1.25; }
+:deep(.grid-status.is-disabled) { border-color: #e4e7ed; color: #909399; background: #f4f4f5; }
+.pagination-bar { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 16px; overflow-x: auto; }
+.pagination-bar :deep(.el-pagination) { flex-wrap: nowrap; min-width: max-content; --el-pagination-font-size: 10px; font-size: 10px; }
+.pagination-bar :deep(.el-pagination .el-select .el-input__wrapper), .pagination-bar :deep(.el-pagination .el-input__wrapper), .pagination-bar :deep(.el-pagination .el-input__inner) { font-size: 10px; }
+@media (max-width: 900px) { .organization-layout { grid-template-columns: 1fr !important; } .tree-panel { max-height: 220px; overflow: auto; } .content-divider { display: none; } }
 </style>

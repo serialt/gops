@@ -36,10 +36,16 @@ async function submit() {
 </template>
 
 <style scoped>
-.login-page { min-height: 100%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at top left, #dbeafe, #f8fafc 45%, #e0e7ff); }
-.login-card { width: 430px; border: 0; border-radius: 16px; padding: 14px; }
+.login-page { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; background: radial-gradient(circle at top left, #dbeafe, #f8fafc 45%, #e0e7ff); }
+.login-card { width: min(430px, 100%); border: 0; border-radius: 16px; padding: 14px; }
 .title { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
 .subtitle { color: #6b7280; margin-bottom: 28px; }
 .submit { width: 100%; margin-top: 8px; }
 .hint { margin-top: 18px; color: #9ca3af; text-align: center; font-size: 13px; }
+
+@media (max-width: 480px) {
+  .login-page { padding: 16px; }
+  .title { font-size: 22px; }
+  .subtitle { margin-bottom: 20px; }
+}
 </style>

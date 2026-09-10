@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDown, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDown, ArrowLeft, ArrowRight, Search, Close, Brush } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -19,7 +20,93 @@ const dashboardMenu = computed(() => ({ path: '/dashboard', title: '仪表盘', 
 const systemMenus = computed(() => [
   { path: '/users', title: '用户管理', icon: User, permission: 'POST /api/v1/users/list' },
   { path: '/roles', title: '角色权限', icon: Key, permission: 'POST /api/v1/roles/list' },
+  { path: '/organizations', title: '组织管理', icon: OfficeBuilding, permission: 'POST /api/v1/organizations/list' },
 ].filter((item) => auth.hasPermission(item.permission)))
+
+type PageTab = { path: string; title: string }
+type MenuSuggestion = { value: string; path: string }
+
+const pageTabs = ref<PageTab[]>([])
+const draggedTabPath = ref<string | null>(null)
+const menuSearch = ref('')
+const menuSearchVisible = ref(false)
+const menuItems = computed(() => [
+  { path: '/dashboard', title: '仪表盘', permission: 'POST /api/v1/dashboard/stats' },
+  ...systemMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+])
+const activeTab = computed(() => route.path)
+
+watch(() => route.path, (path) => {
+  const title = (route.meta.title as string) || '页面'
+  if (!pageTabs.value.some((tab) => tab.path === path)) pageTabs.value.push({ path, title })
+}, { immediate: true })
+
+function queryMenuSuggestions(query: string, callback: (results: MenuSuggestion[]) => void) {
+  const keyword = query.trim().toLowerCase()
+  callback(menuItems.value
+    .filter((item) => !keyword || item.title.toLowerCase().includes(keyword))
+    .map((item) => ({ value: item.title, path: item.path })))
+}
+
+function selectMenu(item: MenuSuggestion) {
+  menuSearch.value = ''
+  menuSearchVisible.value = false
+  router.push(item.path)
+}
+
+function openTab(path: string) {
+  router.push(path)
+}
+
+function closeTab(path: string) {
+  const index = pageTabs.value.findIndex((tab) => tab.path === path)
+  pageTabs.value = pageTabs.value.filter((tab) => tab.path !== path)
+  if (activeTab.value === path) {
+    const nextTab = pageTabs.value[index] || pageTabs.value[index - 1]
+    router.push(nextTab?.path || '/dashboard')
+  }
+}
+
+async function clearTabs() {
+  if (pageTabs.value.length <= 1) return
+  try {
+    await ElMessageBox.confirm('确定清空除当前页面外的所有已打开标签吗？', '清空其他页面', {
+      confirmButtonText: '清空',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    pageTabs.value = pageTabs.value.filter(tab => tab.path === activeTab.value)
+  } catch {
+    // 用户取消操作。
+  }
+}
+
+function handleTabDragStart(event: DragEvent, path: string) {
+  draggedTabPath.value = path
+  event.dataTransfer?.setData('text/plain', path)
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+
+function handleTabDrop(path: string) {
+  const sourcePath = draggedTabPath.value
+  draggedTabPath.value = null
+  if (!sourcePath || sourcePath === path) return
+  const sourceIndex = pageTabs.value.findIndex(tab => tab.path === sourcePath)
+  const targetIndex = pageTabs.value.findIndex(tab => tab.path === path)
+  if (sourceIndex < 0 || targetIndex < 0) return
+  const [tab] = pageTabs.value.splice(sourceIndex, 1)
+  pageTabs.value.splice(targetIndex, 0, tab)
+}
+
+function handleTabDropAtEnd() {
+  const sourcePath = draggedTabPath.value
+  draggedTabPath.value = null
+  if (!sourcePath) return
+  const sourceIndex = pageTabs.value.findIndex(tab => tab.path === sourcePath)
+  if (sourceIndex < 0 || sourceIndex === pageTabs.value.length - 1) return
+  const [tab] = pageTabs.value.splice(sourceIndex, 1)
+  pageTabs.value.push(tab)
+}
 
 function logout() {
   auth.logout()
@@ -40,12 +127,23 @@ function handlePointerMove(e: PointerEvent) {
   if (!isDragging.value) return
   const delta = e.clientX - startX.value
   const maxWidth = Math.min(360, Math.max(180, window.innerWidth * 0.32))
-  const newWidth = Math.min(maxWidth, Math.max(56, startWidth.value + delta))
+  const newWidth = Math.min(maxWidth, Math.max(36, startWidth.value + delta))
   sidebarWidth.value = newWidth
-  isCollapsed.value = newWidth <= 70
+  isCollapsed.value = newWidth <= 100
 }
 
 function handlePointerUp() {
+  if (isDragging.value) {
+    if (sidebarWidth.value <= 120) {
+      sidebarWidth.value = 36
+      isCollapsed.value = true
+    } else if (startWidth.value <= 36) {
+      sidebarWidth.value = 180
+      isCollapsed.value = false
+    } else {
+      isCollapsed.value = false
+    }
+  }
   isDragging.value = false
   document.removeEventListener('pointermove', handlePointerMove)
   document.removeEventListener('pointerup', handlePointerUp)
@@ -58,7 +156,7 @@ function toggleCollapse() {
   if (!isCollapsed.value && sidebarWidth.value <= 100) {
     sidebarWidth.value = 180
   } else if (isCollapsed.value) {
-    sidebarWidth.value = 56
+    sidebarWidth.value = 36
   }
 }
 </script>
@@ -66,13 +164,13 @@ function toggleCollapse() {
 <template>
   <el-container class="layout">
     <el-aside :width="`${sidebarWidth}px`" class="sidebar">
-      <div v-if="sidebarWidth > 70" class="brand-wrap">
+      <div v-if="sidebarWidth > 60" class="brand-wrap">
         <div class="brand-mark">V3</div>
         <div class="brand-name">Admin</div>
       </div>
 
-      <div v-if="sidebarWidth > 70" class="nav-group-label">导航</div>
-      <el-menu v-if="sidebarWidth > 70" :default-active="active" router class="menu">
+      <div v-if="sidebarWidth > 60" class="nav-group-label">导航</div>
+      <el-menu v-if="sidebarWidth > 60" :default-active="active" router class="menu">
         <el-menu-item v-if="auth.hasPermission(dashboardMenu.permission)" :index="dashboardMenu.path">
           <el-icon><component :is="dashboardMenu.icon" /></el-icon>
           <span>{{ dashboardMenu.title }}</span>
@@ -100,9 +198,6 @@ function toggleCollapse() {
         </el-menu>
       </div>
 
-      <div class="collapse-btn" @click="toggleCollapse" :title="sidebarWidth > 70 ? '收起' : '展开'">
-        <el-icon><component :is="sidebarWidth > 70 ? ArrowLeft : ArrowRight" /></el-icon>
-      </div>
     </el-aside>
 
     <div
@@ -111,30 +206,72 @@ function toggleCollapse() {
       role="separator"
       aria-label="拖动调整侧边栏宽度"
       @pointerdown="handlePointerDown"
-    />
+      @dblclick="toggleCollapse"
+    >
+      <button class="divider-handle" type="button" :aria-label="sidebarWidth > 60 ? '收起侧栏' : '展开侧栏'" @pointerdown.stop @click.stop="toggleCollapse">
+        <el-icon><component :is="sidebarWidth > 60 ? ArrowLeft : ArrowRight" /></el-icon>
+      </button>
+    </div>
 
     <el-container class="content-shell">
       <el-header class="header">
-        <div class="header-title-wrap">
-          <span class="header-badge" />
-          <div class="header-title">{{ route.meta.title }}</div>
+        <div class="top-navigation">
+          <el-popover v-model:visible="menuSearchVisible" placement="bottom-start" :width="240" trigger="click">
+            <template #reference>
+              <button class="menu-search-button" type="button" title="搜索菜单" aria-label="搜索菜单">
+                <el-icon><Search /></el-icon>
+              </button>
+            </template>
+            <el-autocomplete
+              v-model="menuSearch"
+              class="menu-search-input"
+              :fetch-suggestions="queryMenuSuggestions"
+              placeholder="搜索菜单"
+              clearable
+              autofocus
+              @select="selectMenu"
+            />
+          </el-popover>
+          <div class="page-tabs" @dragover.prevent @drop.prevent="handleTabDropAtEnd">
+            <button
+              v-for="tab in pageTabs"
+              :key="tab.path"
+              class="page-tab"
+              :class="{ active: activeTab === tab.path }"
+              draggable="true"
+              @dragstart="handleTabDragStart($event, tab.path)"
+              @dragover.prevent
+              @drop.stop.prevent="handleTabDrop(tab.path)"
+              @dragend="draggedTabPath = null"
+              @click="openTab(tab.path)"
+            >
+              <span>{{ tab.title }}</span>
+              <el-icon class="tab-close" @click.stop="closeTab(tab.path)"><Close /></el-icon>
+            </button>
+            <div class="tab-drop-end" aria-label="拖到末尾" @dragover.prevent @drop.stop.prevent="handleTabDropAtEnd" />
+          </div>
         </div>
 
-        <el-dropdown trigger="click">
-          <div class="user-entry">
-            <div class="avatar">{{ (auth.user?.nickname || auth.user?.username || 'A').slice(0, 1).toUpperCase() }}</div>
-            <div class="user-meta">
-              <span class="user-name">{{ auth.user?.nickname || auth.user?.username }}</span>
-              <small>管理员</small>
+        <div class="header-actions">
+          <el-tooltip content="清空其他已打开页面" placement="bottom">
+            <button class="header-action" type="button" aria-label="清空其他已打开页面" @click="clearTabs"><el-icon><Brush /></el-icon></button>
+          </el-tooltip>
+          <el-dropdown trigger="click">
+            <div class="user-entry">
+              <div class="avatar">{{ (auth.user?.nickname || auth.user?.username || 'A').slice(0, 1).toUpperCase() }}</div>
+              <div class="user-meta">
+                <span class="user-name">{{ auth.user?.nickname || auth.user?.username }}</span>
+                <small>管理员</small>
+              </div>
+              <el-icon class="arrow"><ArrowDown /></el-icon>
             </div>
-            <el-icon class="arrow"><ArrowDown /></el-icon>
-          </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item :icon="SwitchButton" @click="logout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item :icon="SwitchButton" @click="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </el-header>
 
       <el-main class="main"><router-view /></el-main>
@@ -294,9 +431,9 @@ function toggleCollapse() {
 .menu-collapsed :deep(.el-menu-item) {
   color: #a8b3c7 !important;
   background: transparent !important;
-  padding: 8px !important;
-  min-height: 40px;
-  width: 40px;
+  padding: 6px !important;
+  min-height: 34px;
+  width: 32px;
   border-radius: 6px;
   margin: 4px auto !important;
   transition: all 0.2s ease;
@@ -342,33 +479,9 @@ function toggleCollapse() {
   display: none;
 }
 
-.collapse-btn {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #536fe8, #6c5ce7);
-  border-radius: 6px;
-  cursor: pointer;
-  color: #fff;
-  box-shadow: 0 6px 14px rgba(83, 111, 232, 0.26);
-  transition: all 0.2s ease;
-}
-
-.collapse-btn:hover {
-  background: linear-gradient(135deg, #405bcc, #5b4bd4);
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(83, 111, 232, 0.36);
-}
-
 .divider {
-  width: 6px;
-  flex: 0 0 6px;
+  width: 2px;
+  flex: 0 0 2px;
   background: #e8e8e8;
   cursor: col-resize;
   user-select: none;
@@ -381,14 +494,24 @@ function toggleCollapse() {
   content: '';
   position: absolute;
   top: 50%;
-  left: 1px;
-  width: 4px;
+  left: 0;
+  width: 2px;
   height: 42px;
   border-radius: 99px;
   background: #cbd5e1;
   transform: translateY(-50%);
   opacity: 0;
   transition: opacity 0.2s ease;
+}
+
+.divider::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  width: 13px;
 }
 
 .divider:hover,
@@ -401,6 +524,35 @@ function toggleCollapse() {
   opacity: 1;
 }
 
+.divider-handle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: #667085;
+  box-shadow: 0 3px 10px rgba(31, 42, 68, 0.12);
+  cursor: pointer;
+}
+
+.divider-handle:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.divider-handle :deep(.el-icon) {
+  font-size: 10px;
+}
+
 .content-shell {
   --el-font-size-medium: 11px;
   --el-font-size-base: 11px;
@@ -409,6 +561,7 @@ function toggleCollapse() {
   width: 0;
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   background: #f7f8fc;
   overflow: hidden;
 }
@@ -416,12 +569,147 @@ function toggleCollapse() {
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 68px !important;
-  padding: 0 24px !important;
+  justify-content: flex-start;
+  height: 40px !important;
+  padding: 0 10px !important;
+  gap: 10px;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
+}
+
+.top-navigation {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  overflow: hidden;
+  min-width: 0;
+  max-width: calc(100% - 180px);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.menu-search-button {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.menu-search-button:hover {
+  color: var(--primary);
+  background: var(--bg-soft);
+}
+
+.menu-search-button :deep(.el-icon) {
+  font-size: 16px;
+}
+
+.menu-search-input {
+  width: 240px !important;
+}
+
+.menu-search-input :deep(.el-input) {
+  width: 100% !important;
+}
+
+.page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.page-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-drop-end {
+  min-width: 32px;
+  height: 30px;
+  flex: 1 0 32px;
+}
+
+.page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  flex: 0 0 auto;
+  max-width: 180px;
+  overflow: hidden;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.page-tab[draggable='true'] {
+  cursor: grab;
+}
+
+.page-tab[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.page-tab.active {
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 2px 6px rgba(31, 42, 68, 0.05);
+}
+
+.tab-close {
+  color: #aeb5c0;
+  font-size: 14px;
+}
+
+.tab-close:hover {
+  color: var(--text);
+}
+
+.header-action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.header-action:hover {
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 .header-title-wrap {
@@ -447,10 +735,10 @@ function toggleCollapse() {
 .user-entry {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 40px;
-  padding: 6px 12px;
-  border-radius: 6px;
+  gap: 6px;
+  height: 30px;
+  padding: 3px 8px;
+  border-radius: 8px;
   background: #f8fafc;
   border: 1px solid var(--line);
   cursor: pointer;
@@ -463,14 +751,14 @@ function toggleCollapse() {
 }
 
 .avatar {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 10px;
   color: #fff;
   background: linear-gradient(135deg, #5b7cfa, #7c5cff);
 }
@@ -482,13 +770,14 @@ function toggleCollapse() {
 }
 
 .user-name {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text);
 }
 
 .user-meta small {
   color: #64748b;
+  font-size: 9px;
 }
 
 .arrow {
@@ -497,9 +786,32 @@ function toggleCollapse() {
 
 .main {
   min-width: 0;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--bg);
   padding: 0;
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px !important;
+  }
+
+  .user-meta,
+  .user-entry .arrow {
+    display: none;
+  }
+
+  .page-tab {
+    width: auto;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .top-navigation { max-width: calc(100% - 120px); }
+  .menu-search-button { width: 48px; flex-basis: 48px; }
+  .page-tab { padding: 0 10px; font-size: 13px; }
+  .header-action { width: 34px; height: 34px; }
 }
 </style>

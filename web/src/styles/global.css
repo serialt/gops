@@ -63,7 +63,14 @@ select {
 }
 
 .page-container {
-  padding: 28px 30px 36px;
+  padding: 0;
+  min-height: 100%;
+}
+
+@media (max-width: 768px) {
+  .page-container {
+    padding: 0;
+  }
 }
 
 .page-toolbar {
@@ -172,6 +179,27 @@ select {
 
 .el-table--striped .el-table__body tr.el-table__row--striped td {
   background: #fafafa !important;
+}
+
+/* 固定列需要使用不透明底色，避免滚动时底层单元格内容透出。 */
+.el-table th.el-table-fixed-column--right {
+  background: #fafafa !important;
+}
+
+.el-table td.el-table-fixed-column--right {
+  background: #ffffff !important;
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table-fixed-column--right {
+  background: #fafafa !important;
+}
+
+.el-table__body tr:hover td.el-table-fixed-column--right {
+  background: #f0f0f0 !important;
+}
+
+.el-table__fixed-right {
+  box-shadow: -5px 0 10px rgba(31, 42, 68, 0.08) !important;
 }
 
 .el-table__row:hover td {

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	// "gops/internal/biz"
+	"gops/internal/biz"
 	"gops/internal/config"
 	"gops/internal/data"
 	"gops/internal/server"
@@ -19,6 +19,7 @@ import (
 func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(), error) {
 	wire.Build(
 		data.ProviderSet,
+		biz.ProviderSet,
 		server.ProviderSet,
 	)
 

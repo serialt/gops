@@ -11,6 +11,12 @@ importers:
       '@element-plus/icons-vue':
         specifier: ^2.3.1
         version: 2.3.2(vue@3.5.41(typescript@5.9.3))
+      ag-grid-community:
+        specifier: ^36.1.0
+        version: 36.1.0
+      ag-grid-vue3:
+        specifier: ^36.1.0
+        version: 36.1.0(vue@3.5.41(typescript@5.9.3))
       axios:
         specifier: ^1.11.0
         version: 1.19.0
@@ -494,6 +500,20 @@ packages:
     resolution: {integrity: sha512-bZpge9eSXwa4ToSiqJ7j6KRwhAsneMFoSz3LMWKQDkqimm3D/tbFlrklrs/IOqC8tEcYmXQZJ6N0UrjhBirVCg==}
     peerDependencies:
       vue: ^3.5.0
+
+  ag-charts-types@14.1.0:
+    resolution: {integrity: sha512-mmzkng88c0l+Z9PvCMowMilhVeNgDU/iMuMemcOQD4BG/qO4vbkxWvyQO0iqju8Dx7YOY81PNzC/RmElQNiVkA==}
+
+  ag-grid-community@36.1.0:
+    resolution: {integrity: sha512-WnvSQ4csRs8gv/b1B0lPHykQXvUJVgi2u5mpY0Aa6dv3pvhDVVqCT8dwUyOeCog4JNPptaXGrOrZ8qP2XoJzVA==}
+
+  ag-grid-vue3@36.1.0:
+    resolution: {integrity: sha512-lktl90iQG4xfa9EbLxdNlSARPuQvs8lDSQADRmWt4OB2ZGTnTr18xMh+ApUNS6qVCBoMGAdkKI/5nVTy/3owDA==}
+    peerDependencies:
+      vue: ^3.5.32
+
+  ag-stack@36.1.0:
+    resolution: {integrity: sha512-Kmkf5iRZmyduNx2KtW450j6GbCdJ4ejacSpb1AWl0yrdquRmScLRc1SlLolx6lyCbTBSJGo4tRraKbBzre+GlQ==}
 
   agent-base@6.0.2:
     resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
@@ -1175,6 +1195,20 @@ snapshots:
   '@vueuse/shared@14.3.0(vue@3.5.41(typescript@5.9.3))':
     dependencies:
       vue: 3.5.41(typescript@5.9.3)
+
+  ag-charts-types@14.1.0: {}
+
+  ag-grid-community@36.1.0:
+    dependencies:
+      ag-charts-types: 14.1.0
+      ag-stack: 36.1.0
+
+  ag-grid-vue3@36.1.0(vue@3.5.41(typescript@5.9.3)):
+    dependencies:
+      ag-grid-community: 36.1.0
+      vue: 3.5.41(typescript@5.9.3)
+
+  ag-stack@36.1.0: {}
 
   agent-base@6.0.2:
     dependencies:

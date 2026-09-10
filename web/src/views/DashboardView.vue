@@ -449,4 +449,16 @@ onMounted(async () => {
   .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .panel-grid { grid-template-columns: 1fr; }
 }
+
+@media (max-width: 640px) {
+  .cards-grid { grid-template-columns: 1fr; gap: 12px; }
+  .panel-grid { gap: 12px; }
+  .mini-card { min-height: 96px; padding: 14px; }
+  .card-value { font-size: 26px; }
+  .panel { padding: 14px; }
+  .donut-wrap { min-height: 190px; }
+  .donut-chart { width: 160px; height: 160px; }
+  .chart-area { height: 200px; }
+  .summary-value { font-size: 26px; }
+}
 </style>

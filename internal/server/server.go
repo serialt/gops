@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"gops/internal/biz"
 	"gops/internal/config"
 	"gops/internal/handler"
 	"gops/internal/middleware"
@@ -46,11 +47,12 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	}
 
 	jwtManager := auth.NewJWTManager(cfg.Server.JwtSecret, cfg.Server.JwtTimeout)
-	authHandler := handler.NewAuthHandler(db, jwtManager, casbinService)
-	dashboardHandler := handler.NewDashboardHandler(db)
-	userHandler := handler.NewUserHandler(db, casbinService)
-	roleHandler := handler.NewRoleHandler(db, casbinService)
-	organizationHandler := handler.NewOrganizationHandler(db)
+	authBiz := biz.NewAuthBiz(db, jwtManager, casbinService)
+	authHandler := handler.NewAuthHandler(authBiz)
+	dashboardHandler := handler.NewDashboardHandler(biz.NewDashboardBiz(db))
+	userHandler := handler.NewUserHandler(biz.NewUserBiz(db, casbinService))
+	roleHandler := handler.NewRoleHandler(biz.NewRoleBiz(db, casbinService))
+	organizationHandler := handler.NewOrganizationHandler(biz.NewOrganizationBiz(db))
 
 	r.Use(gin.Logger(), gin.Recovery())
 

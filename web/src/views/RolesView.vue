@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { ColDef } from 'ag-grid-community'
+import AppDataGrid from '@/components/AppDataGrid.vue'
 import { createRole, deleteRole, getPermissionCatalog, getRolePermissions, getRoles, setRolePermissions, updateRole } from '@/api'
 import type { Permission, Role } from '@/types'
 
@@ -9,14 +11,31 @@ const catalog = ref<Permission[]>([])
 const roleDialog = ref(false)
 const permissionDrawer = ref(false)
 const editingID = ref<number | null>(null)
+const currentPage = ref(1)
+const pageSize = ref(10)
 const selectedRole = ref<Role | null>(null)
 const checkedKeys = ref<string[]>([])
 const form = reactive({ code: '', name: '', description: '' })
+function actionButton(text: string, className: string, onClick: () => void) { const button = document.createElement('button'); button.className = `grid-action ${className}`; button.textContent = text; button.onclick = onClick; return button }
+const roleColumnDefs = computed<ColDef[]>(() => [
+  { headerName: '序号', valueGetter: params => String((currentPage.value - 1) * pageSize.value + (params.node?.rowIndex ?? 0) + 1), width: 70 },
+  { field: 'code', headerName: '角色编码' },
+  { field: 'name', headerName: '角色名称' },
+  { field: 'description', headerName: '说明' },
+  {
+    headerName: '操作', flex: 1, minWidth: 220,
+    cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(actionButton('配置权限', 'permission', () => openPermissions(params.data)), actionButton('编辑', 'edit', () => openEdit(params.data))); if (params.data.code !== 'admin') wrap.append(actionButton('删除', 'delete', () => remove(params.data))); return wrap },
+  },
+])
 const grouped = computed(() => catalog.value.reduce<Record<string, Permission[]>>((result, item) => {
   const group = result[item.group] ?? (result[item.group] = [])
   group.push(item)
   return result
 }, {}))
+const pagedRoles = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return roles.value.slice(start, start + pageSize.value)
+})
 
 function groupKeys(group: string) {
   return (grouped.value[group] ?? []).map(item => item.key)
@@ -50,10 +69,13 @@ function clearPermissions() {
 }
 
 async function load() {
+  currentPage.value = 1
   const [rolesRes, catalogRes] = await Promise.all([getRoles(), getPermissionCatalog()])
   roles.value = rolesRes.data.data
   catalog.value = catalogRes.data.data
 }
+
+function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1 }
 
 function openCreate() {
   editingID.value = null
@@ -109,21 +131,17 @@ onMounted(load)
         <el-button v-permission="'POST /api/v1/roles/create'" type="primary" class="primary-btn" @click="openCreate">新增角色</el-button>
       </div>
 
-      <el-table :data="roles" stripe class="data-table">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="code" label="角色编码" />
-        <el-table-column prop="name" label="角色名称" />
-        <el-table-column prop="description" label="说明" />
-        <el-table-column label="操作" width="260" fixed="right">
-          <template #default="{ row }">
-            <div class="action-group">
-              <el-button v-permission="'POST /api/v1/roles/permissions/get'" link type="success" @click="openPermissions(row)">配置权限</el-button>
-              <el-button v-permission="'POST /api/v1/roles/update'" link type="primary" class="edit-btn" @click="openEdit(row)">编辑</el-button>
-              <el-button v-if="row.code !== 'admin'" v-permission="'POST /api/v1/roles/delete'" link type="danger" @click="remove(row)">删除</el-button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
+      <AppDataGrid :row-data="pagedRoles" :column-defs="roleColumnDefs" />
+      <div class="pagination-bar">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="roles.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handlePageSizeChange"
+        />
+      </div>
     </div>
 
     <el-dialog v-model="roleDialog" :title="editingID ? '编辑角色' : '新增角色'" width="520px">
@@ -184,6 +202,9 @@ onMounted(load)
   border-radius: 8px;
   padding: 16px;
   box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 92px);
 }
 
 .page-toolbar {
@@ -225,10 +246,36 @@ onMounted(load)
   padding-bottom: 12px;
 }
 
+.pagination-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 16px;
+  overflow-x: auto;
+}
+
+.pagination-bar :deep(.el-pagination) {
+  flex-wrap: nowrap;
+  min-width: max-content;
+  --el-pagination-font-size: 10px;
+  font-size: 10px;
+}
+
+.pagination-bar :deep(.el-pagination .el-select .el-input__wrapper),
+.pagination-bar :deep(.el-pagination .el-input__wrapper),
+.pagination-bar :deep(.el-pagination .el-input__inner) {
+  font-size: 10px;
+}
+
+@media (max-width: 768px) {
+  .page-toolbar { flex-wrap: wrap; }
+}
+
 .action-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
+  white-space: nowrap;
 }
 
 .edit-btn {
@@ -242,6 +289,12 @@ onMounted(load)
   color: #fff !important;
   background: #536fe8 !important;
 }
+
+:deep(.grid-action-group) { display: flex; align-items: center; justify-content: flex-start; gap: 10px; height: 100%; white-space: nowrap; }
+:deep(.grid-action) { border: 1px solid transparent; border-radius: 6px; padding: 4px 9px; background: #fff; font: inherit; cursor: pointer; line-height: 1.25; }
+:deep(.grid-action.permission) { border-color: #ccefc1; color: #58b83d; background: #f0f9eb; }
+:deep(.grid-action.edit) { padding: 4px 9px; border: 1px solid #536fe8; border-radius: 6px; color: #3658c9; background: #eaf0ff; }
+:deep(.grid-action.delete) { border-color: #ffd5d5; color: #ef6262; background: #fff5f5; }
 
 .permission-group {
   margin-bottom: 14px;
