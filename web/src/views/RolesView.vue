@@ -219,7 +219,8 @@ onMounted(load)
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 92px);
+  height: 100%;
+  min-height: 100%;
 }
 
 .page-toolbar {

@@ -64,7 +64,33 @@ select {
 
 .page-container {
   padding: 0;
+  height: 100%;
   min-height: 100%;
+}
+
+/* 标准列表页由卡片占满内容区，分页固定在卡片底部。 */
+.page-container.table-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 1px);
+}
+
+.page-container.table-shell > .section-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page-container.table-shell .app-data-grid-shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page-container.table-shell .grid-pagination {
+  margin-top: auto;
 }
 
 @media (max-width: 768px) {
@@ -137,6 +163,30 @@ select {
   border-color: #ccefc1 !important;
   color: #58b83d !important;
   background: #f4fbf1 !important;
+}
+
+/* 状态标签不继承 AG Grid 的行高，始终保持紧凑并在单元格内居中。 */
+.app-data-grid .grid-status {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  height: 28px !important;
+  max-height: 28px !important;
+  padding: 3px 8px !important;
+  border: 1px solid #d9f0cf !important;
+  border-radius: 8px !important;
+  background: #f0f9eb !important;
+  color: #58b83d !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  vertical-align: middle !important;
+}
+
+.app-data-grid .grid-status.is-disabled {
+  border-color: #e4e7ed !important;
+  background: #f4f4f5 !important;
+  color: #909399 !important;
 }
 
 .el-card {

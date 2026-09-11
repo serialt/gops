@@ -184,7 +184,6 @@ function toggleCollapse() {
       </div>
 
       <div class="sidebar-menu-scroll">
-      <div v-if="sidebarWidth > 60" class="nav-group-label">导航</div>
       <el-menu v-if="sidebarWidth > 60" :default-active="active" router class="menu">
         <el-menu-item v-if="auth.hasPermission(dashboardMenu.permission)" :index="dashboardMenu.path">
           <el-icon><component :is="dashboardMenu.icon" /></el-icon>
@@ -359,15 +358,6 @@ function toggleCollapse() {
   line-height: 1;
   color: #fff;
   white-space: nowrap;
-}
-
-.nav-group-label {
-  margin: 12px 16px 8px;
-  font-size: 12px;
-  letter-spacing: 0;
-  text-transform: none;
-  color: #888;
-  font-weight: 500;
 }
 
 .sidebar-menu-scroll {
@@ -825,12 +815,19 @@ function toggleCollapse() {
 }
 
 .main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--bg);
-  padding: 0;
+  padding: 0 0 1px;
+}
+
+.main :deep(.page-container) {
+  flex: 1 0 auto;
+  min-height: 0;
 }
 
 @media (max-width: 768px) {

@@ -171,8 +171,8 @@ watch(
 </template>
 
 <style scoped>
-.system-config-page { min-height: 100%; }
-.section-card { min-height: calc(100vh - 92px); padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
+.system-config-page { height: 100%; min-height: 100%; }
+.section-card { min-height: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
 .page-toolbar { margin-bottom: 10px; }
 .page-title { margin: 0; font-size: 18px; line-height: 1.35; }
 .page-subtitle { margin: 2px 0 0; color: var(--text-soft); font-size: 11px; line-height: 1.45; }

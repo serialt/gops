@@ -161,7 +161,7 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
 </template>
 
 <style scoped>
-.organization-layout { display: grid; gap: 0; min-height: calc(100vh - 92px); }
+.organization-layout { display: grid; gap: 0; height: 100%; min-height: 100%; }
 .tree-panel, .section-card { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow); }
 .tree-panel { min-width: 0; overflow: hidden; padding: 12px 8px; }
 .content-divider { width: 2px; cursor: col-resize; touch-action: none; position: relative; background: transparent; }

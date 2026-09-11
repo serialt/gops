@@ -301,10 +301,11 @@ function toggleOrganizationPane() {
 <style scoped>
 .table-shell {
   background: var(--bg);
-  min-height: 100%;
+  height: calc(100% - 1px);
+  min-height: calc(100% - 1px);
 }
 
-.user-layout { display: grid; gap: 0; min-height: calc(100vh - 92px); }
+.user-layout { display: grid; gap: 0; height: 100%; min-height: 100%; }
 .organization-tree { min-width: 0; overflow: hidden; padding: 14px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow); }
 .content-divider { width: 2px; cursor: col-resize; touch-action: none; position: relative; background: transparent; }
 .content-divider::before { content: ''; position: absolute; z-index: 1; top: 0; bottom: 0; left: -6px; width: 13px; }
