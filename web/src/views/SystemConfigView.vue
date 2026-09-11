@@ -16,7 +16,7 @@ const form = reactive({
   password_require_digit: false, password_require_letter: false, password_require_upper: false,
   password_require_lower: false, password_require_special: false,
   session_timeout_minutes: 30, captcha_enabled: false, max_login_failures: 5, account_lock_minutes: 30,
-  verification_email_enabled: false, verification_smtp_host: '', verification_smtp_port: 465,
+  verification_email_enabled: false, verification_email_sender_name: '', verification_smtp_host: '', verification_smtp_port: 465,
   verification_smtp_username: '', verification_smtp_password: '', verification_smtp_tls: true,
   verification_webhook_enabled: false, verification_webhook_url: '', verification_webhook_secret: '',
 })
@@ -132,6 +132,7 @@ watch(
             <el-tab-pane label="邮件" name="email">
               <el-form :model="form" label-width="96px" class="system-form">
                 <el-form-item label="启用邮件验证码"><el-switch v-model="form.verification_email_enabled" active-text="开启" inactive-text="关闭" /></el-form-item>
+                <el-form-item label="发件人名称"><el-input v-model="form.verification_email_sender_name" placeholder="系统管理员" /></el-form-item>
                 <el-form-item label="SMTP 服务器">
                   <div class="smtp-row">
                     <el-input v-model="form.verification_smtp_host" placeholder="smtp.example.com" />
