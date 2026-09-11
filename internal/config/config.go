@@ -27,7 +27,6 @@ type Server struct {
 	JwtSecret  string `json:"jwt_secret" yaml:"jwt_secret"`
 	AESKey     string `json:"aes_key" yaml:"aes_key"`
 	JwtTimeout time.Duration
-	AdminPass  string `json:"admin_pass" yaml:"admin_pass"`
 }
 
 type Log struct {

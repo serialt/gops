@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 
 	"gops/docs"
 	"gops/internal/config"
 	"gops/internal/data"
+	"gops/internal/server"
 
 	"github.com/serialt/sugar/v3"
 )
@@ -24,6 +27,7 @@ var (
 	CheckCfg    bool
 	GenModel    bool
 	GenTable    bool
+	ResetPass   string
 	GenTableDir = "sql"
 	Args        []string
 )
@@ -33,6 +37,7 @@ func init() {
 	flag.BoolVar(&CheckCfg, "k", true, "check cfg")
 	flag.BoolVar(&GenModel, "g", false, "gorm gen model")
 	flag.StringVar(&ConfigFile, "c", "config.yaml", "Config file")
+	flag.StringVar(&ResetPass, "u", "", "reset user pass")
 	flag.BoolVar(&GenTable, "t", false, "goose cmd")
 	flag.Parse()
 	Args = flag.Args()
@@ -66,6 +71,16 @@ func main() {
 		sugar.WithShort(true),
 		sugar.WithLevel(cfg.Log.Level),
 	)
+	slog.SetDefault(loggger)
+
+	if ResetPass != "" {
+		if len(Args) != 1 {
+			slog.Info("password is empty")
+			return
+		}
+		server.ResetUserPassword(context.Background(), ResetPass, Args[0], cfg)
+
+	}
 
 	server, cleanup, err := InitializeServer(cfg, loggger)
 	if err != nil {

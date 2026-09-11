@@ -42,7 +42,7 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	if err != nil {
 		return nil, fmt.Errorf("initialize casbin: %w", err)
 	}
-	if err := seed(db, casbinService, cfg.Server.AdminPass); err != nil {
+	if err := seed(db, casbinService); err != nil {
 		return nil, fmt.Errorf("seed data: %w", err)
 	}
 
