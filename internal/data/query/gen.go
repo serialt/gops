@@ -20,6 +20,7 @@ var (
 	Organization     *organization
 	OrganizationUser *organizationUser
 	Role             *role
+	SystemConfig     *systemConfig
 	User             *user
 	UserRole         *userRole
 )
@@ -29,6 +30,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Organization = &Q.Organization
 	OrganizationUser = &Q.OrganizationUser
 	Role = &Q.Role
+	SystemConfig = &Q.SystemConfig
 	User = &Q.User
 	UserRole = &Q.UserRole
 }
@@ -39,6 +41,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Organization:     newOrganization(db, opts...),
 		OrganizationUser: newOrganizationUser(db, opts...),
 		Role:             newRole(db, opts...),
+		SystemConfig:     newSystemConfig(db, opts...),
 		User:             newUser(db, opts...),
 		UserRole:         newUserRole(db, opts...),
 	}
@@ -50,6 +53,7 @@ type Query struct {
 	Organization     organization
 	OrganizationUser organizationUser
 	Role             role
+	SystemConfig     systemConfig
 	User             user
 	UserRole         userRole
 }
@@ -64,6 +68,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Organization:     q.Organization.clone(db),
 		OrganizationUser: q.OrganizationUser.clone(db),
 		Role:             q.Role.clone(db),
+		SystemConfig:     q.SystemConfig.clone(db),
 		User:             q.User.clone(db),
 		UserRole:         q.UserRole.clone(db),
 	}
@@ -83,6 +88,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Organization:     q.Organization.replaceDB(db),
 		OrganizationUser: q.OrganizationUser.replaceDB(db),
 		Role:             q.Role.replaceDB(db),
+		SystemConfig:     q.SystemConfig.replaceDB(db),
 		User:             q.User.replaceDB(db),
 		UserRole:         q.UserRole.replaceDB(db),
 	}
@@ -92,6 +98,7 @@ type queryCtx struct {
 	Organization     *organizationDo
 	OrganizationUser *organizationUserDo
 	Role             *roleDo
+	SystemConfig     *systemConfigDo
 	User             *userDo
 	UserRole         *userRoleDo
 }
@@ -101,6 +108,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Organization:     q.Organization.WithContext(ctx),
 		OrganizationUser: q.OrganizationUser.WithContext(ctx),
 		Role:             q.Role.WithContext(ctx),
+		SystemConfig:     q.SystemConfig.WithContext(ctx),
 		User:             q.User.WithContext(ctx),
 		UserRole:         q.UserRole.WithContext(ctx),
 	}

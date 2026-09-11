@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDown, ArrowLeft, ArrowRight, Search, Close, Brush } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSystemConfigStore } from '@/stores/system-config'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const systemConfig = useSystemConfigStore()
 const active = computed(() => route.path)
 
 const sidebarWidth = ref(180)
@@ -21,6 +23,7 @@ const systemMenus = computed(() => [
   { path: '/users', title: '用户管理', icon: User, permission: 'POST /api/v1/users/list' },
   { path: '/roles', title: '角色权限', icon: Key, permission: 'POST /api/v1/roles/list' },
   { path: '/organizations', title: '组织管理', icon: OfficeBuilding, permission: 'POST /api/v1/organizations/list' },
+  { path: '/system-config', title: '系统配置', icon: Setting },
 ].filter((item) => auth.hasPermission(item.permission)))
 
 type PageTab = { path: string; title: string }
@@ -150,6 +153,7 @@ function handlePointerUp() {
 }
 
 onBeforeUnmount(handlePointerUp)
+onMounted(() => systemConfig.fetchConfig())
 
 function toggleCollapse() {
   isCollapsed.value = !isCollapsed.value
@@ -166,7 +170,7 @@ function toggleCollapse() {
     <el-aside :width="`${sidebarWidth}px`" class="sidebar">
       <div v-if="sidebarWidth > 60" class="brand-wrap">
         <div class="brand-mark">V3</div>
-        <div class="brand-name">Admin</div>
+        <div class="brand-name">{{ systemConfig.systemName }}</div>
       </div>
 
       <div v-if="sidebarWidth > 60" class="nav-group-label">导航</div>
@@ -176,7 +180,7 @@ function toggleCollapse() {
           <span>{{ dashboardMenu.title }}</span>
         </el-menu-item>
         <el-sub-menu v-if="systemMenus.length" index="system-config">
-          <template #title><el-icon><Setting /></el-icon><span>系统配置</span></template>
+          <template #title><el-icon><Setting /></el-icon><span>系统管理</span></template>
           <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
             <el-icon><component :is="item.icon" /></el-icon>
             <span>{{ item.title }}</span>
@@ -190,7 +194,7 @@ function toggleCollapse() {
             <el-icon><component :is="dashboardMenu.icon" /></el-icon>
           </el-menu-item>
           <el-sub-menu v-if="systemMenus.length" index="system-config">
-            <template #title><el-icon><Setting /></el-icon><span>系统配置</span></template>
+            <template #title><el-icon><Setting /></el-icon><span>系统管理</span></template>
             <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
               <el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span>
             </el-menu-item>

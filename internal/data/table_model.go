@@ -9,6 +9,7 @@ func gopsTable(g *gen.Generator) {
 	role := g.GenerateModel("role")
 	organization := g.GenerateModel("organization")
 	organizationUser := g.GenerateModel("organization_user")
+	systemConfig := g.GenerateModel("system_config")
 	userRole := g.GenerateModel("user_role")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
 		&field.RelateConfig{
@@ -28,6 +29,7 @@ func gopsTable(g *gen.Generator) {
 		user,
 		organization,
 		organizationUser,
+		systemConfig,
 	)
 
 }

@@ -25,6 +25,7 @@ type Redis struct {
 type Server struct {
 	HttpPort   int64  `json:"http_port" yaml:"http_port"`
 	JwtSecret  string `json:"jwt_secret" yaml:"jwt_secret"`
+	AESKey     string `json:"aes_key" yaml:"aes_key"`
 	JwtTimeout time.Duration
 	AdminPass  string `json:"admin_pass" yaml:"admin_pass"`
 }

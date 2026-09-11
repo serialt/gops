@@ -11,6 +11,9 @@ type Permission struct {
 func Catalog() []Permission {
 	items := []Permission{
 		{Group: "仪表盘", Name: "查看仪表盘", Path: "/api/v1/dashboard/stats", Method: "POST"},
+		{Group: "系统配置", Name: "查看系统配置", Path: "/api/v1/system-config/get", Method: "POST"},
+		{Group: "系统配置", Name: "修改系统配置", Path: "/api/v1/system-config/update", Method: "POST"},
+		{Group: "系统配置", Name: "发送 SMTP 测试邮件", Path: "/api/v1/system-config/email/test", Method: "POST"},
 		{Group: "用户管理", Name: "查看用户", Path: "/api/v1/users/list", Method: "POST"},
 		{Group: "用户管理", Name: "新增用户", Path: "/api/v1/users/create", Method: "POST"},
 		{Group: "用户管理", Name: "修改用户", Path: "/api/v1/users/update", Method: "POST"},

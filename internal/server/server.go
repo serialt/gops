@@ -53,6 +53,7 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	userHandler := handler.NewUserHandler(biz.NewUserBiz(db, casbinService))
 	roleHandler := handler.NewRoleHandler(biz.NewRoleBiz(db, casbinService))
 	organizationHandler := handler.NewOrganizationHandler(biz.NewOrganizationBiz(db))
+	systemConfigHandler := handler.NewSystemConfigHandler(biz.NewSystemConfigBiz(db, cfg.Server.AESKey))
 
 	r.Use(gin.Logger(), gin.Recovery())
 
@@ -86,6 +87,9 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	authorized.POST("/organizations/update", organizationHandler.Update)
 	authorized.POST("/organizations/delete", organizationHandler.Delete)
 	authorized.POST("/organizations/move", organizationHandler.Move)
+	authorized.POST("/system-config/get", systemConfigHandler.Get)
+	authorized.POST("/system-config/update", systemConfigHandler.Update)
+	authorized.POST("/system-config/email/test", systemConfigHandler.TestEmail)
 
 	return r, nil
 }
