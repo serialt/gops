@@ -89,6 +89,56 @@ select {
   color: var(--text);
 }
 
+/* AG Grid 列表操作统一样式：系统管理与资产管理共用，避免各页面出现细微差异。 */
+.app-data-grid .grid-action,
+.app-data-grid .asset-action,
+.app-data-grid .credential-action,
+.app-data-grid .cloud-action,
+.app-data-grid .host-action,
+.app-data-grid .db-action,
+.app-data-grid .audit-action {
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  padding: 4px 9px !important;
+  background: #fff !important;
+  color: var(--text) !important;
+  font: inherit !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 3px rgba(24, 34, 53, .08) !important;
+}
+
+.app-data-grid .grid-action.edit,
+.app-data-grid .asset-action.edit,
+.app-data-grid .credential-action.edit,
+.app-data-grid .cloud-action.edit,
+.app-data-grid .host-action.edit,
+.app-data-grid .db-action.edit,
+.app-data-grid .audit-action.edit {
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+  background: #f7f8ff !important;
+}
+
+.app-data-grid .grid-action.delete,
+.app-data-grid .asset-action.delete,
+.app-data-grid .credential-action.delete,
+.app-data-grid .cloud-action.delete,
+.app-data-grid .host-action.delete,
+.app-data-grid .db-action.delete,
+.app-data-grid .audit-action.delete {
+  border-color: #ffd5d5 !important;
+  color: #ef6262 !important;
+  background: #fff7f7 !important;
+}
+
+.app-data-grid .grid-action.permission {
+  border-color: #ccefc1 !important;
+  color: #58b83d !important;
+  background: #f4fbf1 !important;
+}
+
 .el-card {
   border-radius: 14px !important;
   border: 1px solid var(--line) !important;

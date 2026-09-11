@@ -31,6 +31,25 @@ func Auth(jwtManager *auth.JWTManager) gin.HandlerFunc {
 	}
 }
 
+// WebSocketAuth validates the token passed during a WebSocket handshake.
+// Browsers cannot attach an Authorization header when constructing a WebSocket.
+func WebSocketAuth(jwtManager *auth.JWTManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.Query("token")
+		if token == "" {
+			response.Error(c, 401, "missing terminal token")
+			return
+		}
+		claims, err := jwtManager.Parse(token)
+		if err != nil {
+			response.Error(c, 401, "invalid or expired token")
+			return
+		}
+		c.Set(UserIDKey, claims.UserID)
+		c.Next()
+	}
+}
+
 func CurrentUserID(c *gin.Context) (uint, bool) {
 	value, ok := c.Get(UserIDKey)
 	if !ok {

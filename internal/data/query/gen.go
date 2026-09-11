@@ -17,20 +17,32 @@ import (
 
 var (
 	Q                = new(Query)
+	AssetGroup       *assetGroup
+	CloudAccount     *cloudAccount
+	Credential       *credential
+	DbInstance       *dbInstance
+	Host             *host
 	Organization     *organization
 	OrganizationUser *organizationUser
 	Role             *role
 	SystemConfig     *systemConfig
+	TerminalSession  *terminalSession
 	User             *user
 	UserRole         *userRole
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
+	AssetGroup = &Q.AssetGroup
+	CloudAccount = &Q.CloudAccount
+	Credential = &Q.Credential
+	DbInstance = &Q.DbInstance
+	Host = &Q.Host
 	Organization = &Q.Organization
 	OrganizationUser = &Q.OrganizationUser
 	Role = &Q.Role
 	SystemConfig = &Q.SystemConfig
+	TerminalSession = &Q.TerminalSession
 	User = &Q.User
 	UserRole = &Q.UserRole
 }
@@ -38,10 +50,16 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
 		db:               db,
+		AssetGroup:       newAssetGroup(db, opts...),
+		CloudAccount:     newCloudAccount(db, opts...),
+		Credential:       newCredential(db, opts...),
+		DbInstance:       newDbInstance(db, opts...),
+		Host:             newHost(db, opts...),
 		Organization:     newOrganization(db, opts...),
 		OrganizationUser: newOrganizationUser(db, opts...),
 		Role:             newRole(db, opts...),
 		SystemConfig:     newSystemConfig(db, opts...),
+		TerminalSession:  newTerminalSession(db, opts...),
 		User:             newUser(db, opts...),
 		UserRole:         newUserRole(db, opts...),
 	}
@@ -50,10 +68,16 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 type Query struct {
 	db *gorm.DB
 
+	AssetGroup       assetGroup
+	CloudAccount     cloudAccount
+	Credential       credential
+	DbInstance       dbInstance
+	Host             host
 	Organization     organization
 	OrganizationUser organizationUser
 	Role             role
 	SystemConfig     systemConfig
+	TerminalSession  terminalSession
 	User             user
 	UserRole         userRole
 }
@@ -65,10 +89,16 @@ func (q *Query) UnderlyingDB() *gorm.DB { return q.db }
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
 		db:               db,
+		AssetGroup:       q.AssetGroup.clone(db),
+		CloudAccount:     q.CloudAccount.clone(db),
+		Credential:       q.Credential.clone(db),
+		DbInstance:       q.DbInstance.clone(db),
+		Host:             q.Host.clone(db),
 		Organization:     q.Organization.clone(db),
 		OrganizationUser: q.OrganizationUser.clone(db),
 		Role:             q.Role.clone(db),
 		SystemConfig:     q.SystemConfig.clone(db),
+		TerminalSession:  q.TerminalSession.clone(db),
 		User:             q.User.clone(db),
 		UserRole:         q.UserRole.clone(db),
 	}
@@ -85,30 +115,48 @@ func (q *Query) WriteDB() *Query {
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
 		db:               db,
+		AssetGroup:       q.AssetGroup.replaceDB(db),
+		CloudAccount:     q.CloudAccount.replaceDB(db),
+		Credential:       q.Credential.replaceDB(db),
+		DbInstance:       q.DbInstance.replaceDB(db),
+		Host:             q.Host.replaceDB(db),
 		Organization:     q.Organization.replaceDB(db),
 		OrganizationUser: q.OrganizationUser.replaceDB(db),
 		Role:             q.Role.replaceDB(db),
 		SystemConfig:     q.SystemConfig.replaceDB(db),
+		TerminalSession:  q.TerminalSession.replaceDB(db),
 		User:             q.User.replaceDB(db),
 		UserRole:         q.UserRole.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
+	AssetGroup       *assetGroupDo
+	CloudAccount     *cloudAccountDo
+	Credential       *credentialDo
+	DbInstance       *dbInstanceDo
+	Host             *hostDo
 	Organization     *organizationDo
 	OrganizationUser *organizationUserDo
 	Role             *roleDo
 	SystemConfig     *systemConfigDo
+	TerminalSession  *terminalSessionDo
 	User             *userDo
 	UserRole         *userRoleDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
+		AssetGroup:       q.AssetGroup.WithContext(ctx),
+		CloudAccount:     q.CloudAccount.WithContext(ctx),
+		Credential:       q.Credential.WithContext(ctx),
+		DbInstance:       q.DbInstance.WithContext(ctx),
+		Host:             q.Host.WithContext(ctx),
 		Organization:     q.Organization.WithContext(ctx),
 		OrganizationUser: q.OrganizationUser.WithContext(ctx),
 		Role:             q.Role.WithContext(ctx),
 		SystemConfig:     q.SystemConfig.WithContext(ctx),
+		TerminalSession:  q.TerminalSession.WithContext(ctx),
 		User:             q.User.WithContext(ctx),
 		UserRole:         q.UserRole.WithContext(ctx),
 	}

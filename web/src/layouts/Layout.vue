@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDown, ArrowLeft, ArrowRight, Search, Close, Brush } from '@element-plus/icons-vue'
+import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDown, ArrowLeft, ArrowRight, Search, Close, Brush, FolderOpened, Monitor } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
 
@@ -25,6 +25,15 @@ const systemMenus = computed(() => [
   { path: '/organizations', title: '组织管理', icon: OfficeBuilding, permission: 'POST /api/v1/organizations/list' },
   { path: '/system-config', title: '系统配置', icon: Setting },
 ].filter((item) => auth.hasPermission(item.permission)))
+const assetMenus = computed(() => [
+  { path: '/assets/groups', title: '资产分组', icon: FolderOpened, permission: 'POST /api/v1/assets/groups/list' },
+  { path: '/assets/credentials', title: '凭证管理', icon: Key, permission: 'POST /api/v1/assets/credentials/list' },
+  { path: '/assets/cloud-accounts', title: '云账号', icon: OfficeBuilding, permission: 'POST /api/v1/assets/cloud-accounts/list' },
+  { path: '/assets/hosts', title: '主机管理', icon: OfficeBuilding, permission: 'POST /api/v1/assets/hosts/list' },
+  { path: '/assets/db-instances', title: '数据库实例', icon: OfficeBuilding, permission: 'POST /api/v1/assets/db-instances/list' },
+  { path: '/assets/terminal', title: '终端', icon: Monitor, permission: 'POST /api/v1/assets/hosts/list' },
+  { path: '/assets/terminal-audit', title: '终端审计', icon: OfficeBuilding, permission: 'POST /api/v1/assets/terminal-sessions/list' },
+].filter((item) => auth.hasPermission(item.permission)))
 
 type PageTab = { path: string; title: string }
 type MenuSuggestion = { value: string; path: string }
@@ -36,6 +45,7 @@ const menuSearchVisible = ref(false)
 const menuItems = computed(() => [
   { path: '/dashboard', title: '仪表盘', permission: 'POST /api/v1/dashboard/stats' },
   ...systemMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+  ...assetMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
 ])
 const activeTab = computed(() => route.path)
 
@@ -173,6 +183,7 @@ function toggleCollapse() {
         <div class="brand-name">{{ systemConfig.systemName }}</div>
       </div>
 
+      <div class="sidebar-menu-scroll">
       <div v-if="sidebarWidth > 60" class="nav-group-label">导航</div>
       <el-menu v-if="sidebarWidth > 60" :default-active="active" router class="menu">
         <el-menu-item v-if="auth.hasPermission(dashboardMenu.permission)" :index="dashboardMenu.path">
@@ -185,6 +196,10 @@ function toggleCollapse() {
             <el-icon><component :is="item.icon" /></el-icon>
             <span>{{ item.title }}</span>
           </el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu v-if="assetMenus.length" index="assets">
+          <template #title><el-icon><FolderOpened /></el-icon><span>资产管理</span></template>
+          <el-menu-item v-for="item in assetMenus" :key="item.path" :index="item.path"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span></el-menu-item>
         </el-sub-menu>
       </el-menu>
 
@@ -199,7 +214,12 @@ function toggleCollapse() {
               <el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span>
             </el-menu-item>
           </el-sub-menu>
+          <el-sub-menu v-if="assetMenus.length" index="assets">
+            <template #title><el-icon><FolderOpened /></el-icon><span>资产管理</span></template>
+            <el-menu-item v-for="item in assetMenus" :key="item.path" :index="item.path"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span></el-menu-item>
+          </el-sub-menu>
         </el-menu>
+      </div>
       </div>
 
     </el-aside>
@@ -300,6 +320,9 @@ function toggleCollapse() {
   transition: width 0.2s ease;
   position: relative;
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .sidebar:has(+ .divider.dragging) {
@@ -346,6 +369,19 @@ function toggleCollapse() {
   color: #888;
   font-weight: 500;
 }
+
+.sidebar-menu-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 179, 199, .45) transparent;
+}
+
+.sidebar-menu-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-menu-scroll::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(168, 179, 199, .45); }
 
 .menu {
   background: transparent !important;

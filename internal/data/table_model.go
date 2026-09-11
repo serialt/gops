@@ -10,6 +10,12 @@ func gopsTable(g *gen.Generator) {
 	organization := g.GenerateModel("organization")
 	organizationUser := g.GenerateModel("organization_user")
 	systemConfig := g.GenerateModel("system_config")
+	assetGroup := g.GenerateModel("asset_group")
+	credential := g.GenerateModel("credential")
+	cloudAccount := g.GenerateModel("cloud_account")
+	host := g.GenerateModel("host")
+	dbInstance := g.GenerateModel("db_instance")
+	terminalSession := g.GenerateModel("terminal_session")
 	userRole := g.GenerateModel("user_role")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
 		&field.RelateConfig{
@@ -30,6 +36,12 @@ func gopsTable(g *gen.Generator) {
 		organization,
 		organizationUser,
 		systemConfig,
+		assetGroup,
+		credential,
+		cloudAccount,
+		host,
+		dbInstance,
+		terminalSession,
 	)
 
 }
