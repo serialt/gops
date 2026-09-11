@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ColDef } from 'ag-grid-community'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { createRole, deleteRole, getPermissionCatalog, getRolePermissions, getRoles, setRolePermissions, updateRole } from '@/api'
+import { createRole, deleteRole, getPermissionCatalog, getRolePermissions, getRoles, setRolePermissions, updateRole } from '@/api/role'
 import type { Permission, Role } from '@/types'
 
 const roles = ref<Role[]>([])
@@ -13,6 +13,7 @@ const permissionDrawer = ref(false)
 const editingID = ref<number | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(10)
+const selectedRoles = ref<Role[]>([])
 const selectedRole = ref<Role | null>(null)
 const checkedKeys = ref<string[]>([])
 const form = reactive({ code: '', name: '', description: '' })
@@ -23,7 +24,7 @@ const roleColumnDefs = computed<ColDef[]>(() => [
   { field: 'name', headerName: '角色名称' },
   { field: 'description', headerName: '说明' },
   {
-    headerName: '操作', flex: 1, minWidth: 220,
+    headerName: '操作', pinned: 'right', width: 220,
     cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(actionButton('配置权限', 'permission', () => openPermissions(params.data)), actionButton('编辑', 'edit', () => openEdit(params.data))); if (params.data.code !== 'admin') wrap.append(actionButton('删除', 'delete', () => remove(params.data))); return wrap },
   },
 ])
@@ -105,6 +106,17 @@ async function remove(role: Role) {
   await load()
 }
 
+function handleRoleSelectionChanged(rows: unknown[]) { selectedRoles.value = rows as Role[] }
+async function batchRemoveRoles() {
+  const deletable = selectedRoles.value.filter(role => role.code !== 'admin')
+  if (!deletable.length) return ElMessage.warning('超级管理员角色不支持删除')
+  await ElMessageBox.confirm(`确定删除已选择的 ${deletable.length} 个角色？`, '批量删除角色', { type: 'warning' })
+  await Promise.all(deletable.map(role => deleteRole(role.id)))
+  selectedRoles.value = []
+  ElMessage.success('批量删除成功')
+  await load()
+}
+
 async function openPermissions(role: Role) {
   selectedRole.value = role
   const { data } = await getRolePermissions(role.id)
@@ -128,10 +140,13 @@ onMounted(load)
     <div class="section-card">
       <div class="page-toolbar">
         <h2 class="page-title">角色列表</h2>
-        <el-button v-permission="'POST /api/v1/roles/create'" type="primary" class="primary-btn" @click="openCreate">新增角色</el-button>
+        <div class="toolbar-actions">
+          <el-button v-if="selectedRoles.length" v-permission="'POST /api/v1/roles/delete'" type="danger" plain @click="batchRemoveRoles">批量删除（{{ selectedRoles.length }}）</el-button>
+          <el-button v-permission="'POST /api/v1/roles/create'" type="primary" class="primary-btn" @click="openCreate">新增角色</el-button>
+        </div>
       </div>
 
-      <AppDataGrid :row-data="pagedRoles" :column-defs="roleColumnDefs" />
+      <AppDataGrid :row-data="pagedRoles" :column-defs="roleColumnDefs" @selection-changed="handleRoleSelectionChanged" />
       <div class="pagination-bar">
         <el-pagination
           v-model:current-page="currentPage"
@@ -222,6 +237,8 @@ onMounted(load)
 .primary-btn {
   border-radius: 6px;
 }
+
+.toolbar-actions { display: flex; align-items: center; gap: 8px; }
 
 .data-table {
   width: 100%;

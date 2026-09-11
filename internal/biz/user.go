@@ -80,15 +80,14 @@ func (b *UserBiz) Update(req *api.UserRequest) (*api.UserResponse, error) {
 }
 
 func (b *UserBiz) Delete(req *api.UserIDRequest, currentID uint) error {
-	if currentID == req.ID {
+	if int64(currentID) == req.ID {
 		return errors.New("cannot delete current user")
 	}
-	id := uint64(req.ID)
 	if err := b.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("user_id = ?", uint(id)).Delete(&model.UserRole{}).Error; err != nil {
+		if err := tx.Where("user_id = ?", req.ID).Delete(&model.UserRole{}).Error; err != nil {
 			return err
 		}
-		result := tx.Delete(&model.User{}, uint(id))
+		result := tx.Delete(&model.User{}, req.ID)
 		if result.Error != nil {
 			return result.Error
 		}
@@ -102,13 +101,13 @@ func (b *UserBiz) Delete(req *api.UserIDRequest, currentID uint) error {
 		}
 		return err
 	}
-	if _, err := b.casbin.Enforcer.DeleteUser(strconv.FormatUint(id, 10)); err != nil {
+	if _, err := b.casbin.Enforcer.DeleteUser(strconv.FormatInt(req.ID, 10)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *UserBiz) saveUser(user *model.User, roleIDs []uint, organizationIDs []uint, create bool) error {
+func (b *UserBiz) saveUser(user *model.User, roleIDs []int64, organizationIDs []int64, create bool) error {
 	var roles []*model.Role
 	if len(roleIDs) > 0 {
 		if err := b.db.Where("id IN ?", roleIDs).Find(&roles).Error; err != nil {

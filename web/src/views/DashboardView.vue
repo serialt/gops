@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { getDashboardStats } from '@/api'
+import { getDashboardStats } from '@/api/dashboard'
 
 const stats = ref({ users: 0, enabled_users: 0, roles: 0, policies: 0 })
 

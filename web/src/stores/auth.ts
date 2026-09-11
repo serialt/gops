@@ -1,10 +1,10 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getMe, login as loginApi } from '@/api'
+import { getMe, login as loginApi } from '@/api/auth'
 import type { User } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('admin_token') || '')
+  const token = ref(localStorage.getItem('token') || '')
   const user = ref<User | null>(null)
   const permissions = ref<string[]>([])
   const loaded = ref(false)
@@ -14,7 +14,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(username: string, password: string) {
     const { data } = await loginApi({ username, password })
     token.value = data.data.token
-    localStorage.setItem('admin_token', token.value)
+    localStorage.setItem('token', token.value)
     await fetchMe()
   }
 
@@ -34,7 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     permissions.value = []
     loaded.value = false
-    localStorage.removeItem('admin_token')
+    localStorage.removeItem('token')
   }
 
   return { token, user, permissions, loaded, isLoggedIn, login, fetchMe, hasPermission, logout }

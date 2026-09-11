@@ -5,7 +5,7 @@ import { Plus, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ColDef, ICellRendererParams } from 'ag-grid-community'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { createOrganization, deleteOrganization, getOrganizations, updateOrganization } from '@/api'
+import { createOrganization, deleteOrganization, getOrganizations, updateOrganization } from '@/api/organization'
 import type { Organization } from '@/types'
 
 const keyword = ref('')
@@ -19,6 +19,7 @@ const treePaneStartX = ref(0)
 const treePaneStartWidth = ref(220)
 const currentPage = ref(1)
 const pageSize = ref(10)
+const selectedOrganizations = ref<Organization[]>([])
 const form = reactive({ parent_id: null as number | null, name: '', code: '', manager: '', status: true })
 
 const treeData = computed(() => {
@@ -55,7 +56,7 @@ const organizationColumnDefs = computed<ColDef[]>(() => [
   { field: 'name', headerName: '组织名称' }, { field: 'code', headerName: '组织编码' }, { field: 'manager', headerName: '负责人' },
   { headerName: '状态', cellRenderer: (params: ICellRendererParams<Organization>) => { const tag = document.createElement('span'); tag.className = `grid-status${params.data?.status ? '' : ' is-disabled'}`; tag.textContent = params.data?.status ? '正常' : '停用'; return tag } },
   { headerName: '更新时间', valueGetter: params => formatDate(params.data.updated_at) },
-  { headerName: '操作', flex: 1, minWidth: 150, cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(organizationActionButton('编辑', 'edit', () => openEdit(params.data)), organizationActionButton('删除', 'delete', () => remove(params.data))); return wrap } },
+  { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(organizationActionButton('编辑', 'edit', () => openEdit(params.data)), organizationActionButton('删除', 'delete', () => remove(params.data))); return wrap } },
 ])
 watch([keyword, selectedId], () => { currentPage.value = 1 })
 
@@ -98,6 +99,16 @@ function openCreate() { editingId.value = null; Object.assign(form, { parent_id:
 function openEdit(row: Organization) { editingId.value = row.id; Object.assign(form, { parent_id: row.parent_id, name: row.name, code: row.code, manager: row.manager, status: row.status }); dialogVisible.value = true }
 async function save() { if (!form.name || !form.code) return ElMessage.warning('请填写组织名称和编码'); if (editingId.value) await updateOrganization(editingId.value, form); else await createOrganization(form); ElMessage.success('保存成功'); dialogVisible.value = false; await load() }
 async function remove(row: Organization) { await ElMessageBox.confirm(`确定删除组织 ${row.name}？`, '提示', { type: 'warning' }); await deleteOrganization(row.id); ElMessage.success('删除成功'); if (selectedId.value === row.id) selectedId.value = null; await load() }
+function handleOrganizationSelectionChanged(rows: unknown[]) { selectedOrganizations.value = rows as Organization[] }
+async function batchRemoveOrganizations() {
+  const deletable = selectedOrganizations.value.filter(organization => organization.code !== 'root')
+  if (!deletable.length) return ElMessage.warning('默认根组织不支持删除')
+  await ElMessageBox.confirm(`确定删除已选择的 ${deletable.length} 个组织？`, '批量删除组织', { type: 'warning' })
+  await Promise.all(deletable.map(organization => deleteOrganization(organization.id)))
+  selectedOrganizations.value = []
+  ElMessage.success('批量删除成功')
+  await load()
+}
 onMounted(load)
 function organizationIndex(index: number) { return (currentPage.value - 1) * pageSize.value + index + 1 }
 function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1 }
@@ -120,12 +131,15 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
         <div class="section-card">
           <div class="page-toolbar">
             <div><h2 class="page-title">{{ selectedName }}</h2><p class="page-subtitle">查看和维护该组织下的部门信息</p></div>
-            <el-button v-permission="'POST /api/v1/organizations/create'" type="primary" :icon="Plus" @click="openCreate">新增组织</el-button>
+            <div class="toolbar-actions">
+              <el-button v-if="selectedOrganizations.length" v-permission="'POST /api/v1/organizations/delete'" type="danger" plain @click="batchRemoveOrganizations">批量删除（{{ selectedOrganizations.length }}）</el-button>
+              <el-button v-permission="'POST /api/v1/organizations/create'" type="primary" :icon="Plus" @click="openCreate">新增组织</el-button>
+            </div>
           </div>
           <div class="list-toolbar">
             <el-input v-model="keyword" placeholder="搜索组织名称或编码" clearable :prefix-icon="Search" />
           </div>
-          <AppDataGrid :row-data="pagedTableData" :column-defs="organizationColumnDefs" />
+          <AppDataGrid :row-data="pagedTableData" :column-defs="organizationColumnDefs" @selection-changed="handleOrganizationSelectionChanged" />
           <div class="pagination-bar">
             <el-pagination
               v-model:current-page="currentPage"
@@ -164,6 +178,7 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
 .tree-panel :deep(.is-current > .el-tree-node__content) { color: var(--primary); font-weight: 700; background: var(--primary-soft); }
 .section-card { display: flex; flex-direction: column; padding: 16px; min-width: 0; min-height: 100%; }
 .page-toolbar { margin-bottom: 14px; }
+.toolbar-actions { display: flex; align-items: center; gap: 8px; }
 .page-subtitle { margin: 5px 0 0; color: var(--text-soft); font-size: 11px; }
 .list-toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
 .list-toolbar :deep(.el-input) { width: 230px; }

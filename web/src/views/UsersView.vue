@@ -4,7 +4,9 @@ import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ColDef, ICellRendererParams } from 'ag-grid-community'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { createOrganization, createUser, deleteOrganization, deleteUser, getOrganizations, getRoles, getUsers, moveOrganization, updateOrganization, updateUser } from '@/api'
+import { createOrganization, deleteOrganization, getOrganizations, moveOrganization, updateOrganization } from '@/api/organization'
+import { getRoles } from '@/api/role'
+import { createUser, deleteUser, getUsers, updateUser } from '@/api/user'
 import type { Organization, Role, User } from '@/types'
 
 const loading = ref(false)
@@ -21,6 +23,7 @@ const organizationPaneStartWidth = ref(200)
 const keyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
+const selectedUsers = ref<User[]>([])
 const dialogVisible = ref(false)
 const editingID = ref<number | null>(null)
 const title = computed(() => editingID.value ? '编辑用户' : '新增用户')
@@ -38,7 +41,7 @@ const userColumnDefs = computed<ColDef[]>(() => [
   { headerName: '所属组织', valueGetter: params => params.data.organizations.map((item: Organization) => item.name).join('、') },
   { headerName: '角色', valueGetter: params => params.data.roles.map((item: Role) => item.name).join('、'), minWidth: 140 },
   { headerName: '状态', minWidth: 100, cellRenderer: (params: ICellRendererParams<User>) => { const tag = document.createElement('span'); tag.className = `grid-status${params.data?.status ? '' : ' is-disabled'}`; tag.textContent = params.data?.status ? '启用' : '禁用'; return tag } },
-  { headerName: '操作', flex: 1, minWidth: 150, cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(userActionButton('编辑', 'edit', () => openEdit(params.data)), userActionButton('删除', 'delete', () => remove(params.data))); return wrap } },
+  { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(userActionButton('编辑', 'edit', () => openEdit(params.data)), userActionButton('删除', 'delete', () => remove(params.data))); return wrap } },
 ])
 const organizationDialogVisible = ref(false)
 const organizationEditingId = ref<number | null>(null)
@@ -165,6 +168,16 @@ async function remove(row: User) {
   await load()
 }
 
+function handleUserSelectionChanged(rows: unknown[]) { selectedUsers.value = rows as User[] }
+async function batchRemoveUsers() {
+  if (!selectedUsers.value.length) return
+  await ElMessageBox.confirm(`确定删除已选择的 ${selectedUsers.value.length} 个用户？`, '批量删除用户', { type: 'warning' })
+  await Promise.all(selectedUsers.value.map(user => deleteUser(user.id)))
+  selectedUsers.value = []
+  ElMessage.success('批量删除成功')
+  await load()
+}
+
 onMounted(load)
 
 function handleOrganizationNodeClick(node: Organization) { activeOrganizationId.value = node.id; loadUsers() }
@@ -210,14 +223,17 @@ function toggleOrganizationPane() {
         </button>
       </div>
       <div class="section-card">
-      <div class="page-toolbar">
-        <div class="toolbar-left">
-          <el-input v-model="keyword" placeholder="用户名或昵称" clearable class="search-input" />
+        <div class="page-toolbar">
+          <div class="toolbar-left">
+            <el-input v-model="keyword" placeholder="用户名或昵称" clearable class="search-input" />
+          </div>
+        <div class="toolbar-actions">
+          <el-button v-if="selectedUsers.length" v-permission="'POST /api/v1/users/delete'" type="danger" plain @click="batchRemoveUsers">批量删除（{{ selectedUsers.length }}）</el-button>
+          <el-button v-permission="'POST /api/v1/users/create'" type="primary" class="primary-btn" @click="openCreate">新增用户</el-button>
         </div>
-        <el-button v-permission="'POST /api/v1/users/create'" type="primary" class="primary-btn" @click="openCreate">新增用户</el-button>
       </div>
 
-        <AppDataGrid v-loading="loading" :row-data="pagedUsers" :column-defs="userColumnDefs" />
+        <AppDataGrid v-loading="loading" :row-data="pagedUsers" :column-defs="userColumnDefs" @selection-changed="handleUserSelectionChanged" />
         <!--
         <el-table-column label="序号" type="index" :index="userIndex" width="70" :resizable="true" />
         <el-table-column prop="username" label="用户名" :width="userColumnWidths.username" :resizable="true" />
@@ -327,6 +343,8 @@ function toggleOrganizationPane() {
   align-items: center;
   gap: 8px;
 }
+
+.toolbar-actions { display: flex; align-items: center; gap: 8px; }
 
 .search-input {
   width: 240px;

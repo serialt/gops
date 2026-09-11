@@ -143,7 +143,7 @@ func (b *RoleBiz) SetPermissions(req *api.PermissionRequest) ([]*api.Permission,
 	return result, nil
 }
 
-func (b *RoleBiz) findRole(id uint) (*model.Role, error) {
+func (b *RoleBiz) findRole(id int64) (*model.Role, error) {
 	var role model.Role
 	if err := b.db.First(&role, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

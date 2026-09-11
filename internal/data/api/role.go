@@ -3,18 +3,18 @@ package api
 import "time"
 
 type RoleRequest struct {
-	ID          uint   `json:"id"`
+	ID          int64  `json:"id"`
 	Code        string `json:"code" binding:"required"`
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
 }
 
 type RoleIDRequest struct {
-	ID uint `json:"id" binding:"required"`
+	ID int64 `json:"id" binding:"required"`
 }
 
 type PermissionRequest struct {
-	ID          uint         `json:"id" binding:"required"`
+	ID          int64        `json:"id" binding:"required"`
 	Permissions []Permission `json:"permissions"`
 }
 

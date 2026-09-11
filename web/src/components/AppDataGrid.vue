@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
-import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef } from 'ag-grid-community'
+import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef, type RowSelectionOptions, type SelectionColumnDef } from 'ag-grid-community'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
@@ -9,10 +9,27 @@ const props = defineProps<{
   rowData: unknown[]
   columnDefs: ColDef[]
 }>()
+const emit = defineEmits<{
+  selectionChanged: [rows: unknown[]]
+}>()
 
 const defaultColDef: ColDef = {
   resizable: true,
   sortable: false,
+  suppressHeaderMenuButton: true,
+}
+const rowSelection: RowSelectionOptions = {
+  mode: 'multiRow',
+  checkboxes: true,
+  headerCheckbox: true,
+  enableClickSelection: false,
+}
+const selectionColumnDef: SelectionColumnDef = {
+  width: 42,
+  minWidth: 42,
+  maxWidth: 42,
+  pinned: 'left',
+  resizable: false,
   suppressHeaderMenuButton: true,
 }
 // 操作列保持固定宽度。仅其左侧最后一个数据列填充余量，其他列继续贴合实际内容。
@@ -21,7 +38,7 @@ const normalizedColumnDefs = computed<ColDef[]>(() => {
   const fillIndex = props.columnDefs.reduce((lastIndex, column, index) => isActionColumn(column) ? lastIndex : index, -1)
   return props.columnDefs.map((column, index) => index === fillIndex
     ? { ...column, width: undefined, flex: undefined, minWidth: column.minWidth ?? 100, suppressSizeToFit: false }
-    : { ...column, pinned: isActionColumn(column) ? undefined : column.pinned, suppressSizeToFit: true },
+    : { ...column, suppressSizeToFit: true },
   )
 })
 
@@ -38,6 +55,10 @@ function fillRemainingSpace(event: any) {
   // 拖拽任意普通列后，由最后一个数据列接收余量，防止固定操作列前出现空区。
   if (event.finished !== false) event.api.sizeColumnsToFit()
 }
+
+function handleSelectionChanged(event: any) {
+  emit('selectionChanged', event.api.getSelectedRows())
+}
 </script>
 
 <template>
@@ -47,12 +68,17 @@ function fillRemainingSpace(event: any) {
     :row-data="rowData"
     :column-defs="normalizedColumnDefs"
     :default-col-def="defaultColDef"
+    :row-selection="rowSelection"
+    :selection-column-def="selectionColumnDef"
     :animate-rows="false"
     :dom-layout="'autoHeight'"
+    :enable-cell-text-selection="true"
+    :ensure-dom-order="true"
     @grid-ready="resizeColumns"
     @first-data-rendered="resizeColumns"
     @column-resized="fillRemainingSpace"
     @grid-size-changed="fillRemainingSpace"
+    @selection-changed="handleSelectionChanged"
   />
 </template>
 
