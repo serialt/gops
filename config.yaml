@@ -9,8 +9,6 @@ server:
     jwt_secret: "replace-with-a-long-random-secret"
     # 生产环境必须替换为独立、随机的 32 字节 AES-256 密钥。
     aes_key: "0123456789abcdef0123456789abcdef"
-    # 第一次初始化 admin /  sugar.tang
-    admin_pass: "sugar.tang"
     
 redis:
   host: 172.12.78.53
