@@ -34,6 +34,19 @@ const assetMenus = computed(() => [
   { path: '/assets/terminal', title: '终端', icon: Monitor, permission: 'POST /api/v1/assets/hosts/list' },
   { path: '/assets/terminal-audit', title: '终端审计', icon: OfficeBuilding, permission: 'POST /api/v1/assets/terminal-sessions/list' },
 ].filter((item) => auth.hasPermission(item.permission)))
+const monitorMenus = computed(() => [
+  { path: '/monitor/domains', title: '域名监控', icon: Monitor, permission: 'POST /api/v1/monitor/domains/list' },
+  { path: '/monitor/channels', title: '告警通道', icon: Setting, permission: 'POST /api/v1/monitor/channels/list' },
+  { path: '/monitor/receivers', title: '告警接收人', icon: User, permission: 'POST /api/v1/monitor/receivers/list' },
+  { path: '/monitor/logs', title: '告警日志', icon: DataAnalysis, permission: 'POST /api/v1/monitor/logs/list' },
+].filter((item) => auth.hasPermission(item.permission)))
+const nginxMenus = computed(() => [
+  { path: '/nginx/sources', title: 'Nginx 数据源', icon: Monitor, permission: 'POST /api/v1/nginx/sources/list' },
+].filter((item) => auth.hasPermission(item.permission)))
+const taskMenus = computed(() => [{ path: '/tasks/jobs', title: '任务作业', icon: Monitor, permission: 'POST /api/v1/tasks/jobs/list' }].filter((item) => auth.hasPermission(item.permission)))
+const kubernetesMenus = computed(() => [{ path: '/kubernetes/clusters', title: '集群管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/clusters/list' }, { path: '/kubernetes/nodes', title: '节点管理', icon: Monitor, permission: 'POST /api/v1/kubernetes/nodes/list' }, { path: '/kubernetes/namespaces', title: '命名空间', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/namespaces/list' }, { path: '/kubernetes/workloads', title: '工作负载', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/workloads/list' }].filter((item) => auth.hasPermission(item.permission)))
+const auditMenus = computed(() => [{ path: '/audit/operations', title: '操作日志', icon: DataAnalysis, permission: 'POST /api/v1/audit/operation-logs/list' }, { path: '/audit/logins', title: '登录日志', icon: User, permission: 'POST /api/v1/audit/login-logs/list' }, { path: '/audit/data', title: '数据日志', icon: FolderOpened, permission: 'POST /api/v1/audit/data-logs/list' }].filter(item => auth.hasPermission(item.permission)))
+const sslCertMenus = computed(() => [{ path: '/ssl-cert/certificates', title: '证书管理', icon: Key, permission: 'POST /api/v1/ssl-cert/certificates/list' }].filter(item => auth.hasPermission(item.permission)))
 
 type PageTab = { path: string; title: string }
 type MenuSuggestion = { value: string; path: string }
@@ -46,6 +59,12 @@ const menuItems = computed(() => [
   { path: '/dashboard', title: '仪表盘', permission: 'POST /api/v1/dashboard/stats' },
   ...systemMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...assetMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+  ...monitorMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+  ...nginxMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+  ...taskMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+  ...kubernetesMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+  ...auditMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+  ...sslCertMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
 ])
 const activeTab = computed(() => route.path)
 
@@ -184,55 +203,148 @@ function toggleCollapse() {
       </div>
 
       <div class="sidebar-menu-scroll">
-      <el-menu v-if="sidebarWidth > 60" :default-active="active" router class="menu">
-        <el-menu-item v-if="auth.hasPermission(dashboardMenu.permission)" :index="dashboardMenu.path">
-          <el-icon><component :is="dashboardMenu.icon" /></el-icon>
-          <span>{{ dashboardMenu.title }}</span>
-        </el-menu-item>
-        <el-sub-menu v-if="systemMenus.length" index="system-config">
-          <template #title><el-icon><Setting /></el-icon><span>系统管理</span></template>
-          <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
-            <el-icon><component :is="item.icon" /></el-icon>
-            <span>{{ item.title }}</span>
-          </el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu v-if="assetMenus.length" index="assets">
-          <template #title><el-icon><FolderOpened /></el-icon><span>资产管理</span></template>
-          <el-menu-item v-for="item in assetMenus" :key="item.path" :index="item.path"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span></el-menu-item>
-        </el-sub-menu>
-      </el-menu>
-
-      <div v-else class="menu-icons">
-        <el-menu :default-active="active" :collapse="true" router class="menu-collapsed">
+        <el-menu v-if="sidebarWidth > 60" :default-active="active" router class="menu">
           <el-menu-item v-if="auth.hasPermission(dashboardMenu.permission)" :index="dashboardMenu.path">
-            <el-icon><component :is="dashboardMenu.icon" /></el-icon>
+            <el-icon>
+              <component :is="dashboardMenu.icon" />
+            </el-icon>
+            <span>{{ dashboardMenu.title }}</span>
           </el-menu-item>
           <el-sub-menu v-if="systemMenus.length" index="system-config">
-            <template #title><el-icon><Setting /></el-icon><span>系统管理</span></template>
+            <template #title><el-icon>
+                <Setting />
+              </el-icon><span>系统管理</span></template>
             <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
-              <el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span>
+              <el-icon>
+                <component :is="item.icon" />
+              </el-icon>
+              <span>{{ item.title }}</span>
             </el-menu-item>
           </el-sub-menu>
           <el-sub-menu v-if="assetMenus.length" index="assets">
-            <template #title><el-icon><FolderOpened /></el-icon><span>资产管理</span></template>
-            <el-menu-item v-for="item in assetMenus" :key="item.path" :index="item.path"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span></el-menu-item>
+            <template #title><el-icon>
+                <FolderOpened />
+              </el-icon><span>资产管理</span></template>
+            <el-menu-item v-for="item in assetMenus" :key="item.path" :index="item.path"><el-icon>
+                <component :is="item.icon" />
+              </el-icon><span>{{ item.title }}</span></el-menu-item>
           </el-sub-menu>
+          <el-sub-menu v-if="monitorMenus.length" index="monitor">
+            <template #title><el-icon>
+                <Monitor />
+              </el-icon><span>监控管理</span></template>
+            <el-menu-item v-for="item in monitorMenus" :key="item.path" :index="item.path"><el-icon>
+                <component :is="item.icon" />
+              </el-icon><span>{{ item.title }}</span></el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu v-if="nginxMenus.length" index="nginx"><template #title><el-icon>
+                <Monitor />
+              </el-icon><span>Nginx 管理</span></template><el-menu-item v-for="item in nginxMenus" :key="item.path"
+              :index="item.path"><el-icon>
+                <component :is="item.icon" />
+              </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+          <el-sub-menu v-if="taskMenus.length" index="tasks"><template #title><el-icon>
+                <Monitor />
+              </el-icon><span>任务中心</span></template><el-menu-item v-for="item in taskMenus" :key="item.path"
+              :index="item.path"><el-icon>
+                <component :is="item.icon" />
+              </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+          <el-sub-menu v-if="kubernetesMenus.length" index="kubernetes"><template #title><el-icon>
+                <OfficeBuilding />
+              </el-icon><span>容器管理</span></template><el-menu-item v-for="item in kubernetesMenus" :key="item.path"
+              :index="item.path"><el-icon>
+                <component :is="item.icon" />
+              </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+          <el-sub-menu v-if="auditMenus.length" index="audit"><template #title><el-icon>
+                <DataAnalysis />
+              </el-icon><span>审计管理</span></template><el-menu-item v-for="item in auditMenus" :key="item.path"
+              :index="item.path"><el-icon>
+                <component :is="item.icon" />
+              </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+          <el-sub-menu v-if="sslCertMenus.length" index="ssl-cert"><template #title><el-icon>
+                <Key />
+              </el-icon><span>SSL 证书</span></template><el-menu-item v-for="item in sslCertMenus" :key="item.path"
+              :index="item.path"><el-icon>
+                <component :is="item.icon" />
+              </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
         </el-menu>
-      </div>
+
+        <div v-else class="menu-icons">
+          <el-menu :default-active="active" :collapse="true" router class="menu-collapsed">
+            <el-menu-item v-if="auth.hasPermission(dashboardMenu.permission)" :index="dashboardMenu.path">
+              <el-icon>
+                <component :is="dashboardMenu.icon" />
+              </el-icon>
+            </el-menu-item>
+            <el-sub-menu v-if="systemMenus.length" index="system-config">
+              <template #title><el-icon>
+                  <Setting />
+                </el-icon><span>系统管理</span></template>
+              <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
+                <el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span>
+              </el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu v-if="assetMenus.length" index="assets">
+              <template #title><el-icon>
+                  <FolderOpened />
+                </el-icon><span>资产管理</span></template>
+              <el-menu-item v-for="item in assetMenus" :key="item.path" :index="item.path"><el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span></el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu v-if="monitorMenus.length" index="monitor">
+              <template #title><el-icon>
+                  <Monitor />
+                </el-icon><span>监控管理</span></template>
+              <el-menu-item v-for="item in monitorMenus" :key="item.path" :index="item.path"><el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span></el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu v-if="nginxMenus.length" index="nginx"><template #title><el-icon>
+                  <Monitor />
+                </el-icon><span>Nginx 管理</span></template><el-menu-item v-for="item in nginxMenus" :key="item.path"
+                :index="item.path"><el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+            <el-sub-menu v-if="taskMenus.length" index="tasks"><template #title><el-icon>
+                  <Monitor />
+                </el-icon><span>任务中心</span></template><el-menu-item v-for="item in taskMenus" :key="item.path"
+                :index="item.path"><el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+            <el-sub-menu v-if="kubernetesMenus.length" index="kubernetes"><template #title><el-icon>
+                  <OfficeBuilding />
+                </el-icon><span>容器管理</span></template><el-menu-item v-for="item in kubernetesMenus" :key="item.path"
+                :index="item.path"><el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+            <el-sub-menu v-if="auditMenus.length" index="audit"><template #title><el-icon>
+                  <DataAnalysis />
+                </el-icon><span>审计管理</span></template><el-menu-item v-for="item in auditMenus" :key="item.path"
+                :index="item.path"><el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+            <el-sub-menu v-if="sslCertMenus.length" index="ssl-cert"><template #title><el-icon>
+                  <Key />
+                </el-icon><span>SSL 证书</span></template><el-menu-item v-for="item in sslCertMenus" :key="item.path"
+                :index="item.path"><el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+          </el-menu>
+        </div>
       </div>
 
     </el-aside>
 
-    <div
-      class="divider"
-      :class="{ dragging: isDragging }"
-      role="separator"
-      aria-label="拖动调整侧边栏宽度"
-      @pointerdown="handlePointerDown"
-      @dblclick="toggleCollapse"
-    >
-      <button class="divider-handle" type="button" :aria-label="sidebarWidth > 60 ? '收起侧栏' : '展开侧栏'" @pointerdown.stop @click.stop="toggleCollapse">
-        <el-icon><component :is="sidebarWidth > 60 ? ArrowLeft : ArrowRight" /></el-icon>
+    <div class="divider" :class="{ dragging: isDragging }" role="separator" aria-label="拖动调整侧边栏宽度"
+      @pointerdown="handlePointerDown" @dblclick="toggleCollapse">
+      <button class="divider-handle" type="button" :aria-label="sidebarWidth > 60 ? '收起侧栏' : '展开侧栏'" @pointerdown.stop
+        @click.stop="toggleCollapse">
+        <el-icon>
+          <component :is="sidebarWidth > 60 ? ArrowLeft : ArrowRight" />
+        </el-icon>
       </button>
     </div>
 
@@ -242,34 +354,22 @@ function toggleCollapse() {
           <el-popover v-model:visible="menuSearchVisible" placement="bottom-start" :width="240" trigger="click">
             <template #reference>
               <button class="menu-search-button" type="button" title="搜索菜单" aria-label="搜索菜单">
-                <el-icon><Search /></el-icon>
+                <el-icon>
+                  <Search />
+                </el-icon>
               </button>
             </template>
-            <el-autocomplete
-              v-model="menuSearch"
-              class="menu-search-input"
-              :fetch-suggestions="queryMenuSuggestions"
-              placeholder="搜索菜单"
-              clearable
-              autofocus
-              @select="selectMenu"
-            />
+            <el-autocomplete v-model="menuSearch" class="menu-search-input" :fetch-suggestions="queryMenuSuggestions"
+              placeholder="搜索菜单" clearable autofocus @select="selectMenu" />
           </el-popover>
           <div class="page-tabs" @dragover.prevent @drop.prevent="handleTabDropAtEnd">
-            <button
-              v-for="tab in pageTabs"
-              :key="tab.path"
-              class="page-tab"
-              :class="{ active: activeTab === tab.path }"
-              draggable="true"
-              @dragstart="handleTabDragStart($event, tab.path)"
-              @dragover.prevent
-              @drop.stop.prevent="handleTabDrop(tab.path)"
-              @dragend="draggedTabPath = null"
-              @click="openTab(tab.path)"
-            >
+            <button v-for="tab in pageTabs" :key="tab.path" class="page-tab" :class="{ active: activeTab === tab.path }"
+              draggable="true" @dragstart="handleTabDragStart($event, tab.path)" @dragover.prevent
+              @drop.stop.prevent="handleTabDrop(tab.path)" @dragend="draggedTabPath = null" @click="openTab(tab.path)">
               <span>{{ tab.title }}</span>
-              <el-icon class="tab-close" @click.stop="closeTab(tab.path)"><Close /></el-icon>
+              <el-icon class="tab-close" @click.stop="closeTab(tab.path)">
+                <Close />
+              </el-icon>
             </button>
             <div class="tab-drop-end" aria-label="拖到末尾" @dragover.prevent @drop.stop.prevent="handleTabDropAtEnd" />
           </div>
@@ -277,16 +377,21 @@ function toggleCollapse() {
 
         <div class="header-actions">
           <el-tooltip content="清空其他已打开页面" placement="bottom">
-            <button class="header-action" type="button" aria-label="清空其他已打开页面" @click="clearTabs"><el-icon><Brush /></el-icon></button>
+            <button class="header-action" type="button" aria-label="清空其他已打开页面" @click="clearTabs"><el-icon>
+                <Brush />
+              </el-icon></button>
           </el-tooltip>
           <el-dropdown trigger="click">
             <div class="user-entry">
-              <div class="avatar">{{ (auth.user?.nickname || auth.user?.username || 'A').slice(0, 1).toUpperCase() }}</div>
+              <div class="avatar">{{ (auth.user?.nickname || auth.user?.username || 'A').slice(0, 1).toUpperCase() }}
+              </div>
               <div class="user-meta">
                 <span class="user-name">{{ auth.user?.nickname || auth.user?.username }}</span>
                 <small>管理员</small>
               </div>
-              <el-icon class="arrow"><ArrowDown /></el-icon>
+              <el-icon class="arrow">
+                <ArrowDown />
+              </el-icon>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -370,8 +475,14 @@ function toggleCollapse() {
   scrollbar-color: rgba(168, 179, 199, .45) transparent;
 }
 
-.sidebar-menu-scroll::-webkit-scrollbar { width: 4px; }
-.sidebar-menu-scroll::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(168, 179, 199, .45); }
+.sidebar-menu-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-menu-scroll::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: rgba(168, 179, 199, .45);
+}
 
 .menu {
   background: transparent !important;
@@ -846,9 +957,23 @@ function toggleCollapse() {
     font-size: 13px;
   }
 
-  .top-navigation { max-width: calc(100% - 120px); }
-  .menu-search-button { width: 48px; flex-basis: 48px; }
-  .page-tab { padding: 0 10px; font-size: 13px; }
-  .header-action { width: 34px; height: 34px; }
+  .top-navigation {
+    max-width: calc(100% - 120px);
+  }
+
+  .menu-search-button {
+    width: 48px;
+    flex-basis: 48px;
+  }
+
+  .page-tab {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .header-action {
+    width: 34px;
+    height: 34px;
+  }
 }
 </style>

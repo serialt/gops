@@ -12,5 +12,10 @@ const router = useRouter()
 </template>
 
 <style scoped>
-.forbidden { height: 100%; display: flex; align-items: center; justify-content: center; }
+.forbidden {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 </style>

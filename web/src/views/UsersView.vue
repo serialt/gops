@@ -37,7 +37,8 @@ function userActionButton(text: string, className: string, onClick: () => void) 
 }
 const userColumnDefs = computed<ColDef[]>(() => [
   { headerName: '序号', valueGetter: params => String((currentPage.value - 1) * pageSize.value + (params.node?.rowIndex ?? 0) + 1), width: 70 },
-  { field: 'username', headerName: '用户名' }, { field: 'nickname', headerName: '昵称' },
+  { field: 'username', headerName: '用户名' },
+  { field: 'nickname', headerName: '昵称' },
   { headerName: '所属组织', valueGetter: params => params.data.organizations.map((item: Organization) => item.name).join('、') },
   { headerName: '角色', valueGetter: params => params.data.roles.map((item: Role) => item.name).join('、'), minWidth: 140 },
   { headerName: '状态', minWidth: 100, cellRenderer: (params: ICellRendererParams<User>) => { const tag = document.createElement('span'); tag.className = `grid-status${params.data?.status ? '' : ' is-disabled'}`; tag.textContent = params.data?.status ? '启用' : '禁用'; return tag } },
@@ -55,8 +56,8 @@ const organizationTree = computed(() => {
   return roots
 })
 const visibleUsers = computed(() => {
-	if (!activeOrganizationId.value) return users.value
-	return users.value.filter(user => user.organizations.some(organization => organization.id === activeOrganizationId.value))
+  if (!activeOrganizationId.value) return users.value
+  return users.value.filter(user => user.organizations.some(organization => organization.id === activeOrganizationId.value))
 })
 const pagedUsers = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
@@ -216,10 +217,20 @@ function toggleOrganizationPane() {
 <template>
   <div class="page-container table-shell" @click="closeContextMenu">
     <div class="user-layout" :style="{ gridTemplateColumns: `${organizationPaneWidth}px 2px minmax(0, 1fr)` }">
-      <aside class="organization-tree"><div class="tree-title"><span>组织架构</span><el-input v-model="organizationKeyword" class="organization-search" placeholder="搜索" clearable /></div><el-tree ref="organizationTreeRef" :data="organizationTree" node-key="id" draggable default-expand-all :filter-node-method="filterOrganizationNode" :allow-drop="allowOrganizationDrop" @node-click="handleOrganizationNodeClick" @node-contextmenu="handleOrganizationContextMenu" @node-drop="handleOrganizationDrop" /></aside>
-      <div class="content-divider" :class="{ dragging: organizationPaneDragging }" role="separator" aria-label="调整组织树宽度" @pointerdown="startOrganizationPaneDrag" @dblclick="toggleOrganizationPane">
-        <button class="content-divider-handle" type="button" :aria-label="organizationPaneWidth ? '收起组织树' : '展开组织树'" @pointerdown.stop @click.stop="toggleOrganizationPane">
-          <el-icon><component :is="organizationPaneWidth ? ArrowLeft : ArrowRight" /></el-icon>
+      <aside class="organization-tree">
+        <div class="tree-title"><span>组织架构</span><el-input v-model="organizationKeyword" class="organization-search"
+            placeholder="搜索" clearable /></div><el-tree ref="organizationTreeRef" :data="organizationTree" node-key="id"
+          draggable default-expand-all :filter-node-method="filterOrganizationNode" :allow-drop="allowOrganizationDrop"
+          @node-click="handleOrganizationNodeClick" @node-contextmenu="handleOrganizationContextMenu"
+          @node-drop="handleOrganizationDrop" />
+      </aside>
+      <div class="content-divider" :class="{ dragging: organizationPaneDragging }" role="separator" aria-label="调整组织树宽度"
+        @pointerdown="startOrganizationPaneDrag" @dblclick="toggleOrganizationPane">
+        <button class="content-divider-handle" type="button" :aria-label="organizationPaneWidth ? '收起组织树' : '展开组织树'"
+          @pointerdown.stop @click.stop="toggleOrganizationPane">
+          <el-icon>
+            <component :is="organizationPaneWidth ? ArrowLeft : ArrowRight" />
+          </el-icon>
         </button>
       </div>
       <div class="section-card">
@@ -227,75 +238,90 @@ function toggleOrganizationPane() {
           <div class="toolbar-left">
             <el-input v-model="keyword" placeholder="用户名或昵称" clearable class="search-input" />
           </div>
-        <div class="toolbar-actions">
-          <el-button v-if="selectedUsers.length" v-permission="'POST /api/v1/users/delete'" type="danger" plain @click="batchRemoveUsers">批量删除（{{ selectedUsers.length }}）</el-button>
-          <el-button v-permission="'POST /api/v1/users/create'" type="primary" class="primary-btn" @click="openCreate">新增用户</el-button>
+          <div class="toolbar-actions">
+            <el-button v-if="selectedUsers.length" v-permission="'POST /api/v1/users/delete'" type="danger" plain
+              @click="batchRemoveUsers">批量删除（{{ selectedUsers.length }}）</el-button>
+            <el-button v-permission="'POST /api/v1/users/create'" type="primary" class="primary-btn"
+              @click="openCreate">新增用户</el-button>
+          </div>
         </div>
-      </div>
 
-        <AppDataGrid v-loading="loading" :row-data="pagedUsers" :column-defs="userColumnDefs" @selection-changed="handleUserSelectionChanged" />
+        <AppDataGrid v-loading="loading" :row-data="pagedUsers" :column-defs="userColumnDefs"
+          @selection-changed="handleUserSelectionChanged" />
         <!--
         <el-table-column label="序号" type="index" :index="userIndex" width="70" :resizable="true" />
         <el-table-column prop="username" label="用户名" :width="userColumnWidths.username" :resizable="true" />
         <el-table-column prop="nickname" label="昵称" :width="userColumnWidths.nickname" :resizable="true" />
         <el-table-column label="所属组织" :width="userColumnWidths.organizations" :resizable="true"><template #default="{ row }"><el-tag v-for="organization in row.organizations" :key="organization.id" class="role-tag">{{ organization.name }}</el-tag></template></el-table-column>
-        <el-table-column label="角色" :width="userColumnWidths.roles" :resizable="true">
-          <template #default="{ row }">
+<el-table-column label="角色" :width="userColumnWidths.roles" :resizable="true">
+  <template #default="{ row }">
             <el-tag v-for="role in row.roles" :key="role.id" class="role-tag">{{ role.name }}</el-tag>
           </template>
-        </el-table-column>
-        <el-table-column label="状态" width="100" :resizable="true">
-          <template #default="{ row }">
+</el-table-column>
+<el-table-column label="状态" width="100" :resizable="true">
+  <template #default="{ row }">
             <el-tag :type="row.status ? 'success' : 'danger'" class="status-tag">{{ row.status ? '启用' : '禁用' }}</el-tag>
           </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right" :resizable="true">
-          <template #default="{ row }">
+</el-table-column>
+<el-table-column label="操作" width="150" fixed="right" :resizable="true">
+  <template #default="{ row }">
             <div class="action-group">
               <el-button v-permission="'POST /api/v1/users/update'" link type="primary" class="edit-btn" @click="openEdit(row)">编辑</el-button>
               <el-button v-permission="'POST /api/v1/users/delete'" link type="danger" @click="remove(row)">删除</el-button>
             </div>
           </template>
-        </el-table-column>
-      </el-table>
-      -->
-      <div class="pagination-bar">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="visibleUsers.length"
-          layout="total, sizes, prev, pager, next, jumper"
-          @current-change="handlePageChange"
-          @size-change="handlePageSizeChange"
-        />
+</el-table-column>
+</el-table>
+-->
+        <div class="pagination-bar">
+          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[10, 20, 50, 100]"
+            :total="visibleUsers.length" layout="total, sizes, prev, pager, next, jumper"
+            @current-change="handlePageChange" @size-change="handlePageSizeChange" />
+        </div>
       </div>
-    </div>
 
-    <el-dialog v-model="dialogVisible" :title="title" width="520px">
-      <el-form :model="form" label-width="90px">
-        <el-form-item label="用户名" required><el-input v-model="form.username" /></el-form-item>
-        <el-form-item :label="editingID ? '新密码' : '密码'" :required="!editingID"><el-input v-model="form.password" type="password" show-password :placeholder="editingID ? '留空表示不修改' : ''" /></el-form-item>
-        <el-form-item label="昵称" required><el-input v-model="form.nickname" /></el-form-item>
-        <el-form-item label="角色"><el-select v-model="form.role_ids" multiple style="width: 100%"><el-option v-for="role in roles" :key="role.id" :label="role.name" :value="role.id" /></el-select></el-form-item>
-        <el-form-item label="所属组织"><el-tree-select v-model="form.organization_ids" :data="organizationTree" node-key="id" multiple show-checkbox check-strictly style="width:100%" /></el-form-item>
-        <el-form-item label="状态"><el-switch v-model="form.status" /></el-form-item>
-      </el-form>
-      <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="organizationDialogVisible" :title="organizationEditingId ? '修改部门' : '新建部门'" width="480px">
-      <el-form :model="organizationForm" label-width="82px"><el-form-item label="上级部门"><el-tree-select v-model="organizationForm.parent_id" :data="organizationTree" node-key="id" check-strictly clearable style="width:100%" /></el-form-item><el-form-item label="部门名称" required><el-input v-model="organizationForm.name" /></el-form-item><el-form-item label="部门编码" required><el-input v-model="organizationForm.code" :disabled="organizations.find(item => item.id === organizationEditingId)?.code === 'root'" /></el-form-item><el-form-item label="负责人"><el-input v-model="organizationForm.manager" /></el-form-item><el-form-item label="状态"><el-switch v-model="organizationForm.status" /></el-form-item></el-form>
-      <template #footer><el-button @click="organizationDialogVisible=false">取消</el-button><el-button type="primary" @click="saveOrganization">保存</el-button></template>
-    </el-dialog>
-    <div v-if="contextMenu.visible && contextMenu.node" class="organization-context-menu" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
-      <el-button v-permission="'POST /api/v1/organizations/update'" link @click="openOrganizationRename(contextMenu.node)">修改名称</el-button>
-      <el-button v-permission="'POST /api/v1/organizations/create'" link @click="openOrganizationCreate(contextMenu.node)">新建部门</el-button>
-      <el-button v-permission="'POST /api/v1/organizations/move'" link :disabled="contextMenu.node.code === 'root'" @click="reorderOrganization(contextMenu.node, -1)">同级上移</el-button>
-      <el-button v-permission="'POST /api/v1/organizations/move'" link :disabled="contextMenu.node.code === 'root'" @click="reorderOrganization(contextMenu.node, 1)">同级下移</el-button>
-      <el-button v-permission="'POST /api/v1/organizations/delete'" link type="danger" :disabled="contextMenu.node.code === 'root'" @click="removeOrganization(contextMenu.node)">删除</el-button>
-    </div>
+      <el-dialog v-model="dialogVisible" :title="title" width="520px">
+        <el-form :model="form" label-width="90px">
+          <el-form-item label="用户名" required><el-input v-model="form.username" /></el-form-item>
+          <el-form-item :label="editingID ? '新密码' : '密码'" :required="!editingID"><el-input v-model="form.password"
+              type="password" show-password :placeholder="editingID ? '留空表示不修改' : ''" /></el-form-item>
+          <el-form-item label="昵称" required><el-input v-model="form.nickname" /></el-form-item>
+          <el-form-item label="角色"><el-select v-model="form.role_ids" multiple style="width: 100%"><el-option
+                v-for="role in roles" :key="role.id" :label="role.name" :value="role.id" /></el-select></el-form-item>
+          <el-form-item label="所属组织"><el-tree-select v-model="form.organization_ids" :data="organizationTree"
+              node-key="id" multiple show-checkbox check-strictly style="width:100%" /></el-form-item>
+          <el-form-item label="状态"><el-switch v-model="form.status" /></el-form-item>
+        </el-form>
+        <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
+            @click="save">保存</el-button></template>
+      </el-dialog>
+      <el-dialog v-model="organizationDialogVisible" :title="organizationEditingId ? '修改部门' : '新建部门'" width="480px">
+        <el-form :model="organizationForm" label-width="82px"><el-form-item label="上级部门"><el-tree-select
+              v-model="organizationForm.parent_id" :data="organizationTree" node-key="id" check-strictly clearable
+              style="width:100%" /></el-form-item><el-form-item label="部门名称" required><el-input
+              v-model="organizationForm.name" /></el-form-item><el-form-item label="部门编码" required><el-input
+              v-model="organizationForm.code"
+              :disabled="organizations.find(item => item.id === organizationEditingId)?.code === 'root'" /></el-form-item><el-form-item
+            label="负责人"><el-input v-model="organizationForm.manager" /></el-form-item><el-form-item
+            label="状态"><el-switch v-model="organizationForm.status" /></el-form-item></el-form>
+        <template #footer><el-button @click="organizationDialogVisible = false">取消</el-button><el-button type="primary"
+            @click="saveOrganization">保存</el-button></template>
+      </el-dialog>
+      <div v-if="contextMenu.visible && contextMenu.node" class="organization-context-menu"
+        :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
+        <el-button v-permission="'POST /api/v1/organizations/update'" link
+          @click="openOrganizationRename(contextMenu.node)">修改名称</el-button>
+        <el-button v-permission="'POST /api/v1/organizations/create'" link
+          @click="openOrganizationCreate(contextMenu.node)">新建部门</el-button>
+        <el-button v-permission="'POST /api/v1/organizations/move'" link :disabled="contextMenu.node.code === 'root'"
+          @click="reorderOrganization(contextMenu.node, -1)">同级上移</el-button>
+        <el-button v-permission="'POST /api/v1/organizations/move'" link :disabled="contextMenu.node.code === 'root'"
+          @click="reorderOrganization(contextMenu.node, 1)">同级下移</el-button>
+        <el-button v-permission="'POST /api/v1/organizations/delete'" link type="danger"
+          :disabled="contextMenu.node.code === 'root'" @click="removeOrganization(contextMenu.node)">删除</el-button>
       </div>
     </div>
+  </div>
 </template>
 
 <style scoped>
@@ -305,20 +331,117 @@ function toggleOrganizationPane() {
   min-height: calc(100% - 1px);
 }
 
-.user-layout { display: grid; gap: 0; height: 100%; min-height: 100%; }
-.organization-tree { min-width: 0; overflow: hidden; padding: 14px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow); }
-.content-divider { width: 2px; cursor: col-resize; touch-action: none; position: relative; background: transparent; }
-.content-divider::before { content: ''; position: absolute; z-index: 1; top: 0; bottom: 0; left: -6px; width: 13px; }
-.content-divider::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--line); }
-.content-divider:hover::after, .content-divider.dragging::after { background: var(--primary); }
-.content-divider-handle { position: absolute; z-index: 2; top: 50%; left: 50%; width: 15px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; transform: translate(-50%, -50%); border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #667085; box-shadow: 0 2px 5px rgba(31, 42, 68, 0.12); cursor: pointer; }
-.content-divider-handle:hover { color: var(--primary); border-color: var(--primary); }
-.content-divider-handle :deep(.el-icon) { font-size: 10px; }
-.tree-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 700; white-space: nowrap; }
-.organization-search { width: 92px; }
-.organization-search :deep(.el-input__wrapper) { min-height: 28px; border-radius: 6px; box-shadow: 0 0 0 1px var(--line) inset; }
-.organization-tree :deep(.el-tree) { background: transparent; font-size: 11px; }
-.organization-tree :deep(.el-tree-node__content) { height: 32px; border-radius: 6px; }
+.user-layout {
+  display: grid;
+  gap: 0;
+  height: 100%;
+  min-height: 100%;
+}
+
+.organization-tree {
+  min-width: 0;
+  overflow: hidden;
+  padding: 14px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+}
+
+.content-divider {
+  width: 2px;
+  cursor: col-resize;
+  touch-action: none;
+  position: relative;
+  background: transparent;
+}
+
+.content-divider::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  width: 13px;
+}
+
+.content-divider::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--line);
+}
+
+.content-divider:hover::after,
+.content-divider.dragging::after {
+  background: var(--primary);
+}
+
+.content-divider-handle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: #667085;
+  box-shadow: 0 2px 5px rgba(31, 42, 68, 0.12);
+  cursor: pointer;
+}
+
+.content-divider-handle:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.content-divider-handle :deep(.el-icon) {
+  font-size: 10px;
+}
+
+.tree-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.organization-search {
+  width: 92px;
+}
+
+.organization-search :deep(.el-input__wrapper) {
+  min-height: 28px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--line) inset;
+}
+
+.organization-tree :deep(.el-tree) {
+  background: transparent;
+  font-size: 11px;
+}
+
+.organization-tree :deep(.el-tree-node__content) {
+  height: 32px;
+  border-radius: 6px;
+}
 
 .section-card {
   background: var(--bg-card);
@@ -345,7 +468,11 @@ function toggleOrganizationPane() {
   gap: 8px;
 }
 
-.toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 .search-input {
   width: 240px;
@@ -393,11 +520,27 @@ function toggleOrganizationPane() {
 }
 
 @media (max-width: 768px) {
-  .user-layout { grid-template-columns: 1fr !important; }
-  .content-divider { display: none; }
-  .organization-tree { max-height: 260px; overflow: auto; }
-  .page-toolbar, .toolbar-left { flex-wrap: wrap; }
-  .search-input { width: min(240px, 100%); }
+  .user-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .content-divider {
+    display: none;
+  }
+
+  .organization-tree {
+    max-height: 260px;
+    overflow: auto;
+  }
+
+  .page-toolbar,
+  .toolbar-left {
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    width: min(240px, 100%);
+  }
 }
 
 .section-card {
@@ -420,12 +563,74 @@ function toggleOrganizationPane() {
   font-weight: 500;
 }
 
-:deep(.grid-action-group) { position: absolute; inset: 0; display: flex; box-sizing: border-box; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
-:deep(.grid-action) { border: 1px solid transparent; border-radius: 8px; padding: 4px 9px; background: #fff; font: inherit; font-size: 11px; cursor: pointer; line-height: 1.25; box-shadow: 0 1px 3px rgba(24, 34, 53, .08); }
-:deep(.grid-action.edit) { border-color: var(--primary); color: var(--primary); background: #f7f8ff; }
-:deep(.grid-action.delete) { border-color: #ffd5d5; color: #ef6262; background: #fff7f7; }
-:deep(.grid-status) { display: inline-flex; padding: 4px 9px; border: 1px solid #d9f0cf; border-radius: 6px; color: #58b83d; background: #f0f9eb; line-height: 1.25; }
-:deep(.grid-status.is-disabled) { border-color: #e4e7ed; color: #909399; background: #f4f4f5; }
-.organization-context-menu { position: fixed; z-index: 3000; display: flex; flex-direction: column; min-width: 112px; padding: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: 0 8px 22px rgb(31 45 61 / 18%); }
-.organization-context-menu :deep(.el-button) { justify-content: flex-start; margin: 0; padding: 7px 9px; font-size: 11px; }
+:deep(.grid-action-group) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+:deep(.grid-action) {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 9px;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1.25;
+  box-shadow: 0 1px 3px rgba(24, 34, 53, .08);
+}
+
+:deep(.grid-action.edit) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #f7f8ff;
+}
+
+:deep(.grid-action.delete) {
+  border-color: #ffd5d5;
+  color: #ef6262;
+  background: #fff7f7;
+}
+
+:deep(.grid-status) {
+  display: inline-flex;
+  padding: 4px 9px;
+  border: 1px solid #d9f0cf;
+  border-radius: 6px;
+  color: #58b83d;
+  background: #f0f9eb;
+  line-height: 1.25;
+}
+
+:deep(.grid-status.is-disabled) {
+  border-color: #e4e7ed;
+  color: #909399;
+  background: #f4f4f5;
+}
+
+.organization-context-menu {
+  position: fixed;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  min-width: 112px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-card);
+  box-shadow: 0 8px 22px rgb(31 45 61 / 18%);
+}
+
+.organization-context-menu :deep(.el-button) {
+  justify-content: flex-start;
+  margin: 0;
+  padding: 7px 9px;
+  font-size: 11px;
+}
 </style>

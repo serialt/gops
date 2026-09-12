@@ -7,14 +7,72 @@ import { createCredential, deleteCredential, listCredentials, updateCredential, 
 
 const rows = ref<Credential[]>([]); const keyword = ref(''); const dialogVisible = ref(false); const editingID = ref<number | null>(null)
 const form = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' })
-function action(text:string, kind:string, fn:()=>void){const el=document.createElement('button');el.textContent=text;el.className=`credential-action ${kind}`;el.onclick=fn;return el}
-const columns=computed<ColDef[]>(()=>[{headerName:'序号',valueGetter:p=>String((p.node?.rowIndex??0)+1),width:70},{field:'name',headerName:'凭证名称',minWidth:120},{field:'credential_type',headerName:'类型',width:100},{field:'username',headerName:'用户名',minWidth:120},{field:'description',headerName:'说明',minWidth:160},{headerName:'操作',pinned:'right',width:150,cellRenderer:(p:any)=>{const wrap=document.createElement('div');wrap.className='credential-actions';wrap.append(action('编辑','edit',()=>edit(p.data)),action('删除','delete',()=>remove(p.data)));return wrap}}])
-async function load(){const {data}=await listCredentials(keyword.value);rows.value=data.data}
-function create(){editingID.value=null;Object.assign(form,{name:'',credential_type:'password',username:'',password:'',private_key:'',passphrase:'',description:''});dialogVisible.value=true}
-function edit(row:Credential){editingID.value=row.id;Object.assign(form,{name:row.name,credential_type:row.credential_type,username:row.username,password:'',private_key:'',passphrase:'',description:row.description});dialogVisible.value=true}
-async function save(){if(!form.name)return ElMessage.warning('请填写凭证名称');if(editingID.value)await updateCredential({...form,id:editingID.value});else await createCredential(form);dialogVisible.value=false;ElMessage.success('保存成功');await load()}
-async function remove(row:Credential){await ElMessageBox.confirm(`确定删除凭证 ${row.name}？`,'删除确认',{type:'warning'});await deleteCredential(row.id);ElMessage.success('删除成功');await load()}
+function action(text: string, kind: string, fn: () => void) { const el = document.createElement('button'); el.textContent = text; el.className = `credential-action ${kind}`; el.onclick = fn; return el }
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '凭证名称', minWidth: 120 }, { field: 'credential_type', headerName: '类型', width: 100 }, { field: 'username', headerName: '用户名', minWidth: 120 }, { field: 'description', headerName: '说明', minWidth: 160 }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'credential-actions'; wrap.append(action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
+async function load() { const { data } = await listCredentials(keyword.value); rows.value = data.data }
+function create() { editingID.value = null; Object.assign(form, { name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); dialogVisible.value = true }
+function edit(row: Credential) { editingID.value = row.id; Object.assign(form, { name: row.name, credential_type: row.credential_type, username: row.username, password: '', private_key: '', passphrase: '', description: row.description }); dialogVisible.value = true }
+async function save() { if (!form.name) return ElMessage.warning('请填写凭证名称'); if (editingID.value) await updateCredential({ ...form, id: editingID.value }); else await createCredential(form); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
+async function remove(row: Credential) { await ElMessageBox.confirm(`确定删除凭证 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteCredential(row.id); ElMessage.success('删除成功'); await load() }
 onMounted(load)
 </script>
-<template><div class="page-container table-shell"><div class="section-card"><div class="page-toolbar"><h2 class="page-title">凭证管理</h2><el-button v-permission="'POST /api/v1/assets/credentials/create'" type="primary" class="primary-btn" @click="create">新增凭证</el-button></div><el-input v-model="keyword" class="credential-search" placeholder="搜索凭证名称或用户名" clearable @input="load"/><AppDataGrid :row-data="rows" :column-defs="columns" pagination/></div><el-dialog v-model="dialogVisible" :title="editingID?'编辑凭证':'新增凭证'" width="480px"><el-form :model="form" label-width="86px"><el-form-item label="名称"><el-input v-model="form.name"/></el-form-item><el-form-item label="类型"><el-select v-model="form.credential_type"><el-option label="密码" value="password"/><el-option label="私钥" value="key"/></el-select></el-form-item><el-form-item label="用户名"><el-input v-model="form.username"/></el-form-item><el-form-item v-if="form.credential_type==='password'" label="密码"><el-input v-model="form.password" type="password" show-password/></el-form-item><el-form-item v-else label="私钥"><el-input v-model="form.private_key" type="textarea"/></el-form-item><el-form-item label="私钥口令"><el-input v-model="form.passphrase" type="password" show-password/></el-form-item><el-form-item label="说明"><el-input v-model="form.description" type="textarea"/></el-form-item></el-form><template #footer><el-button @click="dialogVisible=false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template></el-dialog></div></template>
-<style scoped>.credential-search{width:260px;margin-bottom:12px}:deep(.credential-actions){position:absolute;inset:0;display:flex;gap:8px;align-items:center;justify-content:center}:deep(.credential-action){padding:4px 9px;border:1px solid transparent;border-radius:8px;background:#fff;font-size:11px;box-shadow:0 1px 3px rgba(24,34,53,.08)}:deep(.credential-action.edit){border-color:var(--primary);color:var(--primary);background:#f7f8ff}:deep(.credential-action.delete){border-color:#ffd5d5;color:#ef6262;background:#fff7f7}</style>
+<template>
+    <div class="page-container table-shell">
+        <div class="section-card">
+            <div class="page-toolbar">
+                <h2 class="page-title">凭证管理</h2><el-button v-permission="'POST /api/v1/assets/credentials/create'"
+                    type="primary" class="primary-btn" @click="create">新增凭证</el-button>
+            </div><el-input v-model="keyword" class="credential-search" placeholder="搜索凭证名称或用户名" clearable
+                @input="load" />
+            <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
+        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑凭证' : '新增凭证'" width="480px"><el-form
+                :model="form" label-width="86px"><el-form-item label="名称"><el-input
+                        v-model="form.name" /></el-form-item><el-form-item label="类型"><el-select
+                        v-model="form.credential_type"><el-option label="密码" value="password" /><el-option label="私钥"
+                            value="key" /></el-select></el-form-item><el-form-item label="用户名"><el-input
+                        v-model="form.username" /></el-form-item><el-form-item
+                    v-if="form.credential_type === 'password'" label="密码"><el-input v-model="form.password"
+                        type="password" show-password /></el-form-item><el-form-item v-else label="私钥"><el-input
+                        v-model="form.private_key" type="textarea" /></el-form-item><el-form-item label="私钥口令"><el-input
+                        v-model="form.passphrase" type="password" show-password /></el-form-item><el-form-item
+                    label="说明"><el-input v-model="form.description" type="textarea" /></el-form-item></el-form><template
+                #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
+                    @click="save">保存</el-button></template></el-dialog>
+    </div>
+</template>
+<style scoped>
+.credential-search {
+    width: 260px;
+    margin-bottom: 12px
+}
+
+:deep(.credential-actions) {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center
+}
+
+:deep(.credential-action) {
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 11px;
+    box-shadow: 0 1px 3px rgba(24, 34, 53, .08)
+}
+
+:deep(.credential-action.edit) {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: #f7f8ff
+}
+
+:deep(.credential-action.delete) {
+    border-color: #ffd5d5;
+    color: #ef6262;
+    background: #fff7f7
+}
+</style>

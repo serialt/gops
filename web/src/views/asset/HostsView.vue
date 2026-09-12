@@ -1,8 +1,66 @@
 <script setup lang="ts">
-import { computed,onMounted,reactive,ref } from 'vue';import { ElMessage,ElMessageBox } from 'element-plus';import type { ColDef } from 'ag-grid-community';import AppDataGrid from '@/components/AppDataGrid.vue';import { createHost,deleteHost,listHosts,type Host,updateHost } from '@/api/asset'
-const rows=ref<Host[]>([]);const keyword=ref('');const dialogVisible=ref(false);const editingID=ref<number|null>(null);const form=reactive({name:'',group_id:0,host_type:'self',ip:'',port:22,ssh_user:'root',credential_id:0,cloud_account_id:0,tags:'',description:'',status:-1})
-function action(text:string,kind:string,fn:()=>void){const el=document.createElement('button');el.textContent=text;el.className=`host-action ${kind}`;el.onclick=fn;return el};const columns=computed<ColDef[]>(()=>[{headerName:'序号',valueGetter:p=>String((p.node?.rowIndex??0)+1),width:70},{field:'name',headerName:'主机名称',minWidth:130},{field:'ip',headerName:'地址',minWidth:140},{field:'port',headerName:'端口',width:80},{field:'ssh_user',headerName:'SSH 用户',width:110},{field:'host_type',headerName:'类型',width:100},{field:'status',headerName:'状态',width:90,cellRenderer:(p:any)=>`<span class="grid-status${p.value===1?'':' is-disabled'}">${p.value===1?'在线':p.value===0?'离线':'未知'}</span>`},{field:'tags',headerName:'标签',minWidth:120},{headerName:'操作',pinned:'right',width:150,cellRenderer:(p:any)=>{const wrap=document.createElement('div');wrap.className='host-actions';wrap.append(action('编辑','edit',()=>edit(p.data)),action('删除','delete',()=>remove(p.data)));return wrap}}])
-async function load(){const{data}=await listHosts(keyword.value);rows.value=data.data}function create(){editingID.value=null;Object.assign(form,{name:'',group_id:0,host_type:'self',ip:'',port:22,ssh_user:'root',credential_id:0,cloud_account_id:0,tags:'',description:'',status:-1});dialogVisible.value=true}function edit(row:Host){editingID.value=row.id;Object.assign(form,row);dialogVisible.value=true}async function save(){if(!form.name||!form.ip)return ElMessage.warning('请填写主机名称和地址');if(editingID.value)await updateHost({...form,id:editingID.value});else await createHost(form);dialogVisible.value=false;ElMessage.success('保存成功');await load()}async function remove(row:Host){await ElMessageBox.confirm(`确定删除主机 ${row.name}？`,'删除确认',{type:'warning'});await deleteHost(row.id);ElMessage.success('删除成功');await load()}onMounted(load)
+import { computed, onMounted, reactive, ref } from 'vue'; import { ElMessage, ElMessageBox } from 'element-plus'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { createHost, deleteHost, listHosts, type Host, updateHost } from '@/api/asset'
+const rows = ref<Host[]>([]); const keyword = ref(''); const dialogVisible = ref(false); const editingID = ref<number | null>(null); const form = reactive({ name: '', group_id: 0, host_type: 'self', ip: '', port: 22, ssh_user: 'root', credential_id: 0, cloud_account_id: 0, tags: '', description: '', status: -1 })
+function action(text: string, kind: string, fn: () => void) { const el = document.createElement('button'); el.textContent = text; el.className = `host-action ${kind}`; el.onclick = fn; return el }; const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '主机名称', minWidth: 130 }, { field: 'ip', headerName: '地址', minWidth: 140 }, { field: 'port', headerName: '端口', width: 80 }, { field: 'ssh_user', headerName: 'SSH 用户', width: 110 }, { field: 'host_type', headerName: '类型', width: 100 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value === 1 ? '' : ' is-disabled'}">${p.value === 1 ? '在线' : p.value === 0 ? '离线' : '未知'}</span>` }, { field: 'tags', headerName: '标签', minWidth: 120 }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'host-actions'; wrap.append(action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
+async function load() { const { data } = await listHosts(keyword.value); rows.value = data.data } function create() { editingID.value = null; Object.assign(form, { name: '', group_id: 0, host_type: 'self', ip: '', port: 22, ssh_user: 'root', credential_id: 0, cloud_account_id: 0, tags: '', description: '', status: -1 }); dialogVisible.value = true } function edit(row: Host) { editingID.value = row.id; Object.assign(form, row); dialogVisible.value = true } async function save() { if (!form.name || !form.ip) return ElMessage.warning('请填写主机名称和地址'); if (editingID.value) await updateHost({ ...form, id: editingID.value }); else await createHost(form); dialogVisible.value = false; ElMessage.success('保存成功'); await load() } async function remove(row: Host) { await ElMessageBox.confirm(`确定删除主机 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteHost(row.id); ElMessage.success('删除成功'); await load() } onMounted(load)
 </script>
-<template><div class="page-container table-shell"><div class="section-card"><div class="page-toolbar"><h2 class="page-title">主机管理</h2><el-button type="primary" class="primary-btn" @click="create">新增主机</el-button></div><el-input v-model="keyword" class="host-search" placeholder="搜索主机名称或地址" clearable @input="load"/><AppDataGrid :row-data="rows" :column-defs="columns" pagination/></div><el-dialog v-model="dialogVisible" :title="editingID?'编辑主机':'新增主机'" width="520px"><el-form :model="form" label-width="90px"><el-form-item label="主机名称"><el-input v-model="form.name"/></el-form-item><el-form-item label="地址"><el-input v-model="form.ip"/></el-form-item><el-form-item label="端口"><el-input-number v-model="form.port" :min="1" :max="65535"/></el-form-item><el-form-item label="SSH 用户"><el-input v-model="form.ssh_user"/></el-form-item><el-form-item label="资产分组 ID"><el-input-number v-model="form.group_id" :min="0"/></el-form-item><el-form-item label="凭证 ID"><el-input-number v-model="form.credential_id" :min="0"/></el-form-item><el-form-item label="云账号 ID"><el-input-number v-model="form.cloud_account_id" :min="0"/></el-form-item><el-form-item label="标签"><el-input v-model="form.tags"/></el-form-item><el-form-item label="说明"><el-input v-model="form.description" type="textarea"/></el-form-item></el-form><template #footer><el-button @click="dialogVisible=false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template></el-dialog></div></template>
-<style scoped>.host-search{width:260px;margin-bottom:12px}:deep(.host-actions){position:absolute;inset:0;display:flex;gap:8px;align-items:center;justify-content:center}:deep(.host-action){padding:4px 9px;border:1px solid transparent;border-radius:8px;background:#fff;font-size:11px;box-shadow:0 1px 3px rgba(24,34,53,.08)}:deep(.host-action.edit){border-color:var(--primary);color:var(--primary);background:#f7f8ff}:deep(.host-action.delete){border-color:#ffd5d5;color:#ef6262;background:#fff7f7}</style>
+<template>
+    <div class="page-container table-shell">
+        <div class="section-card">
+            <div class="page-toolbar">
+                <h2 class="page-title">主机管理</h2><el-button type="primary" class="primary-btn"
+                    @click="create">新增主机</el-button>
+            </div><el-input v-model="keyword" class="host-search" placeholder="搜索主机名称或地址" clearable @input="load" />
+            <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
+        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑主机' : '新增主机'" width="520px"><el-form
+                :model="form" label-width="90px"><el-form-item label="主机名称"><el-input
+                        v-model="form.name" /></el-form-item><el-form-item label="地址"><el-input
+                        v-model="form.ip" /></el-form-item><el-form-item label="端口"><el-input-number v-model="form.port"
+                        :min="1" :max="65535" /></el-form-item><el-form-item label="SSH 用户"><el-input
+                        v-model="form.ssh_user" /></el-form-item><el-form-item label="资产分组 ID"><el-input-number
+                        v-model="form.group_id" :min="0" /></el-form-item><el-form-item label="凭证 ID"><el-input-number
+                        v-model="form.credential_id" :min="0" /></el-form-item><el-form-item
+                    label="云账号 ID"><el-input-number v-model="form.cloud_account_id"
+                        :min="0" /></el-form-item><el-form-item label="标签"><el-input
+                        v-model="form.tags" /></el-form-item><el-form-item label="说明"><el-input
+                        v-model="form.description" type="textarea" /></el-form-item></el-form><template
+                #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
+                    @click="save">保存</el-button></template></el-dialog>
+    </div>
+</template>
+<style scoped>
+.host-search {
+    width: 260px;
+    margin-bottom: 12px
+}
+
+:deep(.host-actions) {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center
+}
+
+:deep(.host-action) {
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 11px;
+    box-shadow: 0 1px 3px rgba(24, 34, 53, .08)
+}
+
+:deep(.host-action.edit) {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: #f7f8ff
+}
+
+:deep(.host-action.delete) {
+    border-color: #ffd5d5;
+    color: #ef6262;
+    background: #fff7f7
+}
+</style>

@@ -39,23 +39,76 @@ onMounted(load)
 <template>
   <div class="page-container table-shell">
     <div class="section-card">
-      <div class="page-toolbar"><h2 class="page-title">资产分组</h2><el-button v-permission="'POST /api/v1/assets/groups/create'" type="primary" class="primary-btn" @click="openCreate">新增分组</el-button></div>
+      <div class="page-toolbar">
+        <h2 class="page-title">资产分组</h2><el-button v-permission="'POST /api/v1/assets/groups/create'" type="primary"
+          class="primary-btn" @click="openCreate">新增分组</el-button>
+      </div>
       <el-input v-model="keyword" class="asset-search" placeholder="搜索分组名称或编码" clearable @input="load" />
       <AppDataGrid :row-data="rows" :column-defs="columnDefs" pagination />
     </div>
     <el-dialog v-model="dialogVisible" :title="editingID ? '编辑资产分组' : '新增资产分组'" width="460px">
-      <el-form :model="form" label-width="80px"><el-form-item label="名称"><el-input v-model="form.name" /></el-form-item><el-form-item label="编码"><el-input v-model="form.code" /></el-form-item><el-form-item label="上级 ID"><el-input-number v-model="form.parent_id" :min="0" /></el-form-item><el-form-item label="排序"><el-input-number v-model="form.sort_order" :min="0" /></el-form-item><el-form-item label="状态"><el-switch v-model="form.status" /></el-form-item><el-form-item label="说明"><el-input v-model="form.description" type="textarea" /></el-form-item></el-form>
-      <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template>
+      <el-form :model="form" label-width="80px"><el-form-item label="名称"><el-input
+            v-model="form.name" /></el-form-item><el-form-item label="编码"><el-input
+            v-model="form.code" /></el-form-item><el-form-item label="上级 ID"><el-input-number v-model="form.parent_id"
+            :min="0" /></el-form-item><el-form-item label="排序"><el-input-number v-model="form.sort_order"
+            :min="0" /></el-form-item><el-form-item label="状态"><el-switch
+            v-model="form.status" /></el-form-item><el-form-item label="说明"><el-input v-model="form.description"
+            type="textarea" /></el-form-item></el-form>
+      <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
+          @click="save">保存</el-button></template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.asset-search { width: 260px; margin-bottom: 12px; }
-:deep(.asset-actions) { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
-:deep(.asset-action) { padding: 4px 9px; border: 1px solid transparent; border-radius: 8px; background: #fff; font-size: 11px; cursor: pointer; box-shadow: 0 1px 3px rgba(24, 34, 53, .08); }
-:deep(.asset-action.edit) { border-color: var(--primary); color: var(--primary); background: #f7f8ff; }
-:deep(.asset-action.delete) { border-color: #ffd5d5; color: #ef6262; background: #fff7f7; }
-:deep(.grid-status) { display: inline-flex; padding: 3px 8px; border: 1px solid #d9f0d0; border-radius: 8px; color: #67c23a; background: #f0f9eb; }
-:deep(.grid-status.is-disabled) { border-color: #e4e7ed; color: #909399; background: #f4f4f5; }
+.asset-search {
+  width: 260px;
+  margin-bottom: 12px;
+}
+
+:deep(.asset-actions) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+:deep(.asset-action) {
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(24, 34, 53, .08);
+}
+
+:deep(.asset-action.edit) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #f7f8ff;
+}
+
+:deep(.asset-action.delete) {
+  border-color: #ffd5d5;
+  color: #ef6262;
+  background: #fff7f7;
+}
+
+:deep(.grid-status) {
+  display: inline-flex;
+  padding: 3px 8px;
+  border: 1px solid #d9f0d0;
+  border-radius: 8px;
+  color: #67c23a;
+  background: #f0f9eb;
+}
+
+:deep(.grid-status.is-disabled) {
+  border-color: #e4e7ed;
+  color: #909399;
+  background: #f4f4f5;
+}
 </style>

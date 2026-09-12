@@ -40,8 +40,7 @@ func seed(db *gorm.DB, casbinService *casbinx.Service) error {
 			return err
 		}
 	} else {
-		slog.Info("系统已经初始化,跳过")
-		return nil
+		slog.Info("系统已经初始化，校验管理员权限")
 	}
 
 	adminRole := model.Role{Code: "admin", Name: "超级管理员", Description: "拥有全部后台接口权限"}

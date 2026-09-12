@@ -84,9 +84,12 @@ onMounted(async () => {
         </div>
 
         <div class="status-list">
-          <div class="status-row"><span class="legend legend--green"></span> 在线 <span class="count">{{ dotValue }}</span></div>
-          <div class="status-row"><span class="legend legend--gray"></span> 离线 <span class="count">{{ Math.max((stats.users || 0) - dotValue, 0) }}</span></div>
-          <div class="status-row"><span class="legend legend--default"></span> 资产总量 <span class="count">{{ stats.users }}</span></div>
+          <div class="status-row"><span class="legend legend--green"></span> 在线 <span class="count">{{ dotValue
+              }}</span></div>
+          <div class="status-row"><span class="legend legend--gray"></span> 离线 <span class="count">{{
+            Math.max((stats.users || 0) - dotValue, 0) }}</span></div>
+          <div class="status-row"><span class="legend legend--default"></span> 资产总量 <span class="count">{{ stats.users
+              }}</span></div>
         </div>
       </section>
 
@@ -372,8 +375,8 @@ onMounted(async () => {
 }
 
 .summary-box {
-  background: rgba(255,255,255,0.42);
-  border: 1px solid rgba(148,163,184,0.16);
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 12px;
   padding: 18px 10px 14px;
   text-align: center;
@@ -396,15 +399,15 @@ onMounted(async () => {
   height: 260px;
   margin-top: 22px;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.25), rgba(255,255,255,0.08));
-  border: 1px solid rgba(148,163,184,0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(148, 163, 184, 0.12);
   overflow: hidden;
 }
 
 .chart-grid {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(to top, rgba(148,163,184,0.14) 1px, transparent 1px);
+  background-image: linear-gradient(to top, rgba(148, 163, 184, 0.14) 1px, transparent 1px);
   background-size: 100% 20%;
 }
 
@@ -427,8 +430,13 @@ onMounted(async () => {
   display: inline-block;
 }
 
-.bar--blue { background: linear-gradient(180deg, #8ab9ff, #2a82f5); }
-.bar--green { background: linear-gradient(180deg, #8fe0bb, #2bb673); }
+.bar--blue {
+  background: linear-gradient(180deg, #8ab9ff, #2a82f5);
+}
+
+.bar--green {
+  background: linear-gradient(180deg, #8fe0bb, #2bb673);
+}
 
 .legend-row {
   display: flex;
@@ -446,19 +454,53 @@ onMounted(async () => {
 }
 
 @media (max-width: 1200px) {
-  .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .panel-grid { grid-template-columns: 1fr; }
+  .cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
-  .cards-grid { grid-template-columns: 1fr; gap: 12px; }
-  .panel-grid { gap: 12px; }
-  .mini-card { min-height: 96px; padding: 14px; }
-  .card-value { font-size: 26px; }
-  .panel { padding: 14px; }
-  .donut-wrap { min-height: 190px; }
-  .donut-chart { width: 160px; height: 160px; }
-  .chart-area { height: 200px; }
-  .summary-value { font-size: 26px; }
+  .cards-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .panel-grid {
+    gap: 12px;
+  }
+
+  .mini-card {
+    min-height: 96px;
+    padding: 14px;
+  }
+
+  .card-value {
+    font-size: 26px;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .donut-wrap {
+    min-height: 190px;
+  }
+
+  .donut-chart {
+    width: 160px;
+    height: 160px;
+  }
+
+  .chart-area {
+    height: 200px;
+  }
+
+  .summary-value {
+    font-size: 26px;
+  }
 }
 </style>

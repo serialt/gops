@@ -77,7 +77,8 @@ onBeforeUnmount(cleanup)
       <div class="host-panel-title">主机终端</div>
       <el-input v-model="keyword" placeholder="搜索主机" clearable />
       <div class="host-list">
-        <button v-for="host in filteredHosts" :key="host.id" class="host-item" :class="{ active: selectedHost?.id === host.id }" @click="open(host)">
+        <button v-for="host in filteredHosts" :key="host.id" class="host-item"
+          :class="{ active: selectedHost?.id === host.id }" @click="open(host)">
           <strong>{{ host.name }}</strong><span>{{ host.ip }}:{{ host.port }}</span>
         </button>
         <el-empty v-if="!filteredHosts.length" description="暂无主机" :image-size="48" />
@@ -91,5 +92,105 @@ onBeforeUnmount(cleanup)
 </template>
 
 <style scoped>
-.terminal-page{display:flex;height:100%;min-height:520px;gap:10px;padding:10px;box-sizing:border-box}.host-panel,.terminal-panel{border:1px solid var(--line);border-radius:10px;background:#fff;min-width:0}.host-panel{width:220px;padding:12px;display:flex;flex-direction:column;gap:10px}.host-panel-title{font-size:15px;font-weight:700}.host-list{overflow:auto;display:flex;flex-direction:column;gap:4px}.host-item{border:0;border-radius:7px;background:transparent;padding:8px;text-align:left;cursor:pointer;color:var(--text);font-size:11px}.host-item:hover,.host-item.active{background:#f1f3ff}.host-item strong,.host-item span{display:block}.host-item span{margin-top:3px;color:#7a8498;font-size:10px}.terminal-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#101827}.terminal-panel header{padding:9px 12px;background:#fff;color:var(--text);font-size:11px}.terminal-body{flex:1;min-height:0;padding:10px;overflow:hidden}@media(max-width:720px){.terminal-page{flex-direction:column}.host-panel{width:auto;max-height:180px}.host-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+.terminal-page {
+  display: flex;
+  height: 100%;
+  min-height: 520px;
+  gap: 10px;
+  padding: 10px;
+  box-sizing: border-box
+}
+
+.host-panel,
+.terminal-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  min-width: 0
+}
+
+.host-panel {
+  width: 220px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px
+}
+
+.host-panel-title {
+  font-size: 15px;
+  font-weight: 700
+}
+
+.host-list {
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px
+}
+
+.host-item {
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 11px
+}
+
+.host-item:hover,
+.host-item.active {
+  background: #f1f3ff
+}
+
+.host-item strong,
+.host-item span {
+  display: block
+}
+
+.host-item span {
+  margin-top: 3px;
+  color: #7a8498;
+  font-size: 10px
+}
+
+.terminal-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #101827
+}
+
+.terminal-panel header {
+  padding: 9px 12px;
+  background: #fff;
+  color: var(--text);
+  font-size: 11px
+}
+
+.terminal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+  overflow: hidden
+}
+
+@media(max-width:720px) {
+  .terminal-page {
+    flex-direction: column
+  }
+
+  .host-panel {
+    width: auto;
+    max-height: 180px
+  }
+
+  .host-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr))
+  }
+}
 </style>

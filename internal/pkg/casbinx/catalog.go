@@ -54,6 +54,22 @@ func Catalog() []Permission {
 		{Group: "角色管理", Name: "查看权限目录", Path: "/api/v1/permissions/catalog", Method: "POST"},
 		{Group: "角色管理", Name: "查看角色权限", Path: "/api/v1/roles/permissions/get", Method: "POST"},
 		{Group: "角色管理", Name: "设置角色权限", Path: "/api/v1/roles/permissions/set", Method: "POST"},
+		{Group: "审计管理", Name: "查看操作日志", Path: "/api/v1/audit/operation-logs/list", Method: "POST"},
+		{Group: "审计管理", Name: "查看登录日志", Path: "/api/v1/audit/login-logs/list", Method: "POST"},
+		{Group: "审计管理", Name: "查看数据日志", Path: "/api/v1/audit/data-logs/list", Method: "POST"},
+		{Group: "Kubernetes", Name: "查看集群", Path: "/api/v1/kubernetes/clusters/list", Method: "POST"},
+		{Group: "Kubernetes", Name: "保存集群", Path: "/api/v1/kubernetes/clusters/save", Method: "POST"},
+		{Group: "Kubernetes", Name: "删除集群", Path: "/api/v1/kubernetes/clusters/delete", Method: "POST"},
+		{Group: "Kubernetes", Name: "查看节点", Path: "/api/v1/kubernetes/nodes/list", Method: "POST"},
+		{Group: "Kubernetes", Name: "查看命名空间", Path: "/api/v1/kubernetes/namespaces/list", Method: "POST"},
+		{Group: "Kubernetes", Name: "查看工作负载", Path: "/api/v1/kubernetes/workloads/list", Method: "POST"},
+		{Group: "监控管理", Name: "查看域名监控", Path: "/api/v1/monitor/domains/list", Method: "POST"},
+		{Group: "监控管理", Name: "查看告警通道", Path: "/api/v1/monitor/channels/list", Method: "POST"},
+		{Group: "监控管理", Name: "查看告警接收人", Path: "/api/v1/monitor/receivers/list", Method: "POST"},
+		{Group: "监控管理", Name: "查看告警日志", Path: "/api/v1/monitor/logs/list", Method: "POST"},
+		{Group: "Nginx 管理", Name: "查看数据源", Path: "/api/v1/nginx/sources/list", Method: "POST"},
+		{Group: "任务中心", Name: "查看任务作业", Path: "/api/v1/tasks/jobs/list", Method: "POST"},
+		{Group: "SSL 证书", Name: "查看证书", Path: "/api/v1/ssl-cert/certificates/list", Method: "POST"},
 	}
 	for i := range items {
 		items[i].Key = items[i].Method + " " + items[i].Path

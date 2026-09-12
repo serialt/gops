@@ -16,6 +16,22 @@ func gopsTable(g *gen.Generator) {
 	host := g.GenerateModel("host")
 	dbInstance := g.GenerateModel("db_instance")
 	terminalSession := g.GenerateModel("terminal_session")
+	monitorDomain := g.GenerateModel("monitor_domain")
+	monitorCheckHistory := g.GenerateModel("monitor_check_history")
+	monitorAlertChannel := g.GenerateModel("monitor_alert_channel")
+	monitorAlertReceiver := g.GenerateModel("monitor_alert_receiver")
+	monitorAlertLog := g.GenerateModel("monitor_alert_log")
+	nginxSource := g.GenerateModel("nginx_source")
+	nginxAccessLog := g.GenerateModel("nginx_access_log")
+	taskTemplate := g.GenerateModel("task_template")
+	taskJob := g.GenerateModel("task_job")
+	taskExecution := g.GenerateModel("task_execution")
+	sslCertificate := g.GenerateModel("ssl_certificate")
+	sslDNSProvider := g.GenerateModel("ssl_dns_provider")
+	auditOperationLog := g.GenerateModel("audit_operation_log")
+	auditLoginLog := g.GenerateModel("audit_login_log")
+	auditDataLog := g.GenerateModel("audit_data_log")
+	kubernetesCluster := g.GenerateModel("kubernetes_cluster")
 	userRole := g.GenerateModel("user_role")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
 		&field.RelateConfig{
@@ -42,6 +58,20 @@ func gopsTable(g *gen.Generator) {
 		host,
 		dbInstance,
 		terminalSession,
+		monitorDomain,
+		monitorCheckHistory,
+		monitorAlertChannel,
+		monitorAlertReceiver,
+		monitorAlertLog,
+		nginxSource,
+		nginxAccessLog,
+		taskTemplate,
+		taskJob,
+		taskExecution,
+		sslCertificate,
+		sslDNSProvider,
+		auditOperationLog, auditLoginLog, auditDataLog,
+		kubernetesCluster,
 	)
 
 }

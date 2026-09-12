@@ -141,31 +141,30 @@ onMounted(load)
       <div class="page-toolbar">
         <h2 class="page-title">角色列表</h2>
         <div class="toolbar-actions">
-          <el-button v-if="selectedRoles.length" v-permission="'POST /api/v1/roles/delete'" type="danger" plain @click="batchRemoveRoles">批量删除（{{ selectedRoles.length }}）</el-button>
-          <el-button v-permission="'POST /api/v1/roles/create'" type="primary" class="primary-btn" @click="openCreate">新增角色</el-button>
+          <el-button v-if="selectedRoles.length" v-permission="'POST /api/v1/roles/delete'" type="danger" plain
+            @click="batchRemoveRoles">批量删除（{{ selectedRoles.length }}）</el-button>
+          <el-button v-permission="'POST /api/v1/roles/create'" type="primary" class="primary-btn"
+            @click="openCreate">新增角色</el-button>
         </div>
       </div>
 
-      <AppDataGrid :row-data="pagedRoles" :column-defs="roleColumnDefs" @selection-changed="handleRoleSelectionChanged" />
+      <AppDataGrid :row-data="pagedRoles" :column-defs="roleColumnDefs"
+        @selection-changed="handleRoleSelectionChanged" />
       <div class="pagination-bar">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="roles.length"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handlePageSizeChange"
-        />
+        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[10, 20, 50, 100]"
+          :total="roles.length" layout="total, sizes, prev, pager, next, jumper" @size-change="handlePageSizeChange" />
       </div>
     </div>
 
     <el-dialog v-model="roleDialog" :title="editingID ? '编辑角色' : '新增角色'" width="520px">
       <el-form :model="form" label-width="90px">
-        <el-form-item label="角色编码" required><el-input v-model="form.code" :disabled="Boolean(editingID)" placeholder="例如 viewer" /></el-form-item>
+        <el-form-item label="角色编码" required><el-input v-model="form.code" :disabled="Boolean(editingID)"
+            placeholder="例如 viewer" /></el-form-item>
         <el-form-item label="角色名称" required><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="说明"><el-input v-model="form.description" type="textarea" /></el-form-item>
       </el-form>
-      <template #footer><el-button @click="roleDialog = false">取消</el-button><el-button type="primary" @click="saveRole">保存</el-button></template>
+      <template #footer><el-button @click="roleDialog = false">取消</el-button><el-button type="primary"
+          @click="saveRole">保存</el-button></template>
     </el-dialog>
 
     <el-drawer v-model="permissionDrawer" :title="`配置权限：${selectedRole?.name || ''}`" size="560px">
@@ -173,34 +172,31 @@ onMounted(load)
       <div v-else class="permission-selector">
         <div class="permission-toolbar">
           <span>已选择 <strong>{{ checkedKeys.length }}</strong> / {{ catalog.length }} 项权限</span>
-          <el-button link type="primary" class="clear-selection-btn" :disabled="!checkedKeys.length" @click="clearPermissions">清空选择</el-button>
+          <el-button link type="primary" class="clear-selection-btn" :disabled="!checkedKeys.length"
+            @click="clearPermissions">清空选择</el-button>
         </div>
         <div v-for="(items, group) in grouped" :key="group" class="permission-group">
           <div class="group-title">
-            <el-checkbox
-              :model-value="isGroupChecked(group)"
-              :indeterminate="isGroupIndeterminate(group)"
-              @change="toggleGroup(group, $event)"
-            >
+            <el-checkbox :model-value="isGroupChecked(group)" :indeterminate="isGroupIndeterminate(group)"
+              @change="toggleGroup(group, $event)">
               {{ group }}
             </el-checkbox>
-            <span class="group-count">{{ groupKeys(group).filter(key => checkedKeys.includes(key)).length }}/{{ items.length }}</span>
+            <span class="group-count">{{groupKeys(group).filter(key => checkedKeys.includes(key)).length}}/{{
+              items.length
+              }}</span>
           </div>
           <div class="permission-list">
-            <el-checkbox
-              v-for="item in items"
-              :key="item.key"
-              :model-value="checkedKeys.includes(item.key)"
-              class="permission-item"
-              @change="togglePermission(item.key, $event)"
-            >
+            <el-checkbox v-for="item in items" :key="item.key" :model-value="checkedKeys.includes(item.key)"
+              class="permission-item" @change="togglePermission(item.key, $event)">
               <span class="permission-name">{{ item.name }}</span>
               <span class="permission-api"><b>{{ item.method }}</b> {{ item.path }}</span>
             </el-checkbox>
           </div>
         </div>
       </div>
-      <template #footer><el-button @click="permissionDrawer = false">取消</el-button><el-button v-if="selectedRole?.code !== 'admin'" v-permission="'POST /api/v1/roles/permissions/set'" type="primary" @click="savePermissions">保存</el-button></template>
+      <template #footer><el-button @click="permissionDrawer = false">取消</el-button><el-button
+          v-if="selectedRole?.code !== 'admin'" v-permission="'POST /api/v1/roles/permissions/set'" type="primary"
+          @click="savePermissions">保存</el-button></template>
     </el-drawer>
   </div>
 </template>
@@ -239,7 +235,11 @@ onMounted(load)
   border-radius: 6px;
 }
 
-.toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 .data-table {
   width: 100%;
@@ -286,7 +286,9 @@ onMounted(load)
 }
 
 @media (max-width: 768px) {
-  .page-toolbar { flex-wrap: wrap; }
+  .page-toolbar {
+    flex-wrap: wrap;
+  }
 }
 
 .action-group {
@@ -308,11 +310,46 @@ onMounted(load)
   background: #536fe8 !important;
 }
 
-:deep(.grid-action-group) { position: absolute; inset: 0; display: flex; box-sizing: border-box; align-items: center; justify-content: center; gap: 10px; white-space: nowrap; }
-:deep(.grid-action) { border: 1px solid transparent; border-radius: 8px; padding: 4px 9px; background: #fff; font: inherit; font-size: 11px; cursor: pointer; line-height: 1.25; box-shadow: 0 1px 3px rgba(24, 34, 53, .08); }
-:deep(.grid-action.permission) { border-color: #ccefc1; color: #58b83d; background: #f4fbf1; }
-:deep(.grid-action.edit) { border-color: var(--primary); color: var(--primary); background: #f7f8ff; }
-:deep(.grid-action.delete) { border-color: #ffd5d5; color: #ef6262; background: #fff7f7; }
+:deep(.grid-action-group) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+:deep(.grid-action) {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 9px;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1.25;
+  box-shadow: 0 1px 3px rgba(24, 34, 53, .08);
+}
+
+:deep(.grid-action.permission) {
+  border-color: #ccefc1;
+  color: #58b83d;
+  background: #f4fbf1;
+}
+
+:deep(.grid-action.edit) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #f7f8ff;
+}
+
+:deep(.grid-action.delete) {
+  border-color: #ffd5d5;
+  color: #ef6262;
+  background: #fff7f7;
+}
 
 .permission-group {
   margin-bottom: 14px;

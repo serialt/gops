@@ -16,32 +16,64 @@ import (
 )
 
 var (
-	Q                = new(Query)
-	AssetGroup       *assetGroup
-	CloudAccount     *cloudAccount
-	Credential       *credential
-	DbInstance       *dbInstance
-	Host             *host
-	Organization     *organization
-	OrganizationUser *organizationUser
-	Role             *role
-	SystemConfig     *systemConfig
-	TerminalSession  *terminalSession
-	User             *user
-	UserRole         *userRole
+	Q                    = new(Query)
+	AssetGroup           *assetGroup
+	AuditDataLog         *auditDataLog
+	AuditLoginLog        *auditLoginLog
+	AuditOperationLog    *auditOperationLog
+	CloudAccount         *cloudAccount
+	Credential           *credential
+	DbInstance           *dbInstance
+	Host                 *host
+	KubernetesCluster    *kubernetesCluster
+	MonitorAlertChannel  *monitorAlertChannel
+	MonitorAlertLog      *monitorAlertLog
+	MonitorAlertReceiver *monitorAlertReceiver
+	MonitorCheckHistory  *monitorCheckHistory
+	MonitorDomain        *monitorDomain
+	NginxAccessLog       *nginxAccessLog
+	NginxSource          *nginxSource
+	Organization         *organization
+	OrganizationUser     *organizationUser
+	Role                 *role
+	SslCertificate       *sslCertificate
+	SslDNSProvider       *sslDNSProvider
+	SystemConfig         *systemConfig
+	TaskExecution        *taskExecution
+	TaskJob              *taskJob
+	TaskTemplate         *taskTemplate
+	TerminalSession      *terminalSession
+	User                 *user
+	UserRole             *userRole
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	AssetGroup = &Q.AssetGroup
+	AuditDataLog = &Q.AuditDataLog
+	AuditLoginLog = &Q.AuditLoginLog
+	AuditOperationLog = &Q.AuditOperationLog
 	CloudAccount = &Q.CloudAccount
 	Credential = &Q.Credential
 	DbInstance = &Q.DbInstance
 	Host = &Q.Host
+	KubernetesCluster = &Q.KubernetesCluster
+	MonitorAlertChannel = &Q.MonitorAlertChannel
+	MonitorAlertLog = &Q.MonitorAlertLog
+	MonitorAlertReceiver = &Q.MonitorAlertReceiver
+	MonitorCheckHistory = &Q.MonitorCheckHistory
+	MonitorDomain = &Q.MonitorDomain
+	NginxAccessLog = &Q.NginxAccessLog
+	NginxSource = &Q.NginxSource
 	Organization = &Q.Organization
 	OrganizationUser = &Q.OrganizationUser
 	Role = &Q.Role
+	SslCertificate = &Q.SslCertificate
+	SslDNSProvider = &Q.SslDNSProvider
 	SystemConfig = &Q.SystemConfig
+	TaskExecution = &Q.TaskExecution
+	TaskJob = &Q.TaskJob
+	TaskTemplate = &Q.TaskTemplate
 	TerminalSession = &Q.TerminalSession
 	User = &Q.User
 	UserRole = &Q.UserRole
@@ -49,37 +81,69 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:               db,
-		AssetGroup:       newAssetGroup(db, opts...),
-		CloudAccount:     newCloudAccount(db, opts...),
-		Credential:       newCredential(db, opts...),
-		DbInstance:       newDbInstance(db, opts...),
-		Host:             newHost(db, opts...),
-		Organization:     newOrganization(db, opts...),
-		OrganizationUser: newOrganizationUser(db, opts...),
-		Role:             newRole(db, opts...),
-		SystemConfig:     newSystemConfig(db, opts...),
-		TerminalSession:  newTerminalSession(db, opts...),
-		User:             newUser(db, opts...),
-		UserRole:         newUserRole(db, opts...),
+		db:                   db,
+		AssetGroup:           newAssetGroup(db, opts...),
+		AuditDataLog:         newAuditDataLog(db, opts...),
+		AuditLoginLog:        newAuditLoginLog(db, opts...),
+		AuditOperationLog:    newAuditOperationLog(db, opts...),
+		CloudAccount:         newCloudAccount(db, opts...),
+		Credential:           newCredential(db, opts...),
+		DbInstance:           newDbInstance(db, opts...),
+		Host:                 newHost(db, opts...),
+		KubernetesCluster:    newKubernetesCluster(db, opts...),
+		MonitorAlertChannel:  newMonitorAlertChannel(db, opts...),
+		MonitorAlertLog:      newMonitorAlertLog(db, opts...),
+		MonitorAlertReceiver: newMonitorAlertReceiver(db, opts...),
+		MonitorCheckHistory:  newMonitorCheckHistory(db, opts...),
+		MonitorDomain:        newMonitorDomain(db, opts...),
+		NginxAccessLog:       newNginxAccessLog(db, opts...),
+		NginxSource:          newNginxSource(db, opts...),
+		Organization:         newOrganization(db, opts...),
+		OrganizationUser:     newOrganizationUser(db, opts...),
+		Role:                 newRole(db, opts...),
+		SslCertificate:       newSslCertificate(db, opts...),
+		SslDNSProvider:       newSslDNSProvider(db, opts...),
+		SystemConfig:         newSystemConfig(db, opts...),
+		TaskExecution:        newTaskExecution(db, opts...),
+		TaskJob:              newTaskJob(db, opts...),
+		TaskTemplate:         newTaskTemplate(db, opts...),
+		TerminalSession:      newTerminalSession(db, opts...),
+		User:                 newUser(db, opts...),
+		UserRole:             newUserRole(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	AssetGroup       assetGroup
-	CloudAccount     cloudAccount
-	Credential       credential
-	DbInstance       dbInstance
-	Host             host
-	Organization     organization
-	OrganizationUser organizationUser
-	Role             role
-	SystemConfig     systemConfig
-	TerminalSession  terminalSession
-	User             user
-	UserRole         userRole
+	AssetGroup           assetGroup
+	AuditDataLog         auditDataLog
+	AuditLoginLog        auditLoginLog
+	AuditOperationLog    auditOperationLog
+	CloudAccount         cloudAccount
+	Credential           credential
+	DbInstance           dbInstance
+	Host                 host
+	KubernetesCluster    kubernetesCluster
+	MonitorAlertChannel  monitorAlertChannel
+	MonitorAlertLog      monitorAlertLog
+	MonitorAlertReceiver monitorAlertReceiver
+	MonitorCheckHistory  monitorCheckHistory
+	MonitorDomain        monitorDomain
+	NginxAccessLog       nginxAccessLog
+	NginxSource          nginxSource
+	Organization         organization
+	OrganizationUser     organizationUser
+	Role                 role
+	SslCertificate       sslCertificate
+	SslDNSProvider       sslDNSProvider
+	SystemConfig         systemConfig
+	TaskExecution        taskExecution
+	TaskJob              taskJob
+	TaskTemplate         taskTemplate
+	TerminalSession      terminalSession
+	User                 user
+	UserRole             userRole
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -88,19 +152,35 @@ func (q *Query) UnderlyingDB() *gorm.DB { return q.db }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:               db,
-		AssetGroup:       q.AssetGroup.clone(db),
-		CloudAccount:     q.CloudAccount.clone(db),
-		Credential:       q.Credential.clone(db),
-		DbInstance:       q.DbInstance.clone(db),
-		Host:             q.Host.clone(db),
-		Organization:     q.Organization.clone(db),
-		OrganizationUser: q.OrganizationUser.clone(db),
-		Role:             q.Role.clone(db),
-		SystemConfig:     q.SystemConfig.clone(db),
-		TerminalSession:  q.TerminalSession.clone(db),
-		User:             q.User.clone(db),
-		UserRole:         q.UserRole.clone(db),
+		db:                   db,
+		AssetGroup:           q.AssetGroup.clone(db),
+		AuditDataLog:         q.AuditDataLog.clone(db),
+		AuditLoginLog:        q.AuditLoginLog.clone(db),
+		AuditOperationLog:    q.AuditOperationLog.clone(db),
+		CloudAccount:         q.CloudAccount.clone(db),
+		Credential:           q.Credential.clone(db),
+		DbInstance:           q.DbInstance.clone(db),
+		Host:                 q.Host.clone(db),
+		KubernetesCluster:    q.KubernetesCluster.clone(db),
+		MonitorAlertChannel:  q.MonitorAlertChannel.clone(db),
+		MonitorAlertLog:      q.MonitorAlertLog.clone(db),
+		MonitorAlertReceiver: q.MonitorAlertReceiver.clone(db),
+		MonitorCheckHistory:  q.MonitorCheckHistory.clone(db),
+		MonitorDomain:        q.MonitorDomain.clone(db),
+		NginxAccessLog:       q.NginxAccessLog.clone(db),
+		NginxSource:          q.NginxSource.clone(db),
+		Organization:         q.Organization.clone(db),
+		OrganizationUser:     q.OrganizationUser.clone(db),
+		Role:                 q.Role.clone(db),
+		SslCertificate:       q.SslCertificate.clone(db),
+		SslDNSProvider:       q.SslDNSProvider.clone(db),
+		SystemConfig:         q.SystemConfig.clone(db),
+		TaskExecution:        q.TaskExecution.clone(db),
+		TaskJob:              q.TaskJob.clone(db),
+		TaskTemplate:         q.TaskTemplate.clone(db),
+		TerminalSession:      q.TerminalSession.clone(db),
+		User:                 q.User.clone(db),
+		UserRole:             q.UserRole.clone(db),
 	}
 }
 
@@ -114,51 +194,99 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:               db,
-		AssetGroup:       q.AssetGroup.replaceDB(db),
-		CloudAccount:     q.CloudAccount.replaceDB(db),
-		Credential:       q.Credential.replaceDB(db),
-		DbInstance:       q.DbInstance.replaceDB(db),
-		Host:             q.Host.replaceDB(db),
-		Organization:     q.Organization.replaceDB(db),
-		OrganizationUser: q.OrganizationUser.replaceDB(db),
-		Role:             q.Role.replaceDB(db),
-		SystemConfig:     q.SystemConfig.replaceDB(db),
-		TerminalSession:  q.TerminalSession.replaceDB(db),
-		User:             q.User.replaceDB(db),
-		UserRole:         q.UserRole.replaceDB(db),
+		db:                   db,
+		AssetGroup:           q.AssetGroup.replaceDB(db),
+		AuditDataLog:         q.AuditDataLog.replaceDB(db),
+		AuditLoginLog:        q.AuditLoginLog.replaceDB(db),
+		AuditOperationLog:    q.AuditOperationLog.replaceDB(db),
+		CloudAccount:         q.CloudAccount.replaceDB(db),
+		Credential:           q.Credential.replaceDB(db),
+		DbInstance:           q.DbInstance.replaceDB(db),
+		Host:                 q.Host.replaceDB(db),
+		KubernetesCluster:    q.KubernetesCluster.replaceDB(db),
+		MonitorAlertChannel:  q.MonitorAlertChannel.replaceDB(db),
+		MonitorAlertLog:      q.MonitorAlertLog.replaceDB(db),
+		MonitorAlertReceiver: q.MonitorAlertReceiver.replaceDB(db),
+		MonitorCheckHistory:  q.MonitorCheckHistory.replaceDB(db),
+		MonitorDomain:        q.MonitorDomain.replaceDB(db),
+		NginxAccessLog:       q.NginxAccessLog.replaceDB(db),
+		NginxSource:          q.NginxSource.replaceDB(db),
+		Organization:         q.Organization.replaceDB(db),
+		OrganizationUser:     q.OrganizationUser.replaceDB(db),
+		Role:                 q.Role.replaceDB(db),
+		SslCertificate:       q.SslCertificate.replaceDB(db),
+		SslDNSProvider:       q.SslDNSProvider.replaceDB(db),
+		SystemConfig:         q.SystemConfig.replaceDB(db),
+		TaskExecution:        q.TaskExecution.replaceDB(db),
+		TaskJob:              q.TaskJob.replaceDB(db),
+		TaskTemplate:         q.TaskTemplate.replaceDB(db),
+		TerminalSession:      q.TerminalSession.replaceDB(db),
+		User:                 q.User.replaceDB(db),
+		UserRole:             q.UserRole.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	AssetGroup       *assetGroupDo
-	CloudAccount     *cloudAccountDo
-	Credential       *credentialDo
-	DbInstance       *dbInstanceDo
-	Host             *hostDo
-	Organization     *organizationDo
-	OrganizationUser *organizationUserDo
-	Role             *roleDo
-	SystemConfig     *systemConfigDo
-	TerminalSession  *terminalSessionDo
-	User             *userDo
-	UserRole         *userRoleDo
+	AssetGroup           *assetGroupDo
+	AuditDataLog         *auditDataLogDo
+	AuditLoginLog        *auditLoginLogDo
+	AuditOperationLog    *auditOperationLogDo
+	CloudAccount         *cloudAccountDo
+	Credential           *credentialDo
+	DbInstance           *dbInstanceDo
+	Host                 *hostDo
+	KubernetesCluster    *kubernetesClusterDo
+	MonitorAlertChannel  *monitorAlertChannelDo
+	MonitorAlertLog      *monitorAlertLogDo
+	MonitorAlertReceiver *monitorAlertReceiverDo
+	MonitorCheckHistory  *monitorCheckHistoryDo
+	MonitorDomain        *monitorDomainDo
+	NginxAccessLog       *nginxAccessLogDo
+	NginxSource          *nginxSourceDo
+	Organization         *organizationDo
+	OrganizationUser     *organizationUserDo
+	Role                 *roleDo
+	SslCertificate       *sslCertificateDo
+	SslDNSProvider       *sslDNSProviderDo
+	SystemConfig         *systemConfigDo
+	TaskExecution        *taskExecutionDo
+	TaskJob              *taskJobDo
+	TaskTemplate         *taskTemplateDo
+	TerminalSession      *terminalSessionDo
+	User                 *userDo
+	UserRole             *userRoleDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		AssetGroup:       q.AssetGroup.WithContext(ctx),
-		CloudAccount:     q.CloudAccount.WithContext(ctx),
-		Credential:       q.Credential.WithContext(ctx),
-		DbInstance:       q.DbInstance.WithContext(ctx),
-		Host:             q.Host.WithContext(ctx),
-		Organization:     q.Organization.WithContext(ctx),
-		OrganizationUser: q.OrganizationUser.WithContext(ctx),
-		Role:             q.Role.WithContext(ctx),
-		SystemConfig:     q.SystemConfig.WithContext(ctx),
-		TerminalSession:  q.TerminalSession.WithContext(ctx),
-		User:             q.User.WithContext(ctx),
-		UserRole:         q.UserRole.WithContext(ctx),
+		AssetGroup:           q.AssetGroup.WithContext(ctx),
+		AuditDataLog:         q.AuditDataLog.WithContext(ctx),
+		AuditLoginLog:        q.AuditLoginLog.WithContext(ctx),
+		AuditOperationLog:    q.AuditOperationLog.WithContext(ctx),
+		CloudAccount:         q.CloudAccount.WithContext(ctx),
+		Credential:           q.Credential.WithContext(ctx),
+		DbInstance:           q.DbInstance.WithContext(ctx),
+		Host:                 q.Host.WithContext(ctx),
+		KubernetesCluster:    q.KubernetesCluster.WithContext(ctx),
+		MonitorAlertChannel:  q.MonitorAlertChannel.WithContext(ctx),
+		MonitorAlertLog:      q.MonitorAlertLog.WithContext(ctx),
+		MonitorAlertReceiver: q.MonitorAlertReceiver.WithContext(ctx),
+		MonitorCheckHistory:  q.MonitorCheckHistory.WithContext(ctx),
+		MonitorDomain:        q.MonitorDomain.WithContext(ctx),
+		NginxAccessLog:       q.NginxAccessLog.WithContext(ctx),
+		NginxSource:          q.NginxSource.WithContext(ctx),
+		Organization:         q.Organization.WithContext(ctx),
+		OrganizationUser:     q.OrganizationUser.WithContext(ctx),
+		Role:                 q.Role.WithContext(ctx),
+		SslCertificate:       q.SslCertificate.WithContext(ctx),
+		SslDNSProvider:       q.SslDNSProvider.WithContext(ctx),
+		SystemConfig:         q.SystemConfig.WithContext(ctx),
+		TaskExecution:        q.TaskExecution.WithContext(ctx),
+		TaskJob:              q.TaskJob.WithContext(ctx),
+		TaskTemplate:         q.TaskTemplate.WithContext(ctx),
+		TerminalSession:      q.TerminalSession.WithContext(ctx),
+		User:                 q.User.WithContext(ctx),
+		UserRole:             q.UserRole.WithContext(ctx),
 	}
 }
 
