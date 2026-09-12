@@ -14,25 +14,25 @@ const TableNameHost = "host"
 
 // Host mapped from table <host>
 type Host struct {
-	ID             int64          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Name           string         `gorm:"column:name;not null;comment:主机名称" json:"name"`                                       // 主机名称
-	GroupID        int64          `gorm:"column:group_id;comment:所属资产分组ID" json:"group_id"`                                    // 所属资产分组ID
-	HostType       string         `gorm:"column:host_type;not null;default:self;comment:主机类型" json:"host_type"`                // 主机类型
-	IP             string         `gorm:"column:ip;not null;comment:主机地址" json:"ip"`                                           // 主机地址
-	Port           int32          `gorm:"column:port;not null;default:22;comment:SSH端口" json:"port"`                           // SSH端口
-	SSHUser        string         `gorm:"column:ssh_user;not null;comment:SSH用户名" json:"ssh_user"`                             // SSH用户名
-	CredentialID   int64          `gorm:"column:credential_id;comment:关联凭证ID" json:"credential_id"`                            // 关联凭证ID
-	CloudAccountID int64          `gorm:"column:cloud_account_id;comment:关联云账号ID" json:"cloud_account_id"`                     // 关联云账号ID
-	Tags           string         `gorm:"column:tags;not null;comment:主机标签" json:"tags"`                                       // 主机标签
-	Description    string         `gorm:"column:description;not null;comment:主机描述" json:"description"`                         // 主机描述
-	Status         int16          `gorm:"column:status;not null;default:-1;comment:连接状态" json:"status"`                        // 连接状态
-	LastSeenAt     time.Time      `gorm:"column:last_seen_at;comment:最后连接时间" json:"last_seen_at"`                              // 最后连接时间
-	Os             string         `gorm:"column:os;not null;comment:操作系统" json:"os"`                                           // 操作系统
-	Kernel         string         `gorm:"column:kernel;not null;comment:内核版本" json:"kernel"`                                   // 内核版本
-	Arch           string         `gorm:"column:arch;not null;comment:系统架构" json:"arch"`                                       // 系统架构
-	CreatedAt      time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt      time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	ID             int64          `gorm:"column:id;primaryKey" json:"id"`
+	Name           string         `gorm:"column:name;not null" json:"name"`
+	GroupID        int64          `gorm:"column:group_id" json:"group_id"`
+	HostType       string         `gorm:"column:host_type;not null;default:'self'" json:"host_type"`
+	IP             string         `gorm:"column:ip;not null" json:"ip"`
+	Port           int64          `gorm:"column:port;not null;default:22" json:"port"`
+	SSHUser        string         `gorm:"column:ssh_user;not null;default:''" json:"ssh_user"`
+	CredentialID   int64          `gorm:"column:credential_id" json:"credential_id"`
+	CloudAccountID int64          `gorm:"column:cloud_account_id" json:"cloud_account_id"`
+	Tags           string         `gorm:"column:tags;not null;default:''" json:"tags"`
+	Description    string         `gorm:"column:description;not null;default:''" json:"description"`
+	Status         int64          `gorm:"column:status;not null;default:-1" json:"status"`
+	LastSeenAt     time.Time      `gorm:"column:last_seen_at" json:"last_seen_at"`
+	Os             string         `gorm:"column:os;not null;default:''" json:"os"`
+	Kernel         string         `gorm:"column:kernel;not null;default:''" json:"kernel"`
+	Arch           string         `gorm:"column:arch;not null;default:''" json:"arch"`
+	CreatedAt      time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt      time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName Host's table name

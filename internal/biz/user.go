@@ -25,7 +25,7 @@ func (b *UserBiz) List(req *api.UserListRequest) ([]*api.UserResponse, error) {
 	var users []model.User
 	query := b.db.Preload("Roles").Preload("Organizations").Order("id DESC")
 	if req.Keyword != "" {
-		query = query.Where("username ILIKE ? OR nickname ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		query = query.Where("username LIKE ? OR nickname LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if req.OrganizationID > 0 {
 		query = query.Joins("JOIN organization_user ON organization_user.user_id = \"user\".id").Where("organization_user.organization_id = ?", req.OrganizationID).Group("\"user\".id")

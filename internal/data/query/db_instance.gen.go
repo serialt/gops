@@ -31,7 +31,7 @@ func newDbInstance(db *gorm.DB, opts ...gen.DOOption) dbInstance {
 	_dbInstance.Name = field.NewString(tableName, "name")
 	_dbInstance.DbType = field.NewString(tableName, "db_type")
 	_dbInstance.Host = field.NewString(tableName, "host")
-	_dbInstance.Port = field.NewInt32(tableName, "port")
+	_dbInstance.Port = field.NewInt64(tableName, "port")
 	_dbInstance.Username = field.NewString(tableName, "username")
 	_dbInstance.Password = field.NewString(tableName, "password")
 	_dbInstance.Version = field.NewString(tableName, "version")
@@ -53,20 +53,20 @@ type dbInstance struct {
 
 	ALL          field.Asterisk
 	ID           field.Int64
-	Name         field.String // 数据库名称
-	DbType       field.String // 数据库类型
-	Host         field.String // 数据库地址
-	Port         field.Int32  // 数据库端口
-	Username     field.String // 数据库用户名
-	Password     field.String // 加密数据库密码
-	Version      field.String // 数据库版本
-	CredentialID field.Int64  // 关联凭证ID
-	Tags         field.String // 数据库标签
-	Description  field.String // 数据库描述
-	Status       field.Bool   // 是否启用
-	CreatedAt    field.Time   // 创建时间
-	UpdatedAt    field.Time   // 更新时间
-	DeletedAt    field.Field  // 软删除时间
+	Name         field.String
+	DbType       field.String
+	Host         field.String
+	Port         field.Int64
+	Username     field.String
+	Password     field.String
+	Version      field.String
+	CredentialID field.Int64
+	Tags         field.String
+	Description  field.String
+	Status       field.Bool
+	CreatedAt    field.Time
+	UpdatedAt    field.Time
+	DeletedAt    field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -87,7 +87,7 @@ func (d *dbInstance) updateTableName(table string) *dbInstance {
 	d.Name = field.NewString(table, "name")
 	d.DbType = field.NewString(table, "db_type")
 	d.Host = field.NewString(table, "host")
-	d.Port = field.NewInt32(table, "port")
+	d.Port = field.NewInt64(table, "port")
 	d.Username = field.NewString(table, "username")
 	d.Password = field.NewString(table, "password")
 	d.Version = field.NewString(table, "version")

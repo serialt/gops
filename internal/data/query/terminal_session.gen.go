@@ -51,18 +51,18 @@ type terminalSession struct {
 
 	ALL             field.Asterisk
 	ID              field.Int64
-	UserID          field.Int64  // 操作用户ID
-	HostID          field.Int64  // 关联主机ID
-	DbInstanceID    field.Int64  // 关联数据库ID
-	SessionType     field.String // 终端类型
-	StartedAt       field.Time   // 开始时间
-	EndedAt         field.Time   // 结束时间
-	DurationSeconds field.Int64  // 会话时长秒数
-	CommandCount    field.Int64  // 命令数量
-	Recording       field.String // 会话录制内容
-	CreatedAt       field.Time   // 创建时间
-	UpdatedAt       field.Time   // 更新时间
-	DeletedAt       field.Field  // 软删除时间
+	UserID          field.Int64
+	HostID          field.Int64
+	DbInstanceID    field.Int64
+	SessionType     field.String
+	StartedAt       field.Time
+	EndedAt         field.Time
+	DurationSeconds field.Int64
+	CommandCount    field.Int64
+	Recording       field.String
+	CreatedAt       field.Time
+	UpdatedAt       field.Time
+	DeletedAt       field.Field
 
 	fieldMap map[string]field.Expr
 }

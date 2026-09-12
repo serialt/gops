@@ -32,13 +32,13 @@ func newHost(db *gorm.DB, opts ...gen.DOOption) host {
 	_host.GroupID = field.NewInt64(tableName, "group_id")
 	_host.HostType = field.NewString(tableName, "host_type")
 	_host.IP = field.NewString(tableName, "ip")
-	_host.Port = field.NewInt32(tableName, "port")
+	_host.Port = field.NewInt64(tableName, "port")
 	_host.SSHUser = field.NewString(tableName, "ssh_user")
 	_host.CredentialID = field.NewInt64(tableName, "credential_id")
 	_host.CloudAccountID = field.NewInt64(tableName, "cloud_account_id")
 	_host.Tags = field.NewString(tableName, "tags")
 	_host.Description = field.NewString(tableName, "description")
-	_host.Status = field.NewInt16(tableName, "status")
+	_host.Status = field.NewInt64(tableName, "status")
 	_host.LastSeenAt = field.NewTime(tableName, "last_seen_at")
 	_host.Os = field.NewString(tableName, "os")
 	_host.Kernel = field.NewString(tableName, "kernel")
@@ -57,24 +57,24 @@ type host struct {
 
 	ALL            field.Asterisk
 	ID             field.Int64
-	Name           field.String // 主机名称
-	GroupID        field.Int64  // 所属资产分组ID
-	HostType       field.String // 主机类型
-	IP             field.String // 主机地址
-	Port           field.Int32  // SSH端口
-	SSHUser        field.String // SSH用户名
-	CredentialID   field.Int64  // 关联凭证ID
-	CloudAccountID field.Int64  // 关联云账号ID
-	Tags           field.String // 主机标签
-	Description    field.String // 主机描述
-	Status         field.Int16  // 连接状态
-	LastSeenAt     field.Time   // 最后连接时间
-	Os             field.String // 操作系统
-	Kernel         field.String // 内核版本
-	Arch           field.String // 系统架构
-	CreatedAt      field.Time   // 创建时间
-	UpdatedAt      field.Time   // 更新时间
-	DeletedAt      field.Field  // 软删除时间
+	Name           field.String
+	GroupID        field.Int64
+	HostType       field.String
+	IP             field.String
+	Port           field.Int64
+	SSHUser        field.String
+	CredentialID   field.Int64
+	CloudAccountID field.Int64
+	Tags           field.String
+	Description    field.String
+	Status         field.Int64
+	LastSeenAt     field.Time
+	Os             field.String
+	Kernel         field.String
+	Arch           field.String
+	CreatedAt      field.Time
+	UpdatedAt      field.Time
+	DeletedAt      field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -96,13 +96,13 @@ func (h *host) updateTableName(table string) *host {
 	h.GroupID = field.NewInt64(table, "group_id")
 	h.HostType = field.NewString(table, "host_type")
 	h.IP = field.NewString(table, "ip")
-	h.Port = field.NewInt32(table, "port")
+	h.Port = field.NewInt64(table, "port")
 	h.SSHUser = field.NewString(table, "ssh_user")
 	h.CredentialID = field.NewInt64(table, "credential_id")
 	h.CloudAccountID = field.NewInt64(table, "cloud_account_id")
 	h.Tags = field.NewString(table, "tags")
 	h.Description = field.NewString(table, "description")
-	h.Status = field.NewInt16(table, "status")
+	h.Status = field.NewInt64(table, "status")
 	h.LastSeenAt = field.NewTime(table, "last_seen_at")
 	h.Os = field.NewString(table, "os")
 	h.Kernel = field.NewString(table, "kernel")

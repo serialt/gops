@@ -14,11 +14,11 @@ const TableNameSystemConfig = "system_config"
 
 // SystemConfig mapped from table <system_config>
 type SystemConfig struct {
-	ConfigKey   string         `gorm:"column:config_key;primaryKey;comment:配置键" json:"config_key"`                          // 配置键
-	ConfigValue string         `gorm:"column:config_value;not null;comment:配置值" json:"config_value"`                        // 配置值
-	CreatedAt   time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt   time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	ConfigKey   string         `gorm:"column:config_key;primaryKey" json:"config_key"`
+	ConfigValue string         `gorm:"column:config_value;not null;default:''" json:"config_value"`
+	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName SystemConfig's table name

@@ -6,10 +6,10 @@ gops -t create  v26.1.1_add sql
 
 一个开箱即用的后台管理脚手架：
 
-- 后端：Gin、GORM、PostgreSQL、JWT、Casbin RBAC
+- 后端：Gin、GORM、SQLite、JWT、Casbin RBAC
 - 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router、Element Plus
 - 权限模型：用户 -> 角色 -> API 路径 + HTTP 方法
-- 部署：Docker Compose（PostgreSQL + Backend + Nginx Frontend）
+- 部署：Docker Compose（Backend + Nginx Frontend，SQLite 数据文件持久化）
 
 ## 默认账号
 
@@ -29,17 +29,11 @@ docker compose up -d --build
 
 - 管理后台：http://localhost:8088
 - 后端健康检查：http://localhost:8080/health
-- PostgreSQL：localhost:5432
+- SQLite：默认数据库文件为 `gops.db`
 
 ## 本地开发
 
-### 1. 启动 PostgreSQL
-
-```bash
-docker compose up -d postgres
-```
-
-### 2. 启动后端
+### 1. 启动后端
 
 ```bash
 cd backend
@@ -51,7 +45,7 @@ go run ./cmd/server
 
 后端默认监听 `:8080`。
 
-### 3. 启动前端
+### 2. 启动前端
 
 ```bash
 cd frontend

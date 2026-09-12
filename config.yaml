@@ -1,5 +1,5 @@
-# dsn: "postgresql://serialt:sugar.tang@127.0.0.1:5432/test"
-dsn: "postgresql://serialt:sugar.tang@127.0.0.1:5432/gops"
+# SQLite 数据库文件路径；生产环境建议挂载到持久化目录。
+dsn: "gops.db"
 
 log:
   file: 

@@ -49,16 +49,16 @@ type credential struct {
 
 	ALL            field.Asterisk
 	ID             field.Int64
-	Name           field.String // 凭证名称
-	CredentialType field.String // 凭证类型
-	Username       field.String // 用户名
-	Password       field.String // 加密密码
-	PrivateKey     field.String // 加密私钥
-	Passphrase     field.String // 加密私钥口令
-	Description    field.String // 凭证描述
-	CreatedAt      field.Time   // 创建时间
-	UpdatedAt      field.Time   // 更新时间
-	DeletedAt      field.Field  // 软删除时间
+	Name           field.String
+	CredentialType field.String
+	Username       field.String
+	Password       field.String
+	PrivateKey     field.String
+	Passphrase     field.String
+	Description    field.String
+	CreatedAt      field.Time
+	UpdatedAt      field.Time
+	DeletedAt      field.Field
 
 	fieldMap map[string]field.Expr
 }

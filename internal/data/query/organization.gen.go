@@ -47,16 +47,16 @@ type organization struct {
 	organizationDo organizationDo
 
 	ALL       field.Asterisk
-	ID        field.Int64  // 组织主键
-	ParentID  field.Int64  // 上级组织主键，根组织为空
-	Name      field.String // 组织名称
-	Code      field.String // 组织编码，系统内唯一
-	Manager   field.String // 组织负责人
-	Status    field.Bool   // 启用状态
-	CreatedAt field.Time   // 创建时间
-	UpdatedAt field.Time   // 更新时间
-	DeletedAt field.Field  // 软删除时间
-	SortOrder field.Int64  // 同级组织排序值
+	ID        field.Int64
+	ParentID  field.Int64
+	Name      field.String
+	Code      field.String
+	Manager   field.String
+	Status    field.Bool
+	CreatedAt field.Time
+	UpdatedAt field.Time
+	DeletedAt field.Field
+	SortOrder field.Int64
 
 	fieldMap map[string]field.Expr
 }

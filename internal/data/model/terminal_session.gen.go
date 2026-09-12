@@ -14,19 +14,19 @@ const TableNameTerminalSession = "terminal_session"
 
 // TerminalSession mapped from table <terminal_session>
 type TerminalSession struct {
-	ID              int64          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	UserID          int64          `gorm:"column:user_id;not null;comment:操作用户ID" json:"user_id"`                               // 操作用户ID
-	HostID          int64          `gorm:"column:host_id;comment:关联主机ID" json:"host_id"`                                        // 关联主机ID
-	DbInstanceID    int64          `gorm:"column:db_instance_id;comment:关联数据库ID" json:"db_instance_id"`                         // 关联数据库ID
-	SessionType     string         `gorm:"column:session_type;not null;comment:终端类型" json:"session_type"`                       // 终端类型
-	StartedAt       time.Time      `gorm:"column:started_at;not null;default:CURRENT_TIMESTAMP;comment:开始时间" json:"started_at"` // 开始时间
-	EndedAt         time.Time      `gorm:"column:ended_at;comment:结束时间" json:"ended_at"`                                        // 结束时间
-	DurationSeconds int64          `gorm:"column:duration_seconds;not null;comment:会话时长秒数" json:"duration_seconds"`             // 会话时长秒数
-	CommandCount    int64          `gorm:"column:command_count;not null;comment:命令数量" json:"command_count"`                     // 命令数量
-	Recording       string         `gorm:"column:recording;not null;comment:会话录制内容" json:"recording"`                           // 会话录制内容
-	CreatedAt       time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt       time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	ID              int64          `gorm:"column:id;primaryKey" json:"id"`
+	UserID          int64          `gorm:"column:user_id;not null" json:"user_id"`
+	HostID          int64          `gorm:"column:host_id" json:"host_id"`
+	DbInstanceID    int64          `gorm:"column:db_instance_id" json:"db_instance_id"`
+	SessionType     string         `gorm:"column:session_type;not null" json:"session_type"`
+	StartedAt       time.Time      `gorm:"column:started_at;not null;default:CURRENT_TIMESTAMP" json:"started_at"`
+	EndedAt         time.Time      `gorm:"column:ended_at" json:"ended_at"`
+	DurationSeconds int64          `gorm:"column:duration_seconds;not null" json:"duration_seconds"`
+	CommandCount    int64          `gorm:"column:command_count;not null" json:"command_count"`
+	Recording       string         `gorm:"column:recording;not null;default:''" json:"recording"`
+	CreatedAt       time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt       time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName TerminalSession's table name

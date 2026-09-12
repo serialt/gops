@@ -39,8 +39,8 @@ type organizationUser struct {
 	organizationUserDo organizationUserDo
 
 	ALL            field.Asterisk
-	OrganizationID field.Int64 // 组织主键
-	UserID         field.Int64 // 用户主键
+	OrganizationID field.Int64
+	UserID         field.Int64
 
 	fieldMap map[string]field.Expr
 }

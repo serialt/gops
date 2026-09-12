@@ -14,17 +14,17 @@ const TableNameCloudAccount = "cloud_account"
 
 // CloudAccount mapped from table <cloud_account>
 type CloudAccount struct {
-	ID          int64          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Name        string         `gorm:"column:name;not null;comment:账号名称" json:"name"`                                       // 账号名称
-	Provider    string         `gorm:"column:provider;not null;comment:云服务商" json:"provider"`                               // 云服务商
-	AccessKey   string         `gorm:"column:access_key;not null;comment:加密访问密钥" json:"access_key"`                         // 加密访问密钥
-	SecretKey   string         `gorm:"column:secret_key;not null;comment:加密访问密钥密码" json:"secret_key"`                       // 加密访问密钥密码
-	Region      string         `gorm:"column:region;not null;comment:默认区域" json:"region"`                                   // 默认区域
-	Description string         `gorm:"column:description;not null;comment:账号描述" json:"description"`                         // 账号描述
-	Status      bool           `gorm:"column:status;not null;default:true;comment:是否启用" json:"status"`                      // 是否启用
-	CreatedAt   time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt   time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	ID          int64          `gorm:"column:id;primaryKey" json:"id"`
+	Name        string         `gorm:"column:name;not null" json:"name"`
+	Provider    string         `gorm:"column:provider;not null" json:"provider"`
+	AccessKey   string         `gorm:"column:access_key;not null;default:''" json:"access_key"`
+	SecretKey   string         `gorm:"column:secret_key;not null;default:''" json:"secret_key"`
+	Region      string         `gorm:"column:region;not null;default:''" json:"region"`
+	Description string         `gorm:"column:description;not null;default:''" json:"description"`
+	Status      bool           `gorm:"column:status;not null;default:TRUE" json:"status"`
+	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName CloudAccount's table name

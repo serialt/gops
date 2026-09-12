@@ -14,16 +14,16 @@ const TableNameAssetGroup = "asset_group"
 
 // AssetGroup mapped from table <asset_group>
 type AssetGroup struct {
-	ID          int64          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Name        string         `gorm:"column:name;not null;comment:分组名称" json:"name"`                                       // 分组名称
-	Code        string         `gorm:"column:code;not null;comment:分组编码" json:"code"`                                       // 分组编码
-	ParentID    int64          `gorm:"column:parent_id;not null;comment:父分组ID" json:"parent_id"`                            // 父分组ID
-	Description string         `gorm:"column:description;not null;comment:分组描述" json:"description"`                         // 分组描述
-	SortOrder   int32          `gorm:"column:sort_order;not null;comment:排序值" json:"sort_order"`                            // 排序值
-	Status      bool           `gorm:"column:status;not null;default:true;comment:是否启用" json:"status"`                      // 是否启用
-	CreatedAt   time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt   time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	ID          int64          `gorm:"column:id;primaryKey" json:"id"`
+	Name        string         `gorm:"column:name;not null" json:"name"`
+	Code        string         `gorm:"column:code;not null" json:"code"`
+	ParentID    int64          `gorm:"column:parent_id;not null" json:"parent_id"`
+	Description string         `gorm:"column:description;not null;default:''" json:"description"`
+	SortOrder   int64          `gorm:"column:sort_order;not null" json:"sort_order"`
+	Status      bool           `gorm:"column:status;not null;default:TRUE" json:"status"`
+	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName AssetGroup's table name

@@ -20,9 +20,9 @@ func NewOrganizationBiz(db *gorm.DB) *OrganizationBiz {
 
 func (b *OrganizationBiz) List(req *api.OrganizationQueryRequest) ([]*api.OrganizationResponse, error) {
 	var rows []model.Organization
-	query := b.db.Order("parent_id NULLS FIRST, sort_order ASC, id ASC")
+	query := b.db.Order("parent_id ASC, sort_order ASC, id ASC")
 	if req.Keyword != "" {
-		query = query.Where("name ILIKE ? OR code ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		query = query.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if err := query.Find(&rows).Error; err != nil {
 		return nil, err

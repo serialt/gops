@@ -32,7 +32,7 @@ func newAssetGroup(db *gorm.DB, opts ...gen.DOOption) assetGroup {
 	_assetGroup.Code = field.NewString(tableName, "code")
 	_assetGroup.ParentID = field.NewInt64(tableName, "parent_id")
 	_assetGroup.Description = field.NewString(tableName, "description")
-	_assetGroup.SortOrder = field.NewInt32(tableName, "sort_order")
+	_assetGroup.SortOrder = field.NewInt64(tableName, "sort_order")
 	_assetGroup.Status = field.NewBool(tableName, "status")
 	_assetGroup.CreatedAt = field.NewTime(tableName, "created_at")
 	_assetGroup.UpdatedAt = field.NewTime(tableName, "updated_at")
@@ -48,15 +48,15 @@ type assetGroup struct {
 
 	ALL         field.Asterisk
 	ID          field.Int64
-	Name        field.String // 分组名称
-	Code        field.String // 分组编码
-	ParentID    field.Int64  // 父分组ID
-	Description field.String // 分组描述
-	SortOrder   field.Int32  // 排序值
-	Status      field.Bool   // 是否启用
-	CreatedAt   field.Time   // 创建时间
-	UpdatedAt   field.Time   // 更新时间
-	DeletedAt   field.Field  // 软删除时间
+	Name        field.String
+	Code        field.String
+	ParentID    field.Int64
+	Description field.String
+	SortOrder   field.Int64
+	Status      field.Bool
+	CreatedAt   field.Time
+	UpdatedAt   field.Time
+	DeletedAt   field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -78,7 +78,7 @@ func (a *assetGroup) updateTableName(table string) *assetGroup {
 	a.Code = field.NewString(table, "code")
 	a.ParentID = field.NewInt64(table, "parent_id")
 	a.Description = field.NewString(table, "description")
-	a.SortOrder = field.NewInt32(table, "sort_order")
+	a.SortOrder = field.NewInt64(table, "sort_order")
 	a.Status = field.NewBool(table, "status")
 	a.CreatedAt = field.NewTime(table, "created_at")
 	a.UpdatedAt = field.NewTime(table, "updated_at")

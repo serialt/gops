@@ -14,13 +14,13 @@ const TableNameRole = "role"
 
 // Role mapped from table <role>
 type Role struct {
-	ID          int64          `gorm:"column:id;primaryKey;autoIncrement:true;comment:角色主键" json:"id"`                      // 角色主键
-	Code        string         `gorm:"column:code;not null;comment:角色编码，系统内唯一" json:"code"`                                 // 角色编码，系统内唯一
-	Name        string         `gorm:"column:name;not null;comment:角色名称" json:"name"`                                       // 角色名称
-	Description string         `gorm:"column:description;comment:角色说明" json:"description"`                                  // 角色说明
-	CreatedAt   time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt   time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	ID          int64          `gorm:"column:id;primaryKey" json:"id"`
+	Code        string         `gorm:"column:code;not null" json:"code"`
+	Name        string         `gorm:"column:name;not null" json:"name"`
+	Description string         `gorm:"column:description" json:"description"`
+	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName Role's table name

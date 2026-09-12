@@ -11,7 +11,7 @@ type AssetGroupRequest struct {
 	Code        string `json:"code" binding:"required"`
 	ParentID    int64  `json:"parent_id"`
 	Description string `json:"description"`
-	SortOrder   int32  `json:"sort_order"`
+	SortOrder   int64  `json:"sort_order"`
 	Status      *bool  `json:"status" binding:"required"`
 }
 type AssetGroupIDRequest struct {
@@ -23,7 +23,7 @@ type AssetGroupResponse struct {
 	Code        string    `json:"code"`
 	ParentID    int64     `json:"parent_id"`
 	Description string    `json:"description"`
-	SortOrder   int32     `json:"sort_order"`
+	SortOrder   int64     `json:"sort_order"`
 	Status      bool      `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -92,13 +92,13 @@ type HostRequest struct {
 	GroupID        int64  `json:"group_id"`
 	HostType       string `json:"host_type"`
 	IP             string `json:"ip" binding:"required"`
-	Port           int32  `json:"port" binding:"min=1,max=65535"`
+	Port           int64  `json:"port" binding:"min=1,max=65535"`
 	SSHUser        string `json:"ssh_user"`
 	CredentialID   int64  `json:"credential_id"`
 	CloudAccountID int64  `json:"cloud_account_id"`
 	Tags           string `json:"tags"`
 	Description    string `json:"description"`
-	Status         int16  `json:"status"`
+	Status         int64  `json:"status"`
 }
 type HostIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
@@ -109,13 +109,13 @@ type HostResponse struct {
 	GroupID        int64     `json:"group_id"`
 	HostType       string    `json:"host_type"`
 	IP             string    `json:"ip"`
-	Port           int32     `json:"port"`
+	Port           int64     `json:"port"`
 	SSHUser        string    `json:"ssh_user"`
 	CredentialID   int64     `json:"credential_id"`
 	CloudAccountID int64     `json:"cloud_account_id"`
 	Tags           string    `json:"tags"`
 	Description    string    `json:"description"`
-	Status         int16     `json:"status"`
+	Status         int64     `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -128,7 +128,7 @@ type DbInstanceRequest struct {
 	Name         string `json:"name" binding:"required"`
 	DbType       string `json:"db_type" binding:"required"`
 	Host         string `json:"host" binding:"required"`
-	Port         int32  `json:"port" binding:"min=1,max=65535"`
+	Port         int64  `json:"port" binding:"min=1,max=65535"`
 	Username     string `json:"username"`
 	Password     string `json:"password"`
 	Version      string `json:"version"`
@@ -145,7 +145,7 @@ type DbInstanceResponse struct {
 	Name         string    `json:"name"`
 	DbType       string    `json:"db_type"`
 	Host         string    `json:"host"`
-	Port         int32     `json:"port"`
+	Port         int64     `json:"port"`
 	Username     string    `json:"username"`
 	Version      string    `json:"version"`
 	CredentialID int64     `json:"credential_id"`

@@ -14,21 +14,21 @@ const TableNameDbInstance = "db_instance"
 
 // DbInstance mapped from table <db_instance>
 type DbInstance struct {
-	ID           int64          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Name         string         `gorm:"column:name;not null;comment:数据库名称" json:"name"`                                      // 数据库名称
-	DbType       string         `gorm:"column:db_type;not null;comment:数据库类型" json:"db_type"`                                // 数据库类型
-	Host         string         `gorm:"column:host;not null;comment:数据库地址" json:"host"`                                      // 数据库地址
-	Port         int32          `gorm:"column:port;not null;comment:数据库端口" json:"port"`                                      // 数据库端口
-	Username     string         `gorm:"column:username;not null;comment:数据库用户名" json:"username"`                             // 数据库用户名
-	Password     string         `gorm:"column:password;not null;comment:加密数据库密码" json:"password"`                            // 加密数据库密码
-	Version      string         `gorm:"column:version;not null;comment:数据库版本" json:"version"`                                // 数据库版本
-	CredentialID int64          `gorm:"column:credential_id;comment:关联凭证ID" json:"credential_id"`                            // 关联凭证ID
-	Tags         string         `gorm:"column:tags;not null;comment:数据库标签" json:"tags"`                                      // 数据库标签
-	Description  string         `gorm:"column:description;not null;comment:数据库描述" json:"description"`                        // 数据库描述
-	Status       bool           `gorm:"column:status;not null;default:true;comment:是否启用" json:"status"`                      // 是否启用
-	CreatedAt    time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt    time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	ID           int64          `gorm:"column:id;primaryKey" json:"id"`
+	Name         string         `gorm:"column:name;not null" json:"name"`
+	DbType       string         `gorm:"column:db_type;not null" json:"db_type"`
+	Host         string         `gorm:"column:host;not null" json:"host"`
+	Port         int64          `gorm:"column:port;not null" json:"port"`
+	Username     string         `gorm:"column:username;not null;default:''" json:"username"`
+	Password     string         `gorm:"column:password;not null;default:''" json:"password"`
+	Version      string         `gorm:"column:version;not null;default:''" json:"version"`
+	CredentialID int64          `gorm:"column:credential_id" json:"credential_id"`
+	Tags         string         `gorm:"column:tags;not null;default:''" json:"tags"`
+	Description  string         `gorm:"column:description;not null;default:''" json:"description"`
+	Status       bool           `gorm:"column:status;not null;default:TRUE" json:"status"`
+	CreatedAt    time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt    time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName DbInstance's table name

@@ -56,14 +56,14 @@ type user struct {
 	userDo userDo
 
 	ALL          field.Asterisk
-	ID           field.Int64  // 用户主键
-	Username     field.String // 登录用户名，系统内唯一
-	PasswordHash field.String // 密码哈希值
-	Nickname     field.String // 用户昵称
-	Status       field.Bool   // 启用状态
-	CreatedAt    field.Time   // 创建时间
-	UpdatedAt    field.Time   // 更新时间
-	DeletedAt    field.Field  // 软删除时间
+	ID           field.Int64
+	Username     field.String
+	PasswordHash field.String
+	Nickname     field.String
+	Status       field.Bool
+	CreatedAt    field.Time
+	UpdatedAt    field.Time
+	DeletedAt    field.Field
 	Roles        userHasManyRoles
 
 	Organizations userHasManyOrganizations

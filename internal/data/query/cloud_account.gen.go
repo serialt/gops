@@ -49,16 +49,16 @@ type cloudAccount struct {
 
 	ALL         field.Asterisk
 	ID          field.Int64
-	Name        field.String // 账号名称
-	Provider    field.String // 云服务商
-	AccessKey   field.String // 加密访问密钥
-	SecretKey   field.String // 加密访问密钥密码
-	Region      field.String // 默认区域
-	Description field.String // 账号描述
-	Status      field.Bool   // 是否启用
-	CreatedAt   field.Time   // 创建时间
-	UpdatedAt   field.Time   // 更新时间
-	DeletedAt   field.Field  // 软删除时间
+	Name        field.String
+	Provider    field.String
+	AccessKey   field.String
+	SecretKey   field.String
+	Region      field.String
+	Description field.String
+	Status      field.Bool
+	CreatedAt   field.Time
+	UpdatedAt   field.Time
+	DeletedAt   field.Field
 
 	fieldMap map[string]field.Expr
 }

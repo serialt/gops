@@ -42,11 +42,11 @@ type systemConfig struct {
 	systemConfigDo systemConfigDo
 
 	ALL         field.Asterisk
-	ConfigKey   field.String // 配置键
-	ConfigValue field.String // 配置值
-	CreatedAt   field.Time   // 创建时间
-	UpdatedAt   field.Time   // 更新时间
-	DeletedAt   field.Field  // 软删除时间
+	ConfigKey   field.String
+	ConfigValue field.String
+	CreatedAt   field.Time
+	UpdatedAt   field.Time
+	DeletedAt   field.Field
 
 	fieldMap map[string]field.Expr
 }

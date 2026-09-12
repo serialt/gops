@@ -14,17 +14,17 @@ const TableNameCredential = "credential"
 
 // Credential mapped from table <credential>
 type Credential struct {
-	ID             int64          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Name           string         `gorm:"column:name;not null;comment:凭证名称" json:"name"`                                       // 凭证名称
-	CredentialType string         `gorm:"column:credential_type;not null;comment:凭证类型" json:"credential_type"`                 // 凭证类型
-	Username       string         `gorm:"column:username;not null;comment:用户名" json:"username"`                                // 用户名
-	Password       string         `gorm:"column:password;not null;comment:加密密码" json:"password"`                               // 加密密码
-	PrivateKey     string         `gorm:"column:private_key;not null;comment:加密私钥" json:"private_key"`                         // 加密私钥
-	Passphrase     string         `gorm:"column:passphrase;not null;comment:加密私钥口令" json:"passphrase"`                         // 加密私钥口令
-	Description    string         `gorm:"column:description;not null;comment:凭证描述" json:"description"`                         // 凭证描述
-	CreatedAt      time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt      time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
+	ID             int64          `gorm:"column:id;primaryKey" json:"id"`
+	Name           string         `gorm:"column:name;not null" json:"name"`
+	CredentialType string         `gorm:"column:credential_type;not null" json:"credential_type"`
+	Username       string         `gorm:"column:username;not null;default:''" json:"username"`
+	Password       string         `gorm:"column:password;not null;default:''" json:"password"`
+	PrivateKey     string         `gorm:"column:private_key;not null;default:''" json:"private_key"`
+	Passphrase     string         `gorm:"column:passphrase;not null;default:''" json:"passphrase"`
+	Description    string         `gorm:"column:description;not null;default:''" json:"description"`
+	CreatedAt      time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt      time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName Credential's table name

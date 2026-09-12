@@ -14,16 +14,16 @@ const TableNameOrganization = "organization"
 
 // Organization mapped from table <organization>
 type Organization struct {
-	ID        int64          `gorm:"column:id;primaryKey;autoIncrement:true;comment:组织主键" json:"id"`                      // 组织主键
-	ParentID  int64          `gorm:"column:parent_id;comment:上级组织主键，根组织为空" json:"parent_id"`                              // 上级组织主键，根组织为空
-	Name      string         `gorm:"column:name;not null;comment:组织名称" json:"name"`                                       // 组织名称
-	Code      string         `gorm:"column:code;not null;comment:组织编码，系统内唯一" json:"code"`                                 // 组织编码，系统内唯一
-	Manager   string         `gorm:"column:manager;not null;comment:组织负责人" json:"manager"`                                // 组织负责人
-	Status    bool           `gorm:"column:status;not null;default:true;comment:启用状态" json:"status"`                      // 启用状态
-	CreatedAt time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP;comment:创建时间" json:"created_at"` // 创建时间
-	UpdatedAt time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP;comment:更新时间" json:"updated_at"` // 更新时间
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at"`                                   // 软删除时间
-	SortOrder int64          `gorm:"column:sort_order;not null;comment:同级组织排序值" json:"sort_order"`                        // 同级组织排序值
+	ID        int64          `gorm:"column:id;primaryKey" json:"id"`
+	ParentID  int64          `gorm:"column:parent_id" json:"parent_id"`
+	Name      string         `gorm:"column:name;not null" json:"name"`
+	Code      string         `gorm:"column:code;not null" json:"code"`
+	Manager   string         `gorm:"column:manager;not null;default:''" json:"manager"`
+	Status    bool           `gorm:"column:status;not null;default:TRUE" json:"status"`
+	CreatedAt time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	SortOrder int64          `gorm:"column:sort_order;not null" json:"sort_order"`
 }
 
 // TableName Organization's table name

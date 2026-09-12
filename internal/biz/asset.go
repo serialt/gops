@@ -21,7 +21,7 @@ func (b *AssetBiz) ListGroups(req *api.AssetGroupListRequest) ([]*api.AssetGroup
 	var rows []model.AssetGroup
 	query := b.db.Order("parent_id ASC, sort_order ASC, id ASC")
 	if req.Keyword != "" {
-		query = query.Where("name ILIKE ? OR code ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		query = query.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if err := query.Find(&rows).Error; err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (b *AssetBiz) ListCredentials(req *api.CredentialListRequest) ([]*api.Crede
 	var rows []model.Credential
 	q := b.db.Order("id DESC")
 	if req.Keyword != "" {
-		q = q.Where("name ILIKE ? OR username ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		q = q.Where("name LIKE ? OR username LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
@@ -184,7 +184,7 @@ func (b *AssetBiz) ListCloudAccounts(req *api.CloudAccountListRequest) ([]*api.C
 	var rows []model.CloudAccount
 	q := b.db.Order("id DESC")
 	if req.Keyword != "" {
-		q = q.Where("name ILIKE ? OR provider ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		q = q.Where("name LIKE ? OR provider LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
@@ -262,7 +262,7 @@ func (b *AssetBiz) ListHosts(req *api.HostListRequest) ([]*api.HostResponse, err
 	var rows []model.Host
 	q := b.db.Order("id DESC")
 	if req.Keyword != "" {
-		q = q.Where("name ILIKE ? OR ip ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		q = q.Where("name LIKE ? OR ip LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if req.GroupID > 0 {
 		q = q.Where("group_id = ?", req.GroupID)
@@ -323,7 +323,7 @@ func (b *AssetBiz) ListDBInstances(req *api.DbInstanceListRequest) ([]*api.DbIns
 	var rows []model.DbInstance
 	q := b.db.Order("id DESC")
 	if req.Keyword != "" {
-		q = q.Where("name ILIKE ? OR host ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		q = q.Where("name LIKE ? OR host LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
@@ -397,7 +397,7 @@ func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) ([]
 		q = q.Where("session_type = ?", req.SessionType)
 	}
 	if req.Keyword != "" {
-		q = q.Where("CAST(user_id AS TEXT) ILIKE ? OR CAST(host_id AS TEXT) ILIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		q = q.Where("CAST(user_id AS TEXT) LIKE ? OR CAST(host_id AS TEXT) LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err

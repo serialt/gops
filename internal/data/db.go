@@ -2,15 +2,16 @@ package data
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"fmt"
 	"gops/internal/config"
 	"log/slog"
-	"strings"
 	"time"
 
+	_ "github.com/glebarez/go-sqlite"
+	"github.com/glebarez/sqlite"
 	"github.com/pressly/goose/v3"
-	"gorm.io/driver/postgres"
 	"gorm.io/gen"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -21,7 +22,7 @@ func NewDB(cfg *config.Config, gslog *slog.Logger) (db *gorm.DB, cleanup func(),
 	if cfg.Log.Level == "debug" {
 		logLevel = logger.Info
 	}
-	db, err = gorm.Open(postgres.Open(cfg.Dsn), &gorm.Config{
+	db, err = gorm.Open(sqlite.Open(cfg.Dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logLevel),
 	})
 	if err != nil {
@@ -65,22 +66,11 @@ func GenModel(cfg *config.Config) {
 		Mode:              gen.WithDefaultQuery,
 	})
 
-	// 定义完整的 MySQL DataTypeMap
+	// SQLite 的整数类型统一生成 int64，避免不同位宽导致模型字段不一致。
 	dataTypeMap := map[string]func(gorm.ColumnType) (dataType string){
-		// ---------------- 数值类型 (全部收拢到 int64/float64) ----------------
-		"tinyint": func(columnType gorm.ColumnType) string {
-			ct, _ := columnType.ColumnType()
-			// 习惯用法：tinyint(1) 映射为 bool
-			if strings.HasPrefix(ct, "tinyint(1)") {
-				return "bool"
-			}
-			return "int64"
-		},
-		"smallint":  func(columnType gorm.ColumnType) string { return "int64" },
-		"mediumint": func(columnType gorm.ColumnType) string { return "int64" },
-		"int":       func(columnType gorm.ColumnType) string { return "int64" },
-		"integer":   func(columnType gorm.ColumnType) string { return "int64" },
-		"bigint":    func(columnType gorm.ColumnType) string { return "int64" },
+		"INTEGER":  func(gorm.ColumnType) string { return "int64" },
+		"BIGINT":   func(gorm.ColumnType) string { return "int64" },
+		"SMALLINT": func(gorm.ColumnType) string { return "int64" },
 	}
 	g.UseDB(db)
 	g.WithDataTypeMap(dataTypeMap)
@@ -95,7 +85,11 @@ func GenModel(cfg *config.Config) {
 func GenTable(cfg *config.Config, migrations embed.FS, gooseArgs []string, dir string) {
 	goose.SetBaseFS(migrations)
 	command := gooseArgs[0]
-	gooseDB, err := goose.OpenDBWithDriver("postgres", cfg.Dsn)
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		slog.Error("goose: failed to set SQLite dialect", "err", err)
+		return
+	}
+	gooseDB, err := sql.Open("sqlite", cfg.Dsn)
 	if err != nil {
 		slog.Error("goose: failed to open DB", "err", err)
 		return

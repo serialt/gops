@@ -61,23 +61,23 @@
 
 ## 数据模型与查询代码
 
-- 数据模型位于 `internal/data/model/`，使用 PostgreSQL model 格式：包含 `TableName<模型名>` 常量、`// <模型> mapped from table <表名>` 注释，以及指针接收器的 `TableName()` 方法。
-- model 字段统一使用 `gorm:"column:<name>;...;comment:<字段说明>" json:"<name>"` 格式；`comment:` 必须存在，值与字段业务说明一致。
+- 数据模型位于 `internal/data/model/`，使用 SQLite model 格式：包含 `TableName<模型名>` 常量、`// <模型> mapped from table <表名>` 注释，以及指针接收器的 `TableName()` 方法。
+- model 字段统一使用 `gorm:"column:<name>;..." json:"<name>"` 格式；字段业务说明通过同一行末尾注释维护。
 - 字段业务说明必须写在字段定义的同一行末尾 `//` 注释中，不单独占行，并与 PostgreSQL 表/字段注释保持一致。例如：`Name string \`gorm:"column:name;not null;comment:组织名称" json:"name"\` // 组织名称`。
 - 除非字段类型映射存在歧义，不强制在 model Tag 中写 `type:`；以表结构迁移和 GORM 默认映射为准。
-- 数据结构采用 SQL 优先：新增或变更表时，先新增 Goose SQL 到 `docs/sql/`，执行迁移后使用 GORM Gen 从 PostgreSQL 表结构生成 model 与 query。
+- 数据结构采用 SQL 优先：新增或变更表时，先新增 Goose SQL 到 `docs/sql/`，执行迁移后使用 GORM Gen 从 SQLite 表结构生成 model 与 query。
 - 禁止手工修改生成的 `.gen.go` model/query 文件；字段说明、类型、默认值和约束应定义在 Goose SQL 中，再重新生成代码。
-- 在 `internal/data/table_model.go` 的 `gopsTable` 中使用 `GenerateModel` 从已迁移的数据库表定义生成 model，并注册 query 生成目标。所有 model 间的 `many2many` 关系必须在此处通过 `field.RelateConfig` 与中间表名声明，禁止在生成后的 model 文件中补写。
+- 在 `internal/data/table_model.go` 的 `gopsTable` 中使用 `GenerateModel` 从已迁移的 SQLite 数据库表定义生成 model，并注册 query 生成目标。所有 model 间的 `many2many` 关系必须在此处通过 `field.RelateConfig` 与中间表名声明，禁止在生成后的 model 文件中补写。
 - `func GenModel(cfg *config.Config)` 生成 `internal/data/model/` 与 `internal/data/query/` 下的代码；生成前必须先完成 Goose 升级。
 - 生成命令为 `go run ./cmd/server -g`。完成后确认生成对应的 `internal/data/query/<table>.gen.go`，并运行 `go test ./...`。
 
 ## 数据库
 
-- 数据库仅支持 PostgreSQL，连接 DSN 必须使用 PostgreSQL 格式。
-- `NewDB` 固定使用 `gorm.io/driver/postgres`；`GenTable` 固定使用 Goose 的 `postgres` 驱动。
+- 数据库仅支持 SQLite，连接 DSN 为 SQLite 数据库文件路径或 SQLite URI。
+- `NewDB` 固定使用 `github.com/glebarez/sqlite`（底层驱动 `github.com/glebarez/go-sqlite`）；`GenTable` 使用 Goose 的 `sqlite3` 方言，并由 `github.com/glebarez/go-sqlite` 打开连接。
 - 不使用 GORM `AutoMigrate`。表、字段、索引、约束及数据初始化均由 Goose SQL 迁移管理；`GenTable` 只执行 Goose。
 - 默认根组织必须由可重复安全的 Goose 数据迁移确保存在：`code` 为 `root`，初始 `name` 为“默认组织”。根组织名称允许修改，但 `code` 不可修改、根组织不可删除。
 - 所有用户必须关联默认根组织。Goose 数据迁移为历史用户补齐根组织关联；用户新增或编辑时，始终保留根组织关联，并可额外关联其他组织。
-- SQL 迁移统一放在 `docs/sql/`，可使用 PostgreSQL 特性，例如 `TIMESTAMPTZ`、`ILIKE`、部分索引和 `GENERATED AS IDENTITY`。
-- Goose 保留用于 PostgreSQL 的数据修复与数据补丁；数据修复迁移必须可重复安全执行，并提供对应的 Down 操作或明确的不可逆说明。
-- 修改模型或迁移后，执行 PostgreSQL 迁移并运行 `go test ./...`。
+- SQL 迁移统一放在 `docs/sql/`，须使用 SQLite 兼容语法，例如 `INTEGER PRIMARY KEY AUTOINCREMENT`、`DATETIME` 和 `ON CONFLICT`；不得使用 PostgreSQL 专有语法或 `COMMENT ON`。
+- Goose 保留用于 SQLite 的数据修复与数据补丁；数据修复迁移必须可重复安全执行，并提供对应的 Down 操作或明确的不可逆说明。
+- 修改模型或迁移后，执行 SQLite 迁移并运行 `go test ./...`。

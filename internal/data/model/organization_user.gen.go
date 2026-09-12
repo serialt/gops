@@ -8,8 +8,8 @@ const TableNameOrganizationUser = "organization_user"
 
 // OrganizationUser mapped from table <organization_user>
 type OrganizationUser struct {
-	OrganizationID int64 `gorm:"column:organization_id;primaryKey;comment:组织主键" json:"organization_id"` // 组织主键
-	UserID         int64 `gorm:"column:user_id;primaryKey;comment:用户主键" json:"user_id"`                 // 用户主键
+	OrganizationID int64 `gorm:"column:organization_id;primaryKey" json:"organization_id"`
+	UserID         int64 `gorm:"column:user_id;not null" json:"user_id"`
 }
 
 // TableName OrganizationUser's table name
