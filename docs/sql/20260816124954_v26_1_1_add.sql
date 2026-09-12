@@ -2,35 +2,35 @@
 
 
 
--- 1. 角色表优化
+-- 表：系统角色表
 CREATE TABLE IF NOT EXISTS "role" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "code" VARCHAR(64) NOT NULL,
-    "name" VARCHAR(64) NOT NULL,
-    "description" VARCHAR(255),
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "deleted_at" DATETIME,
-    CONSTRAINT uq_role_code UNIQUE ("code") -- 优化3: 直接在表内定义唯一约束
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT, -- 角色主键
+    "code" VARCHAR(64) NOT NULL, -- 角色编码，系统内唯一
+    "name" VARCHAR(64) NOT NULL, -- 角色名称
+    "description" VARCHAR(255), -- 角色说明
+    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 创建时间
+    "updated_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 更新时间
+    "deleted_at" DATETIME, -- 软删除时间
+    CONSTRAINT uq_role_code UNIQUE ("code")
 );
 
--- 2. 用户表优化
+-- 表：系统用户表
 CREATE TABLE IF NOT EXISTS "user" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "username" VARCHAR(64) NOT NULL,
-    "password_hash" VARCHAR(255) NOT NULL,
-    "nickname" VARCHAR(64) NOT NULL,
-    "status" BOOLEAN NOT NULL DEFAULT TRUE,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "deleted_at" DATETIME,
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT, -- 用户主键
+    "username" VARCHAR(64) NOT NULL, -- 登录用户名，系统内唯一
+    "password_hash" VARCHAR(255) NOT NULL, -- 密码哈希
+    "nickname" VARCHAR(64) NOT NULL, -- 用户昵称
+    "status" BOOLEAN NOT NULL DEFAULT TRUE, -- 启用状态
+    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 创建时间
+    "updated_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 更新时间
+    "deleted_at" DATETIME, -- 软删除时间
     CONSTRAINT uq_user_username UNIQUE ("username")
 );
 
--- 3. 用户角色关联表优化
+-- 表：用户与角色关联表
 CREATE TABLE IF NOT EXISTS "user_role" (
-    "user_id" INTEGER NOT NULL,
-    "role_id" INTEGER NOT NULL,
+    "user_id" INTEGER NOT NULL, -- 用户主键
+    "role_id" INTEGER NOT NULL, -- 角色主键
     PRIMARY KEY ("user_id", "role_id")
  
 );
