@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"time"
 
-	_ "github.com/glebarez/go-sqlite"
 	"github.com/glebarez/sqlite"
 	"github.com/pressly/goose/v3"
 	"gorm.io/gen"
