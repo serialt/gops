@@ -2,6 +2,7 @@ package biz
 
 import (
 	"errors"
+	"strings"
 
 	"gops/internal/data/api"
 	"gops/internal/data/model"
@@ -15,7 +16,53 @@ type AssetBiz struct {
 	aesKey string
 }
 
+var cloudProviderOptions = []*api.CloudProviderOptionResponse{
+	{Value: "aliyun", Label: "阿里云", Regions: cloudRegions(
+		"华东 1（杭州）|cn-hangzhou", "华东 2（上海）|cn-shanghai", "华北 1（青岛）|cn-qingdao", "华北 2（北京）|cn-beijing", "华北 3（张家口）|cn-zhangjiakou", "华北 5（呼和浩特）|cn-huhehaote", "华北 6（乌兰察布）|cn-wulanchabu", "华南 1（深圳）|cn-shenzhen", "华南 2（河源）|cn-heyuan", "华南 3（广州）|cn-guangzhou", "西南 1（成都）|cn-chengdu",
+		"中国香港|cn-hongkong", "新加坡|ap-southeast-1", "澳大利亚（悉尼）|ap-southeast-2", "马来西亚（吉隆坡）|ap-southeast-3", "印度尼西亚（雅加达）|ap-southeast-5", "菲律宾（马尼拉）|ap-southeast-6", "泰国（曼谷）|ap-southeast-7", "日本（东京）|ap-northeast-1", "韩国（首尔）|ap-northeast-2", "美国（硅谷）|us-west-1", "美国（弗吉尼亚）|us-east-1", "德国（法兰克福）|eu-central-1", "英国（伦敦）|eu-west-1", "阿联酋（迪拜）|me-east-1", "沙特（利雅得）|me-central-1",
+	)},
+	{Value: "huawei", Label: "华为云", Regions: cloudRegions(
+		"华北-北京一|cn-north-1", "华北-北京四|cn-north-4", "华北-乌兰察布一|cn-north-9", "华北-乌兰察布-汽车一|cn-north-11", "华北三|cn-north-12", "华东-上海二|cn-east-2", "华东-上海一|cn-east-3", "华东二|cn-east-4", "华东-青岛|cn-east-5", "华南-广州|cn-south-1", "华南-广州-友好用户环境|cn-south-4", "西南-贵阳一|cn-southwest-2",
+		"中国-香港|ap-southeast-1", "亚太-曼谷|ap-southeast-2", "亚太-新加坡|ap-southeast-3", "亚太-雅加达|ap-southeast-4", "亚太-马尼拉|ap-southeast-5", "非洲-约翰内斯堡|af-south-1", "非洲-开罗|af-north-1", "中东-利雅得|me-east-1", "土耳其-伊斯坦布尔|tr-west-1", "拉美-墨西哥城一|na-mexico-1", "拉美-墨西哥城二|la-north-2", "拉美-圣保罗一|sa-brazil-1", "拉美-圣地亚哥|la-south-2",
+	)},
+	{Value: "tencent", Label: "腾讯云", Regions: cloudRegions(
+		"华北地区（北京）|ap-beijing", "华东地区（上海）|ap-shanghai", "华东地区（南京）|ap-nanjing", "华南地区（广州）|ap-guangzhou", "西南地区（成都）|ap-chengdu", "西南地区（重庆）|ap-chongqing", "华南地区（深圳金融）|ap-shenzhen-fsi", "华东地区（上海金融）|ap-shanghai-fsi",
+		"中国香港|ap-hongkong", "新加坡|ap-singapore", "马来西亚（新山）|ap-johorbahru", "印度尼西亚（雅加达）|ap-jakarta", "泰国（曼谷）|ap-bangkok", "日本（东京）|ap-tokyo", "日本（大阪）|ap-osaka", "韩国（首尔）|ap-seoul", "印度（孟买）|ap-mumbai", "美国（硅谷）|na-siliconvalley", "美国（弗吉尼亚）|na-ashburn", "德国（法兰克福）|eu-frankfurt", "俄罗斯（莫斯科）|eu-moscow",
+	)},
+	{Value: "aws", Label: "AWS", Regions: cloudRegions(
+		"中国（北京）|cn-north-1", "中国（宁夏）|cn-northwest-1",
+		"亚太（香港）|ap-east-1", "亚太（台北）|ap-east-2", "亚太（孟买）|ap-south-1", "亚太（海得拉巴）|ap-south-2", "亚太（新加坡）|ap-southeast-1", "亚太（悉尼）|ap-southeast-2", "亚太（雅加达）|ap-southeast-3", "亚太（墨尔本）|ap-southeast-4", "亚太（马来西亚）|ap-southeast-5", "亚太（新西兰）|ap-southeast-6", "亚太（曼谷）|ap-southeast-7", "亚太（东京）|ap-northeast-1", "亚太（首尔）|ap-northeast-2", "亚太（大阪）|ap-northeast-3", "美国东部（弗吉尼亚北部）|us-east-1", "美国东部（俄亥俄）|us-east-2", "美国西部（加利福尼亚北部）|us-west-1", "美国西部（俄勒冈）|us-west-2", "加拿大（中部）|ca-central-1", "加拿大西部（卡尔加里）|ca-west-1", "南美洲（圣保罗）|sa-east-1", "墨西哥（中部）|mx-central-1", "欧洲（爱尔兰）|eu-west-1", "欧洲（伦敦）|eu-west-2", "欧洲（巴黎）|eu-west-3", "欧洲（法兰克福）|eu-central-1", "欧洲（苏黎世）|eu-central-2", "欧洲（斯德哥尔摩）|eu-north-1", "欧洲（米兰）|eu-south-1", "欧洲（西班牙）|eu-south-2", "中东（巴林）|me-south-1", "中东（阿联酋）|me-central-1", "以色列（特拉维夫）|il-central-1", "非洲（开普敦）|af-south-1",
+	)},
+}
+
+var databaseTypeOptions = []*api.DatabaseTypeOptionResponse{
+	{Value: "postgresql", Label: "PostgreSQL", DefaultPort: 5432},
+	{Value: "mysql", Label: "MySQL", DefaultPort: 3306},
+	{Value: "oracle", Label: "Oracle", DefaultPort: 1521},
+	{Value: "sqlserver", Label: "SQL Server", DefaultPort: 1433},
+	{Value: "mariadb", Label: "MariaDB", DefaultPort: 3306},
+}
+
+func cloudRegions(values ...string) []*api.CloudRegionOptionResponse {
+	regions := make([]*api.CloudRegionOptionResponse, 0, len(values))
+	for _, value := range values {
+		parts := strings.SplitN(value, "|", 2)
+		regions = append(regions, &api.CloudRegionOptionResponse{Label: parts[0], Value: parts[1]})
+	}
+	return regions
+}
+
 func NewAssetBiz(db *gorm.DB, aesKey string) *AssetBiz { return &AssetBiz{db: db, aesKey: aesKey} }
+
+// CloudProviderOptions 返回后端定义的云服务商与区域枚举。
+func (b *AssetBiz) CloudProviderOptions() []*api.CloudProviderOptionResponse {
+	return cloudProviderOptions
+}
+
+// DatabaseTypeOptions returns backend-defined database type options.
+func (b *AssetBiz) DatabaseTypeOptions() []*api.DatabaseTypeOptionResponse {
+	return databaseTypeOptions
+}
 
 func (b *AssetBiz) ListGroups(req *api.AssetGroupListRequest) ([]*api.AssetGroupResponse, error) {
 	var rows []model.AssetGroup
@@ -308,6 +355,17 @@ func (b *AssetBiz) DeleteCloudAccount(req *api.CloudAccountIDRequest) error {
 	return nil
 }
 func (b *AssetBiz) cloudAccountModel(req *api.CloudAccountRequest) (model.CloudAccount, error) {
+	provider, ok := findCloudProviderOption(req.Provider)
+	if !ok {
+		return model.CloudAccount{}, errors.New("unsupported cloud provider")
+	}
+	region := req.Region
+	if region == "" {
+		region = provider.Regions[0].Value
+	}
+	if !cloudProviderHasRegion(provider, region) {
+		return model.CloudAccount{}, errors.New("unsupported cloud region")
+	}
 	accessKey, err := cryptox.Encrypt(b.aesKey, req.AccessKey)
 	if err != nil {
 		return model.CloudAccount{}, err
@@ -316,7 +374,25 @@ func (b *AssetBiz) cloudAccountModel(req *api.CloudAccountRequest) (model.CloudA
 	if err != nil {
 		return model.CloudAccount{}, err
 	}
-	return model.CloudAccount{Name: req.Name, Provider: req.Provider, AccessKey: accessKey, SecretKey: secretKey, Region: req.Region, Description: req.Description, Status: *req.Status}, nil
+	return model.CloudAccount{Name: req.Name, Provider: provider.Value, AccessKey: accessKey, SecretKey: secretKey, Region: region, Description: req.Description, Status: *req.Status}, nil
+}
+
+func findCloudProviderOption(value string) (*api.CloudProviderOptionResponse, bool) {
+	for _, provider := range cloudProviderOptions {
+		if provider.Value == value {
+			return provider, true
+		}
+	}
+	return nil, false
+}
+
+func cloudProviderHasRegion(provider *api.CloudProviderOptionResponse, value string) bool {
+	for _, region := range provider.Regions {
+		if region.Value == value {
+			return true
+		}
+	}
+	return false
 }
 func cloudAccountResponse(row model.CloudAccount) *api.CloudAccountResponse {
 	return &api.CloudAccountResponse{ID: row.ID, Name: row.Name, Provider: row.Provider, Region: row.Region, Description: row.Description, Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
@@ -444,6 +520,16 @@ func (b *AssetBiz) DeleteDBInstance(req *api.DbInstanceIDRequest) error {
 	return nil
 }
 func (b *AssetBiz) dbInstanceModel(req *api.DbInstanceRequest) (model.DbInstance, error) {
+	var databaseType *api.DatabaseTypeOptionResponse
+	for _, option := range databaseTypeOptions {
+		if option.Value == req.DbType {
+			databaseType = option
+			break
+		}
+	}
+	if databaseType == nil || req.Port < 1 {
+		return model.DbInstance{}, ErrInvalid
+	}
 	password, err := cryptox.Encrypt(b.aesKey, req.Password)
 	if err != nil {
 		return model.DbInstance{}, err

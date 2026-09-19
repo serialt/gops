@@ -238,6 +238,11 @@ func (h *AssetHandler) ListCloudAccounts(c *gin.Context) {
 	response.OK(c, result)
 }
 
+// CloudProviderOptions POST /api/v1/assets/cloud-accounts/options 查询云服务商与区域枚举。
+func (h *AssetHandler) CloudProviderOptions(c *gin.Context) {
+	response.OK(c, h.biz.CloudProviderOptions())
+}
+
 // CreateCloudAccount POST /api/v1/assets/cloud-accounts/create 创建云账号。
 func (h *AssetHandler) CreateCloudAccount(c *gin.Context) {
 	req := new(api.CloudAccountRequest)
@@ -339,6 +344,11 @@ func (h *AssetHandler) DeleteHost(c *gin.Context) {
 		return
 	}
 	response.OK(c, nil)
+}
+
+// DatabaseTypeOptions POST /api/v1/assets/db-instances/options 查询数据库类型枚举。
+func (h *AssetHandler) DatabaseTypeOptions(c *gin.Context) {
+	response.OK(c, h.biz.DatabaseTypeOptions())
 }
 
 // ListDBInstances POST /api/v1/assets/db-instances/list 查询数据库实例。

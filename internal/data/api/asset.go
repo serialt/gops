@@ -58,6 +58,15 @@ type CredentialResponse struct {
 type CloudAccountListRequest struct {
 	Keyword string `json:"keyword"`
 }
+type CloudProviderOptionResponse struct {
+	Value   string                       `json:"value"`
+	Label   string                       `json:"label"`
+	Regions []*CloudRegionOptionResponse `json:"regions"`
+}
+type CloudRegionOptionResponse struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
 type CloudAccountRequest struct {
 	ID          int64  `json:"id"`
 	Name        string `json:"name" binding:"required"`
@@ -80,6 +89,13 @@ type CloudAccountResponse struct {
 	Status      bool      `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// DatabaseTypeOptionResponse represents one database type and its default port.
+type DatabaseTypeOptionResponse struct {
+	Value       string `json:"value"`
+	Label       string `json:"label"`
+	DefaultPort int64  `json:"default_port"`
 }
 
 type HostListRequest struct {

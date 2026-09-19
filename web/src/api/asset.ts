@@ -37,8 +37,11 @@ export const updateCredential = (data: Required<Pick<CredentialRequest, 'id'>> &
 export const deleteCredential = (id: number) => request.post<null>('/assets/credentials/delete', { id })
 
 export interface CloudAccount { id: number; name: string; provider: string; region: string; description: string; status: boolean; created_at: string; updated_at: string }
+export interface CloudRegionOption { value: string; label: string }
+export interface CloudProviderOption { value: string; label: string; regions: CloudRegionOption[] }
 export interface CloudAccountRequest { id?: number; name: string; provider: string; access_key: string; secret_key: string; region: string; description: string; status: boolean }
 export const listCloudAccounts = (keyword = '') => request.post<CloudAccount[]>('/assets/cloud-accounts/list', { keyword })
+export const getCloudProviderOptions = () => request.post<CloudProviderOption[]>('/assets/cloud-accounts/options', {})
 export const createCloudAccount = (data: CloudAccountRequest) => request.post<CloudAccount>('/assets/cloud-accounts/create', data)
 export const updateCloudAccount = (data: Required<Pick<CloudAccountRequest, 'id'>> & CloudAccountRequest) => request.post<CloudAccount>('/assets/cloud-accounts/update', data)
 export const deleteCloudAccount = (id: number) => request.post<null>('/assets/cloud-accounts/delete', { id })
@@ -51,8 +54,10 @@ export const updateHost = (data:Required<Pick<HostRequest,'id'>>&HostRequest) =>
 export const deleteHost = (id:number) => request.post<null>('/assets/hosts/delete',{id})
 
 export interface DbInstance { id:number; name:string; db_type:string; host:string; port:number; username:string; version:string; credential_id:number; tags:string; description:string; status:boolean; created_at:string; updated_at:string }
+export interface DatabaseTypeOption { value: string; label: string; default_port: number }
 export interface DbInstanceRequest { id?:number; name:string; db_type:string; host:string; port:number; username:string; password:string; version:string; credential_id:number; tags:string; description:string; status:boolean }
 export const listDBInstances = (keyword='') => request.post<DbInstance[]>('/assets/db-instances/list',{keyword})
+export const getDatabaseTypeOptions = () => request.post<DatabaseTypeOption[]>('/assets/db-instances/options', {})
 export const createDBInstance = (data:DbInstanceRequest) => request.post<DbInstance>('/assets/db-instances/create',data)
 export const updateDBInstance = (data:Required<Pick<DbInstanceRequest,'id'>>&DbInstanceRequest) => request.post<DbInstance>('/assets/db-instances/update',data)
 export const deleteDBInstance = (id:number) => request.post<null>('/assets/db-instances/delete',{id})
