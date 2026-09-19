@@ -44,10 +44,13 @@ onMounted(load)
 </template>
 <style
   scoped>
+  .table-shell { background: var(--bg); min-height: 100%; }
+  .section-card { display: flex; flex-direction: column; min-height: 100%; padding: 12px 16px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
+  .page-toolbar { margin-bottom: 8px; }
   .filters {
     display: flex;
     gap: 8px;
-    margin-bottom: 12px
+    margin-bottom: 8px
   }
 
   .filters .el-input {
@@ -57,6 +60,8 @@ onMounted(load)
   .filters .el-select {
     width: 120px
   }
+
+  .filters :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px var(--line) inset; }
 
   :deep(.audit-actions) {
     position: absolute;

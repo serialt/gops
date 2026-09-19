@@ -6,8 +6,8 @@ import AppDataGrid from '@/components/AppDataGrid.vue'
 import { createCloudAccount, deleteCloudAccount, listCloudAccounts, updateCloudAccount, type CloudAccount } from '@/api/asset'
 const rows = ref<CloudAccount[]>([]); const keyword = ref(''); const dialogVisible = ref(false); const editingID = ref<number | null>(null); const form = reactive({ name: '', provider: 'aliyun', access_key: '', secret_key: '', region: '', description: '', status: true })
 function action(text: string, kind: string, fn: () => void) { const el = document.createElement('button'); el.textContent = text; el.className = `cloud-action ${kind}`; el.onclick = fn; return el }
-const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '账号名称', minWidth: 130 }, { field: 'provider', headerName: '云服务商', width: 120 }, { field: 'region', headerName: '默认区域', width: 120 }, { field: 'description', headerName: '说明', minWidth: 160 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value ? '' : ' is-disabled'}">${p.value ? '启用' : '禁用'}</span>` }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'cloud-actions'; wrap.append(action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
-async function load() { const { data } = await listCloudAccounts(keyword.value); rows.value = data.data } function create() { editingID.value = null; Object.assign(form, { name: '', provider: 'aliyun', access_key: '', secret_key: '', region: '', description: '', status: true }); dialogVisible.value = true } function edit(row: CloudAccount) { editingID.value = row.id; Object.assign(form, { name: row.name, provider: row.provider, access_key: '', secret_key: '', region: row.region, description: row.description, status: row.status }); dialogVisible.value = true } async function save() { if (!form.name) return ElMessage.warning('请填写账号名称'); if (editingID.value) await updateCloudAccount({ ...form, id: editingID.value }); else await createCloudAccount(form); dialogVisible.value = false; ElMessage.success('保存成功'); await load() } async function remove(row: CloudAccount) { await ElMessageBox.confirm(`确定删除云账号 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteCloudAccount(row.id); ElMessage.success('删除成功'); await load() } onMounted(load)
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '账号名称', minWidth: 130 }, { field: 'provider', headerName: '云服务商', width: 120, cellRenderer: (p: { value: string }) => `<span class="cloud-provider">${({ aliyun: '阿里云', tencent: '腾讯云', aws: 'AWS', huawei: '华为云' } as Record<string, string>)[p.value] ?? p.value}</span>` }, { field: 'region', headerName: '默认区域', width: 120 }, { field: 'description', headerName: '说明', minWidth: 160 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value ? '' : ' is-disabled'}">${p.value ? '启用' : '禁用'}</span>` }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'cloud-actions'; wrap.append(action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
+async function load() { const { data } = await listCloudAccounts(keyword.value); rows.value = data.data } function create() { editingID.value = null; Object.assign(form, { name: '', provider: 'aliyun', access_key: '', secret_key: '', region: '', description: '', status: true }); dialogVisible.value = true } function edit(row: CloudAccount) { editingID.value = row.id; Object.assign(form, { name: row.name, provider: row.provider, access_key: '', secret_key: '', region: row.region, description: row.description, status: row.status }); dialogVisible.value = true } async function save() { if (!form.name.trim()) return ElMessage.warning('请填写账号名称'); if (!editingID.value && (!form.access_key.trim() || !form.secret_key)) return ElMessage.warning('请填写 AccessKey 和 SecretKey'); if (editingID.value) await updateCloudAccount({ ...form, id: editingID.value }); else await createCloudAccount(form); dialogVisible.value = false; ElMessage.success('保存成功'); await load() } async function remove(row: CloudAccount) { await ElMessageBox.confirm(`确定删除云账号 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteCloudAccount(row.id); ElMessage.success('删除成功'); await load() } onMounted(load)
 </script>
 <template>
     <div class="page-container table-shell">
@@ -17,28 +17,34 @@ async function load() { const { data } = await listCloudAccounts(keyword.value);
                     type="primary" class="primary-btn" @click="create">新增云账号</el-button>
             </div><el-input v-model="keyword" class="cloud-search" placeholder="搜索账号名称或云服务商" clearable @input="load" />
             <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
-        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑云账号' : '新增云账号'" width="480px"><el-form :model="form"
-                label-width="90px"><el-form-item label="账号名称"><el-input
-                        v-model="form.name" /></el-form-item><el-form-item label="云服务商"><el-select
-                        v-model="form.provider"><el-option label="阿里云" value="aliyun" /><el-option label="腾讯云"
-                            value="tencent" /><el-option label="AWS" value="aws" /><el-option label="华为云"
-                            value="huawei" /></el-select></el-form-item><el-form-item label="AccessKey"><el-input
-                        v-model="form.access_key" autocomplete="off" /></el-form-item><el-form-item
-                    label="SecretKey"><el-input v-model="form.secret_key" type="password" show-password
-                        autocomplete="new-password" /></el-form-item><el-form-item label="默认区域"><el-input
-                        v-model="form.region" /></el-form-item><el-form-item label="状态"><el-switch
-                        v-model="form.status" /></el-form-item><el-form-item label="说明"><el-input
-                        v-model="form.description" type="textarea" /></el-form-item></el-form><template
-                #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
-                    @click="save">保存</el-button></template></el-dialog>
+        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑云账号' : '新增云账号'" width="560px">
+            <el-form :model="form" label-width="92px" class="cloud-form">
+                <el-form-item label="账号名称" required><el-input v-model="form.name" placeholder="请输入云账号名称，如：生产环境阿里云" /></el-form-item>
+                <el-form-item label="云服务商" required><el-select v-model="form.provider" style="width: 100%"><el-option label="阿里云" value="aliyun" /><el-option label="腾讯云" value="tencent" /><el-option label="AWS" value="aws" /><el-option label="华为云" value="huawei" /></el-select></el-form-item>
+                <el-form-item label="AccessKey" required><el-input v-model="form.access_key" autocomplete="off" :placeholder="editingID ? '留空则不修改' : '请输入 AccessKey'" /></el-form-item>
+                <el-form-item label="SecretKey" required><el-input v-model="form.secret_key" type="password" show-password autocomplete="new-password" :placeholder="editingID ? '留空则不修改' : '请输入 SecretKey'" /></el-form-item>
+                <el-form-item label="默认区域"><el-input v-model="form.region" placeholder="如：cn-hangzhou" /></el-form-item>
+                <el-form-item label="状态"><el-switch v-model="form.status" /></el-form-item>
+                <el-form-item label="备注"><el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入备注信息" /></el-form-item>
+            </el-form>
+            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template>
+        </el-dialog>
     </div>
 </template>
 <style
     scoped>
+    .table-shell { background: var(--bg); min-height: 100%; }
+    .section-card { display: flex; flex-direction: column; min-height: 100%; padding: 12px 16px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
+    .page-toolbar { margin-bottom: 8px; }
     .cloud-search {
         width: 260px;
-        margin-bottom: 12px
+        margin-bottom: 8px
     }
+
+    .cloud-form :deep(.el-form-item) { margin-bottom: 16px; }
+    .cloud-form :deep(.el-form-item__label) { color: var(--text); font-size: 12px; font-weight: 600; }
+    .cloud-form :deep(.el-input__wrapper), .cloud-form :deep(.el-textarea__inner) { box-shadow: 0 0 0 1px var(--line) inset; }
+    :deep(.cloud-provider) { display: inline-flex; padding: 3px 9px; border: 1px solid #d9e7ff; border-radius: 8px; color: var(--primary); background: #f2f6ff; line-height: 1.25; }
 
     :deep(.cloud-actions) {
         position: absolute;

@@ -115,6 +115,12 @@ select {
   color: var(--text);
 }
 
+/* 弹窗基于侧栏右侧的整个业务页面区域居中。 */
+.el-overlay:has(.el-dialog) .el-dialog,
+.el-overlay:has(.el-message-box) .el-message-box {
+  transform: translateX(calc(var(--app-content-offset, 0px) / 2));
+}
+
 /* AG Grid 列表操作统一样式：系统管理与资产管理共用，避免各页面出现细微差异。 */
 .app-data-grid .grid-action,
 .app-data-grid .asset-action,

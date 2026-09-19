@@ -73,6 +73,10 @@ watch(() => route.path, (path) => {
   if (!pageTabs.value.some((tab) => tab.path === path)) pageTabs.value.push({ path, title })
 }, { immediate: true })
 
+watch(sidebarWidth, (width) => {
+  document.documentElement.style.setProperty('--app-content-offset', `${width + 2}px`)
+}, { immediate: true })
+
 function queryMenuSuggestions(query: string, callback: (results: MenuSuggestion[]) => void) {
   const keyword = query.trim().toLowerCase()
   callback(menuItems.value

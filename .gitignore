@@ -6,3 +6,5 @@ dist/
 web/node_modules/
 web/dist/
 *.db
+
+__debug*

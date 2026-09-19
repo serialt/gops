@@ -52,17 +52,81 @@ func (b *AssetBiz) UpdateGroup(req *api.AssetGroupRequest) (*api.AssetGroupRespo
 		return nil, ErrInvalid
 	}
 	var row model.AssetGroup
-	if err := b.db.First(&row, req.ID).Error; err != nil {
+	if err := b.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&row, req.ID).Error; err != nil {
+			return err
+		}
+
+		wasEnabled := row.Status
+		row.Name, row.Code, row.ParentID, row.Description, row.SortOrder, row.Status = req.Name, req.Code, req.ParentID, req.Description, req.SortOrder, *req.Status
+		if err := tx.Save(&row).Error; err != nil {
+			return err
+		}
+
+		if wasEnabled && !row.Status {
+			return updateAssetGroupDescendantStatus(tx, row.ID, false)
+		}
+		if !wasEnabled && row.Status {
+			return updateAssetGroupAncestorStatus(tx, row.ParentID, true)
+		}
+		return nil
+	}); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	row.Name, row.Code, row.ParentID, row.Description, row.SortOrder, row.Status = req.Name, req.Code, req.ParentID, req.Description, req.SortOrder, *req.Status
-	if err := b.db.Save(&row).Error; err != nil {
-		return nil, err
-	}
 	return assetGroupResponse(row), nil
+}
+
+// updateAssetGroupDescendantStatus 同步更新指定分组的所有子孙分组状态。
+func updateAssetGroupDescendantStatus(tx *gorm.DB, groupID int64, status bool) error {
+	var groups []model.AssetGroup
+	if err := tx.Find(&groups).Error; err != nil {
+		return err
+	}
+	childIDs := make(map[int64][]int64, len(groups))
+	for _, group := range groups {
+		childIDs[group.ParentID] = append(childIDs[group.ParentID], group.ID)
+	}
+	ids := make([]int64, 0)
+	queue := append([]int64(nil), childIDs[groupID]...)
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		ids = append(ids, id)
+		queue = append(queue, childIDs[id]...)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return tx.Model(&model.AssetGroup{}).Where("id IN ?", ids).Update("status", status).Error
+}
+
+// updateAssetGroupAncestorStatus 同步更新指定分组的所有父级分组状态。
+func updateAssetGroupAncestorStatus(tx *gorm.DB, parentID int64, status bool) error {
+	if parentID == 0 {
+		return nil
+	}
+	var groups []model.AssetGroup
+	if err := tx.Find(&groups).Error; err != nil {
+		return err
+	}
+	parentIDs := make(map[int64]int64, len(groups))
+	for _, group := range groups {
+		parentIDs[group.ID] = group.ParentID
+	}
+	ids := make([]int64, 0)
+	seen := make(map[int64]struct{})
+	for parentID != 0 {
+		if _, ok := seen[parentID]; ok {
+			return ErrInvalid
+		}
+		seen[parentID] = struct{}{}
+		ids = append(ids, parentID)
+		parentID = parentIDs[parentID]
+	}
+	return tx.Model(&model.AssetGroup{}).Where("id IN ?", ids).Update("status", status).Error
 }
 
 func (b *AssetBiz) DeleteGroup(req *api.AssetGroupIDRequest) error {

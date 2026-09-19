@@ -12,30 +12,36 @@ async function load() { const { data } = await listDBInstances(keyword.value); r
                     @click="create">新增实例</el-button>
             </div><el-input v-model="keyword" class="db-search" placeholder="搜索实例名称或地址" clearable @input="load" />
             <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
-        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑数据库实例' : '新增数据库实例'" width="500px"><el-form
-                :model="form" label-width="84px"><el-form-item label="实例名称"><el-input
-                        v-model="form.name" /></el-form-item><el-form-item label="数据库类型"><el-select
-                        v-model="form.db_type"><el-option label="PostgreSQL" value="postgresql" /><el-option
-                            label="MySQL" value="mysql" /><el-option label="Redis"
-                            value="redis" /></el-select></el-form-item><el-form-item label="地址"><el-input
-                        v-model="form.host" /></el-form-item><el-form-item label="端口"><el-input-number
-                        v-model="form.port" :min="1" :max="65535" /></el-form-item><el-form-item label="用户名"><el-input
-                        v-model="form.username" /></el-form-item><el-form-item label="密码"><el-input
-                        v-model="form.password" type="password" show-password /></el-form-item><el-form-item
-                    label="版本"><el-input v-model="form.version" /></el-form-item><el-form-item
-                    label="凭证 ID"><el-input-number v-model="form.credential_id" :min="0" /></el-form-item><el-form-item
-                    label="标签"><el-input v-model="form.tags" /></el-form-item><el-form-item label="说明"><el-input
-                        v-model="form.description" type="textarea" /></el-form-item></el-form><template
-                #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
-                    @click="save">保存</el-button></template></el-dialog>
+        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑数据库实例' : '新增数据库实例'" width="560px">
+            <el-form :model="form" label-width="92px" class="db-form">
+                <el-form-item label="实例名称" required><el-input v-model="form.name" placeholder="请输入实例名称，如：生产 MySQL 主库" /></el-form-item>
+                <el-form-item label="数据库类型" required><el-select v-model="form.db_type" style="width: 100%"><el-option label="PostgreSQL" value="postgresql" /><el-option label="MySQL" value="mysql" /><el-option label="Redis" value="redis" /></el-select></el-form-item>
+                <el-form-item label="数据库地址" required><el-input v-model="form.host" placeholder="IP 地址或主机名" /></el-form-item>
+                <el-form-item label="端口"><el-input-number v-model="form.port" :min="1" :max="65535" controls-position="right" /></el-form-item>
+                <el-form-item label="用户名"><el-input v-model="form.username" placeholder="请输入用户名" /></el-form-item>
+                <el-form-item label="密码"><el-input v-model="form.password" type="password" show-password :placeholder="editingID ? '留空则不修改密码' : '请输入密码'" /></el-form-item>
+                <el-form-item label="版本"><el-input v-model="form.version" placeholder="如：16.2" /></el-form-item>
+                <el-form-item label="凭证 ID"><el-input-number v-model="form.credential_id" :min="0" controls-position="right" /></el-form-item>
+                <el-form-item label="标签"><el-input v-model="form.tags" placeholder="多个标签以逗号分隔" /></el-form-item>
+                <el-form-item label="备注"><el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入备注信息" /></el-form-item>
+            </el-form>
+            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template>
+        </el-dialog>
     </div>
 </template>
 <style
     scoped>
     .db-search {
         width: 260px;
-        margin-bottom: 12px
+        margin-bottom: 8px
     }
+
+    .table-shell { background: var(--bg); min-height: 100%; }
+    .section-card { display: flex; flex-direction: column; min-height: 100%; padding: 12px 16px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
+    .page-toolbar { margin-bottom: 8px; }
+    .db-form :deep(.el-form-item) { margin-bottom: 16px; }
+    .db-form :deep(.el-form-item__label) { color: var(--text); font-size: 12px; font-weight: 600; }
+    .db-form :deep(.el-input__wrapper), .db-form :deep(.el-textarea__inner) { box-shadow: 0 0 0 1px var(--line) inset; }
 
     :deep(.db-actions) {
         position: absolute;

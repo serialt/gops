@@ -55,12 +55,38 @@ const pagedRows = computed(() => {
 })
 const domLayout = computed(() => props.pagination ? 'normal' : 'autoHeight')
 
+function hasTimestampField(field: 'created_at' | 'updated_at') {
+  return props.rowData.some((row) => typeof row === 'object' && row !== null && field in row)
+}
+
+function formatTimestamp(value: unknown) {
+  if (!value) return '-'
+  const timestamp = String(value)
+  return timestamp.replace('T', ' ').slice(0, 19)
+}
+
+// 所有列表在操作列前统一补齐时间字段，页面仅需提供业务列即可。
+const columnDefsWithTimestamps = computed<ColDef[]>(() => {
+  const columns = [...props.columnDefs]
+  const fields = new Set(columns.map((column) => column.field))
+  const timestamps: ColDef[] = []
+  if (hasTimestampField('created_at') && !fields.has('created_at')) {
+    timestamps.push({ field: 'created_at', headerName: '创建时间', minWidth: 150, valueFormatter: (params) => formatTimestamp(params.value) })
+  }
+  if (hasTimestampField('updated_at') && !fields.has('updated_at')) {
+    timestamps.push({ field: 'updated_at', headerName: '编辑时间', minWidth: 150, valueFormatter: (params) => formatTimestamp(params.value) })
+  }
+  const actionIndex = columns.findIndex((column) => column.headerName === '操作')
+  columns.splice(actionIndex < 0 ? columns.length : actionIndex, 0, ...timestamps)
+  return columns
+})
+
 watch(() => props.rowData, () => { currentPage.value = 1 })
 // 操作列保持固定宽度。仅其左侧最后一个数据列填充余量，其他列继续贴合实际内容。
 const normalizedColumnDefs = computed<ColDef[]>(() => {
   const isActionColumn = (column: ColDef) => column.headerName === '操作'
-  const fillIndex = props.columnDefs.reduce((lastIndex, column, index) => isActionColumn(column) ? lastIndex : index, -1)
-  return props.columnDefs.map((column, index) => index === fillIndex
+  const fillIndex = columnDefsWithTimestamps.value.reduce((lastIndex, column, index) => isActionColumn(column) ? lastIndex : index, -1)
+  return columnDefsWithTimestamps.value.map((column, index) => index === fillIndex
     ? { ...column, width: undefined, flex: undefined, minWidth: column.minWidth ?? 100, suppressSizeToFit: false }
     : { ...column, suppressSizeToFit: true },
   )
@@ -121,7 +147,7 @@ function handleSelectionChanged(event: any) {
 <style scoped>
 .app-data-grid-shell { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; }
 .app-data-grid { flex: 1; width: 100%; min-height: 0; --ag-font-size: 11px; --ag-font-family: inherit; --ag-border-color: var(--line); --ag-header-background-color: #fafafa; --ag-row-border-color: var(--line); --ag-background-color: #fff; --ag-odd-row-background-color: #fafafa; --ag-header-foreground-color: var(--text); --ag-foreground-color: var(--text); --ag-row-hover-color: #f0f0f0; }
-.grid-pagination { display: flex; justify-content: flex-end; min-height: 48px; padding: 12px 0 0; overflow-x: auto; }
+.grid-pagination { display: flex; justify-content: flex-end; min-height: 30px; padding: 2px 0 0; overflow-x: auto; }
 .grid-pagination :deep(.el-pagination) { flex-wrap: nowrap; min-width: max-content; font-size: 10px; --el-pagination-font-size: 10px; }
 .grid-pagination :deep(.el-pagination .el-select .el-input__wrapper), .grid-pagination :deep(.el-pagination .el-input__wrapper), .grid-pagination :deep(.el-pagination .el-input__inner) { font-size: 10px; }
 </style>

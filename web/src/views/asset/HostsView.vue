@@ -12,27 +12,35 @@ async function load() { const { data } = await listHosts(keyword.value); rows.va
                     @click="create">新增主机</el-button>
             </div><el-input v-model="keyword" class="host-search" placeholder="搜索主机名称或地址" clearable @input="load" />
             <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
-        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑主机' : '新增主机'" width="520px"><el-form
-                :model="form" label-width="90px"><el-form-item label="主机名称"><el-input
-                        v-model="form.name" /></el-form-item><el-form-item label="地址"><el-input
-                        v-model="form.ip" /></el-form-item><el-form-item label="端口"><el-input-number v-model="form.port"
-                        :min="1" :max="65535" /></el-form-item><el-form-item label="SSH 用户"><el-input
-                        v-model="form.ssh_user" /></el-form-item><el-form-item label="资产分组 ID"><el-input-number
-                        v-model="form.group_id" :min="0" /></el-form-item><el-form-item label="凭证 ID"><el-input-number
-                        v-model="form.credential_id" :min="0" /></el-form-item><el-form-item
-                    label="云账号 ID"><el-input-number v-model="form.cloud_account_id"
-                        :min="0" /></el-form-item><el-form-item label="标签"><el-input
-                        v-model="form.tags" /></el-form-item><el-form-item label="说明"><el-input
-                        v-model="form.description" type="textarea" /></el-form-item></el-form><template
-                #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
-                    @click="save">保存</el-button></template></el-dialog>
+        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑主机' : '新增主机'" width="560px">
+            <el-form :model="form" label-width="92px" class="host-form">
+                <el-form-item label="主机名称" required><el-input v-model="form.name" placeholder="请输入主机名称，如：生产 Web-01" /></el-form-item>
+                <el-form-item label="主机类型"><el-select v-model="form.host_type" style="width: 100%"><el-option label="自建主机" value="self" /><el-option label="云主机" value="cloud" /></el-select></el-form-item>
+                <el-form-item label="主机地址" required><el-input v-model="form.ip" placeholder="IP 地址或主机名" /></el-form-item>
+                <el-form-item label="SSH 端口"><el-input-number v-model="form.port" :min="1" :max="65535" controls-position="right" /></el-form-item>
+                <el-form-item label="SSH 用户"><el-input v-model="form.ssh_user" placeholder="如：root" /></el-form-item>
+                <el-form-item label="资产分组 ID"><el-input-number v-model="form.group_id" :min="0" controls-position="right" /></el-form-item>
+                <el-form-item label="凭证 ID"><el-input-number v-model="form.credential_id" :min="0" controls-position="right" /></el-form-item>
+                <el-form-item label="云账号 ID"><el-input-number v-model="form.cloud_account_id" :min="0" controls-position="right" /></el-form-item>
+                <el-form-item label="标签"><el-input v-model="form.tags" placeholder="多个标签以逗号分隔" /></el-form-item>
+                <el-form-item label="备注"><el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入备注信息" /></el-form-item>
+            </el-form>
+            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template>
+        </el-dialog>
     </div>
 </template>
 <style scoped>
 .host-search {
     width: 260px;
-    margin-bottom: 12px
+    margin-bottom: 8px
 }
+
+.table-shell { background: var(--bg); min-height: 100%; }
+.section-card { display: flex; flex-direction: column; min-height: 100%; padding: 12px 16px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
+.page-toolbar { margin-bottom: 8px; }
+.host-form :deep(.el-form-item) { margin-bottom: 16px; }
+.host-form :deep(.el-form-item__label) { color: var(--text); font-size: 12px; font-weight: 600; }
+.host-form :deep(.el-input__wrapper), .host-form :deep(.el-textarea__inner) { box-shadow: 0 0 0 1px var(--line) inset; }
 
 :deep(.host-actions) {
     position: absolute;
