@@ -34,6 +34,8 @@ func gopsTable(g *gen.Generator) {
 	kubernetesCluster := g.GenerateModel("kubernetes_cluster")
 	kubernetesTerminalSession := g.GenerateModel("kubernetes_terminal_session")
 	kubernetesClusterInspection := g.GenerateModel("kubernetes_cluster_inspection")
+	kubernetesUserKubeConfig := g.GenerateModel("kubernetes_user_kube_config")
+	kubernetesUserRoleBinding := g.GenerateModel("kubernetes_user_role_binding")
 	userRole := g.GenerateModel("user_role")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
 		&field.RelateConfig{
@@ -76,6 +78,8 @@ func gopsTable(g *gen.Generator) {
 		kubernetesCluster,
 		kubernetesTerminalSession,
 		kubernetesClusterInspection,
+		kubernetesUserKubeConfig,
+		kubernetesUserRoleBinding,
 	)
 
 }

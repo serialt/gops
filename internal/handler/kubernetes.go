@@ -161,6 +161,21 @@ func (h *KubernetesHandler) ListPods(c *gin.Context) {
 	response.OK(c, d)
 }
 
+// UpdateNode POST /api/v1/kubernetes/nodes/update 更新 Kubernetes 节点配置。
+func (h *KubernetesHandler) UpdateNode(c *gin.Context) {
+	r := new(api.KubernetesNodeUpdateRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid node update request")
+		return
+	}
+	d, e := h.biz.UpdateNode(r)
+	if e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
 // GetClusterStats POST /api/v1/kubernetes/stats/get 查询 Kubernetes 集群统计。
 func (h *KubernetesHandler) GetClusterStats(c *gin.Context) {
 	r := new(api.KubernetesClusterStatsRequest)

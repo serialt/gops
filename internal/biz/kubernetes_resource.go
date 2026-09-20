@@ -41,12 +41,45 @@ func (b *KubernetesBiz) Nodes(r *api.KubernetesResourceListRequest) ([]*api.Kube
 	}
 	o := make([]*api.KubernetesNodeResponse, 0, len(rows.Items))
 	for _, n := range rows.Items {
-		if r.Keyword != "" && !strings.Contains(strings.ToLower(n.Name), strings.ToLower(r.Keyword)) {
+		item := nodeResponse(n)
+		keyword := strings.ToLower(strings.TrimSpace(r.Keyword))
+		if keyword != "" && !strings.Contains(strings.ToLower(item.Name), keyword) && !strings.Contains(strings.ToLower(item.InternalIP), keyword) && !strings.Contains(strings.ToLower(item.ExternalIP), keyword) {
 			continue
 		}
-		o = append(o, nodeResponse(n))
+		if r.Status == "Ready" && item.Status != "就绪" {
+			continue
+		}
+		if r.Status == "NotReady" && item.Status == "就绪" {
+			continue
+		}
+		role := strings.ToLower(strings.TrimSpace(r.Role))
+		roles := strings.ToLower(item.Roles)
+		if role == "worker" && roles != "" && !strings.Contains(roles, "worker") {
+			continue
+		}
+		if role != "" && role != "worker" && !strings.Contains(roles, role) {
+			continue
+		}
+		o = append(o, item)
 	}
 	return o, nil
+}
+func (b *KubernetesBiz) UpdateNode(r *api.KubernetesNodeUpdateRequest) (*api.KubernetesNodeResponse, error) {
+	c, err := b.client(r.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	node, err := c.CoreV1().Nodes().Get(context.Background(), r.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	node.Labels = r.Labels
+	node.Spec.Unschedulable = !r.Schedulable
+	updated, err := c.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return nodeResponse(*updated), nil
 }
 func nodeResponse(n corev1.Node) *api.KubernetesNodeResponse {
 	status := "未知"
@@ -130,6 +163,9 @@ func (b *KubernetesBiz) Namespaces(r *api.KubernetesResourceListRequest) ([]*api
 	o := make([]*api.KubernetesNamespaceResponse, 0, len(rows.Items))
 	for _, x := range rows.Items {
 		if r.Keyword != "" && !strings.Contains(strings.ToLower(x.Name), strings.ToLower(r.Keyword)) {
+			continue
+		}
+		if r.Status != "" && !strings.EqualFold(string(x.Status.Phase), r.Status) {
 			continue
 		}
 		o = append(o, &api.KubernetesNamespaceResponse{

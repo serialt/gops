@@ -28,6 +28,8 @@ var (
 	KubernetesCluster           *kubernetesCluster
 	KubernetesClusterInspection *kubernetesClusterInspection
 	KubernetesTerminalSession   *kubernetesTerminalSession
+	KubernetesUserKubeConfig    *kubernetesUserKubeConfig
+	KubernetesUserRoleBinding   *kubernetesUserRoleBinding
 	MonitorAlertChannel         *monitorAlertChannel
 	MonitorAlertLog             *monitorAlertLog
 	MonitorAlertReceiver        *monitorAlertReceiver
@@ -62,6 +64,8 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	KubernetesCluster = &Q.KubernetesCluster
 	KubernetesClusterInspection = &Q.KubernetesClusterInspection
 	KubernetesTerminalSession = &Q.KubernetesTerminalSession
+	KubernetesUserKubeConfig = &Q.KubernetesUserKubeConfig
+	KubernetesUserRoleBinding = &Q.KubernetesUserRoleBinding
 	MonitorAlertChannel = &Q.MonitorAlertChannel
 	MonitorAlertLog = &Q.MonitorAlertLog
 	MonitorAlertReceiver = &Q.MonitorAlertReceiver
@@ -97,6 +101,8 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		KubernetesCluster:           newKubernetesCluster(db, opts...),
 		KubernetesClusterInspection: newKubernetesClusterInspection(db, opts...),
 		KubernetesTerminalSession:   newKubernetesTerminalSession(db, opts...),
+		KubernetesUserKubeConfig:    newKubernetesUserKubeConfig(db, opts...),
+		KubernetesUserRoleBinding:   newKubernetesUserRoleBinding(db, opts...),
 		MonitorAlertChannel:         newMonitorAlertChannel(db, opts...),
 		MonitorAlertLog:             newMonitorAlertLog(db, opts...),
 		MonitorAlertReceiver:        newMonitorAlertReceiver(db, opts...),
@@ -133,6 +139,8 @@ type Query struct {
 	KubernetesCluster           kubernetesCluster
 	KubernetesClusterInspection kubernetesClusterInspection
 	KubernetesTerminalSession   kubernetesTerminalSession
+	KubernetesUserKubeConfig    kubernetesUserKubeConfig
+	KubernetesUserRoleBinding   kubernetesUserRoleBinding
 	MonitorAlertChannel         monitorAlertChannel
 	MonitorAlertLog             monitorAlertLog
 	MonitorAlertReceiver        monitorAlertReceiver
@@ -172,6 +180,8 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		KubernetesCluster:           q.KubernetesCluster.clone(db),
 		KubernetesClusterInspection: q.KubernetesClusterInspection.clone(db),
 		KubernetesTerminalSession:   q.KubernetesTerminalSession.clone(db),
+		KubernetesUserKubeConfig:    q.KubernetesUserKubeConfig.clone(db),
+		KubernetesUserRoleBinding:   q.KubernetesUserRoleBinding.clone(db),
 		MonitorAlertChannel:         q.MonitorAlertChannel.clone(db),
 		MonitorAlertLog:             q.MonitorAlertLog.clone(db),
 		MonitorAlertReceiver:        q.MonitorAlertReceiver.clone(db),
@@ -216,6 +226,8 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		KubernetesCluster:           q.KubernetesCluster.replaceDB(db),
 		KubernetesClusterInspection: q.KubernetesClusterInspection.replaceDB(db),
 		KubernetesTerminalSession:   q.KubernetesTerminalSession.replaceDB(db),
+		KubernetesUserKubeConfig:    q.KubernetesUserKubeConfig.replaceDB(db),
+		KubernetesUserRoleBinding:   q.KubernetesUserRoleBinding.replaceDB(db),
 		MonitorAlertChannel:         q.MonitorAlertChannel.replaceDB(db),
 		MonitorAlertLog:             q.MonitorAlertLog.replaceDB(db),
 		MonitorAlertReceiver:        q.MonitorAlertReceiver.replaceDB(db),
@@ -250,6 +262,8 @@ type queryCtx struct {
 	KubernetesCluster           *kubernetesClusterDo
 	KubernetesClusterInspection *kubernetesClusterInspectionDo
 	KubernetesTerminalSession   *kubernetesTerminalSessionDo
+	KubernetesUserKubeConfig    *kubernetesUserKubeConfigDo
+	KubernetesUserRoleBinding   *kubernetesUserRoleBindingDo
 	MonitorAlertChannel         *monitorAlertChannelDo
 	MonitorAlertLog             *monitorAlertLogDo
 	MonitorAlertReceiver        *monitorAlertReceiverDo
@@ -284,6 +298,8 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		KubernetesCluster:           q.KubernetesCluster.WithContext(ctx),
 		KubernetesClusterInspection: q.KubernetesClusterInspection.WithContext(ctx),
 		KubernetesTerminalSession:   q.KubernetesTerminalSession.WithContext(ctx),
+		KubernetesUserKubeConfig:    q.KubernetesUserKubeConfig.WithContext(ctx),
+		KubernetesUserRoleBinding:   q.KubernetesUserRoleBinding.WithContext(ctx),
 		MonitorAlertChannel:         q.MonitorAlertChannel.WithContext(ctx),
 		MonitorAlertLog:             q.MonitorAlertLog.WithContext(ctx),
 		MonitorAlertReceiver:        q.MonitorAlertReceiver.WithContext(ctx),

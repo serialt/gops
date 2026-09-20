@@ -18,7 +18,7 @@ const treePaneDragging = ref(false)
 const treePaneStartX = ref(0)
 const treePaneStartWidth = ref(220)
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(20)
 const selectedOrganizations = ref<Organization[]>([])
 const form = reactive({ parent_id: null as number | null, name: '', code: '', manager: '', status: true })
 
@@ -155,7 +155,7 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
             @selection-changed="handleOrganizationSelectionChanged" />
           <div class="pagination-bar">
             <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]" :total="tableData.length" layout="total, sizes, prev, pager, next, jumper"
+              :page-sizes="[20, 50, 100, 500, 1000]" :total="tableData.length" layout="total, sizes, prev, pager, next, jumper"
               @size-change="handlePageSizeChange" />
           </div>
         </div>

@@ -22,7 +22,7 @@ const organizationPaneStartX = ref(0)
 const organizationPaneStartWidth = ref(200)
 const keyword = ref('')
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(20)
 const selectedUsers = ref<User[]>([])
 const dialogVisible = ref(false)
 const editingID = ref<number | null>(null)
@@ -274,7 +274,7 @@ function toggleOrganizationPane() {
 </el-table>
 -->
         <div class="pagination-bar">
-          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[10, 20, 50, 100]"
+          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100, 500, 1000]"
             :total="visibleUsers.length" layout="total, sizes, prev, pager, next, jumper"
             @current-change="handlePageChange" @size-change="handlePageSizeChange" />
         </div>

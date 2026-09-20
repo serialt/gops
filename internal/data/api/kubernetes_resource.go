@@ -4,9 +4,17 @@ type KubernetesResourceListRequest struct {
 	ClusterID int64  `json:"cluster_id" binding:"required"`
 	Keyword   string `json:"keyword"`
 	Namespace string `json:"namespace"`
+	Status    string `json:"status"`
+	Role      string `json:"role"`
 }
 type KubernetesClusterStatsRequest struct {
 	ClusterID int64 `json:"cluster_id" binding:"required"`
+}
+type KubernetesNodeUpdateRequest struct {
+	ClusterID   int64             `json:"cluster_id" binding:"required"`
+	Name        string            `json:"name" binding:"required"`
+	Labels      map[string]string `json:"labels"`
+	Schedulable bool              `json:"schedulable"`
 }
 type KubernetesNodeResponse struct {
 	Name             string            `json:"name"`

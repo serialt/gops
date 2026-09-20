@@ -190,9 +190,44 @@ select {
   box-shadow: none !important;
 }
 
+.app-data-grid .grid-action.icon-only {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+}
+
+.app-data-grid .grid-action.icon-only svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.grid-action-tooltip {
+  position: fixed;
+  z-index: 10000;
+  transform: translate(-50%, -100%);
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(24, 34, 53, .92);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 3px 8px rgba(24, 34, 53, .18);
+}
+
 .app-data-grid .grid-action-group.compact {
-  gap: 2px;
+  gap: 6px;
   padding: 0 2px;
+  justify-content: center;
 }
 
 .app-data-grid .grid-action-group {

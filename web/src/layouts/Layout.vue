@@ -44,7 +44,7 @@ const nginxMenus = computed(() => [
   { path: '/nginx/sources', title: 'Nginx 数据源', icon: Monitor, permission: 'POST /api/v1/nginx/sources/list' },
 ].filter((item) => auth.hasPermission(item.permission)))
 const taskMenus = computed(() => [{ path: '/tasks/jobs', title: '任务作业', icon: Monitor, permission: 'POST /api/v1/tasks/jobs/list' }].filter((item) => auth.hasPermission(item.permission)))
-const kubernetesMenus = computed(() => [{ path: '/kubernetes/clusters', title: '集群管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/clusters/list' }, { path: '/kubernetes/nodes', title: '节点管理', icon: Monitor, permission: 'POST /api/v1/kubernetes/nodes/list' }, { path: '/kubernetes/namespaces', title: '命名空间', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/workloads', title: '工作负载', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/pods', title: 'Pod 管理', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/pods/list' }, { path: '/kubernetes/network', title: '网络管理', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/config', title: '配置管理', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/storage', title: '存储管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/access', title: '访问控制', icon: Monitor, permission: 'POST /api/v1/kubernetes/resources/list' }].filter((item) => auth.hasPermission(item.permission)))
+const kubernetesMenus = computed(() => [{ path: '/kubernetes/clusters', title: '集群管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/clusters/list' }, { path: '/kubernetes/nodes', title: '节点管理', icon: Monitor, permission: 'POST /api/v1/kubernetes/nodes/list' }, { path: '/kubernetes/namespaces', title: '命名空间', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/namespaces/list' }, { path: '/kubernetes/workloads', title: '工作负载', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/pods', title: 'Pod 管理', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/pods/list' }, { path: '/kubernetes/network', title: '网络管理', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/config', title: '配置管理', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/storage', title: '存储管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/access', title: '访问控制', icon: Monitor, permission: 'POST /api/v1/kubernetes/resources/list' }].filter((item) => auth.hasPermission(item.permission)))
 const auditMenus = computed(() => [{ path: '/audit/operations', title: '操作日志', icon: DataAnalysis, permission: 'POST /api/v1/audit/operation-logs/list' }, { path: '/audit/logins', title: '登录日志', icon: User, permission: 'POST /api/v1/audit/login-logs/list' }, { path: '/audit/data', title: '数据日志', icon: FolderOpened, permission: 'POST /api/v1/audit/data-logs/list' }].filter(item => auth.hasPermission(item.permission)))
 const sslCertMenus = computed(() => [{ path: '/ssl-cert/certificates', title: '证书管理', icon: Key, permission: 'POST /api/v1/ssl-cert/certificates/list' }].filter(item => auth.hasPermission(item.permission)))
 
@@ -934,12 +934,13 @@ function toggleCollapse() {
 .main {
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--bg);
-  padding: 0 0 1px;
+  padding: 0 8px 1px 0;
 }
 
 .main :deep(.page-container) {

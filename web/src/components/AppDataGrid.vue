@@ -15,6 +15,7 @@ const emit = defineEmits<{
 }>()
 
 const defaultColDef: ColDef = {
+  minWidth: 10,
   resizable: true,
   sortable: false,
   suppressHeaderMenuButton: true,
@@ -47,7 +48,7 @@ const localeText = {
   pageSizeSelectorLabel: '每页',
 }
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(20)
 const pagedRows = computed(() => {
   if (!props.pagination) return props.rowData
   const start = (currentPage.value - 1) * pageSize.value
@@ -86,10 +87,13 @@ watch(() => props.rowData, () => { currentPage.value = 1 })
 const normalizedColumnDefs = computed<ColDef[]>(() => {
   const isActionColumn = (column: ColDef) => column.headerName === '操作'
   const fillIndex = columnDefsWithTimestamps.value.reduce((lastIndex, column, index) => isActionColumn(column) ? lastIndex : index, -1)
-  return columnDefsWithTimestamps.value.map((column, index) => index === fillIndex
-    ? { ...column, width: undefined, flex: undefined, minWidth: column.minWidth ?? 100, suppressSizeToFit: false }
-    : { ...column, suppressSizeToFit: true },
-  )
+  return columnDefsWithTimestamps.value.map((column, index) => {
+    if (index === fillIndex) {
+      return { ...column, width: undefined, flex: undefined, minWidth: column.minWidth ?? 100, maxWidth: undefined, suppressSizeToFit: false }
+    }
+    if (isActionColumn(column) || column.width) return { ...column, suppressSizeToFit: true }
+    return { ...column, minWidth: column.minWidth ?? 10, maxWidth: column.maxWidth ?? 320, suppressSizeToFit: true }
+  })
 })
 
 function resizeColumns(event: any) {
@@ -136,7 +140,7 @@ function handleSelectionChanged(event: any) {
       <el-pagination
         v-model:current-page="currentPage"
         v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
+        :page-sizes="[20, 50, 100, 500, 1000]"
         :total="rowData.length"
         layout="total, sizes, prev, pager, next, jumper"
       />

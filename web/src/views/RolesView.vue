@@ -12,7 +12,7 @@ const roleDialog = ref(false)
 const permissionDrawer = ref(false)
 const editingID = ref<number | null>(null)
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(20)
 const selectedRoles = ref<Role[]>([])
 const selectedRole = ref<Role | null>(null)
 const checkedKeys = ref<string[]>([])
@@ -151,7 +151,7 @@ onMounted(load)
       <AppDataGrid :row-data="pagedRoles" :column-defs="roleColumnDefs"
         @selection-changed="handleRoleSelectionChanged" />
       <div class="pagination-bar">
-        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[10, 20, 50, 100]"
+        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100, 500, 1000]"
           :total="roles.length" layout="total, sizes, prev, pager, next, jumper" @size-change="handlePageSizeChange" />
       </div>
     </div>
