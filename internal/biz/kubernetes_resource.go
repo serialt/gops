@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"gops/internal/data/api"
 	"gops/internal/data/model"
+	"gops/internal/pkg/utils"
+	"strings"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"strings"
 )
 
 func (b *KubernetesBiz) client(clusterID int64) (*kubernetes.Clientset, error) {
@@ -86,7 +88,12 @@ func (b *KubernetesBiz) Namespaces(r *api.KubernetesResourceListRequest) ([]*api
 		if r.Keyword != "" && !strings.Contains(strings.ToLower(x.Name), strings.ToLower(r.Keyword)) {
 			continue
 		}
-		o = append(o, &api.KubernetesNamespaceResponse{Name: x.Name, Status: string(x.Status.Phase), CreatedAt: x.CreationTimestamp.Format("2006-01-02 15:04:05")})
+		o = append(o, &api.KubernetesNamespaceResponse{
+			Name:      x.Name,
+			Status:    string(x.Status.Phase),
+			Age:       utils.CalculateAge(x.CreationTimestamp.Time),
+			Labels:    x.Labels,
+			CreatedAt: x.CreationTimestamp.Format("2006-01-02 15:04:05")})
 	}
 	return o, nil
 }

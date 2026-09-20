@@ -4,12 +4,26 @@ import (
 	"errors"
 	"gops/internal/data/api"
 	"gops/internal/data/model"
+	"sync"
+
 	"gorm.io/gorm"
+	"k8s.io/client-go/kubernetes"
+	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-type KubernetesBiz struct{ db *gorm.DB }
+type KubernetesBiz struct {
+	db             *gorm.DB
+	clientsetCache map[string]*kubernetes.Clientset
+	metricsCache   map[uint]*metricsv.Clientset
+	cacheMutex     sync.RWMutex
+}
 
-func NewKubernetesBiz(db *gorm.DB) *KubernetesBiz { return &KubernetesBiz{db} }
+func NewKubernetesBiz(db *gorm.DB) *KubernetesBiz {
+	return &KubernetesBiz{
+		db: db,
+	}
+}
+
 func (b *KubernetesBiz) List(r *api.KubernetesClusterListRequest) ([]*api.KubernetesClusterResponse, error) {
 	var a []model.KubernetesCluster
 	q := b.db.Order("id DESC")
@@ -33,7 +47,6 @@ func (b *KubernetesBiz) Save(r *api.KubernetesClusterRequest) (*api.KubernetesCl
 			return nil, k8sErr(e)
 		}
 		x.CreatedAt = old.CreatedAt
-		x.Version = x.Version
 		x.NodeCount = old.NodeCount
 		x.PodCount = old.PodCount
 	}
