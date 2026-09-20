@@ -214,17 +214,6 @@ function toggleCollapse() {
             </el-icon>
             <span>{{ dashboardMenu.title }}</span>
           </el-menu-item>
-          <el-sub-menu v-if="systemMenus.length" index="system-config">
-            <template #title><el-icon>
-                <Setting />
-              </el-icon><span>系统管理</span></template>
-            <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
-              <el-icon>
-                <component :is="item.icon" />
-              </el-icon>
-              <span>{{ item.title }}</span>
-            </el-menu-item>
-          </el-sub-menu>
           <el-sub-menu v-if="assetMenus.length" index="assets">
             <template #title><el-icon>
                 <FolderOpened />
@@ -270,7 +259,19 @@ function toggleCollapse() {
               </el-icon><span>SSL 证书</span></template><el-menu-item v-for="item in sslCertMenus" :key="item.path"
               :index="item.path"><el-icon>
                 <component :is="item.icon" />
-              </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+              </el-icon><span>{{ item.title }}</span></el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu v-if="systemMenus.length" index="system-config">
+            <template #title><el-icon>
+                <Setting />
+              </el-icon><span>系统管理</span></template>
+            <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
+              <el-icon>
+                <component :is="item.icon" />
+              </el-icon>
+              <span>{{ item.title }}</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
 
         <div v-else class="menu-icons">
@@ -280,16 +281,6 @@ function toggleCollapse() {
                 <component :is="dashboardMenu.icon" />
               </el-icon>
             </el-menu-item>
-            <el-sub-menu v-if="systemMenus.length" index="system-config">
-              <template #title><el-icon>
-                  <Setting />
-                </el-icon><span>系统管理</span></template>
-              <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
-                <el-icon>
-                  <component :is="item.icon" />
-                </el-icon><span>{{ item.title }}</span>
-              </el-menu-item>
-            </el-sub-menu>
             <el-sub-menu v-if="assetMenus.length" index="assets">
               <template #title><el-icon>
                   <FolderOpened />
@@ -335,7 +326,18 @@ function toggleCollapse() {
                 </el-icon><span>SSL 证书</span></template><el-menu-item v-for="item in sslCertMenus" :key="item.path"
                 :index="item.path"><el-icon>
                   <component :is="item.icon" />
-                </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+                </el-icon><span>{{ item.title }}</span></el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu v-if="systemMenus.length" index="system-config">
+              <template #title><el-icon>
+                  <Setting />
+                </el-icon><span>系统管理</span></template>
+              <el-menu-item v-for="item in systemMenus" :key="item.path" :index="item.path">
+                <el-icon>
+                  <component :is="item.icon" />
+                </el-icon><span>{{ item.title }}</span>
+              </el-menu-item>
+            </el-sub-menu>
           </el-menu>
         </div>
       </div>
