@@ -77,6 +77,15 @@ func (h *MonitorHandler) CheckDomain(c *gin.Context) {
 	}
 }
 
+// ListCheckHistory POST /api/v1/monitor/domains/history 查询域名请求日志。
+func (h *MonitorHandler) ListCheckHistory(c *gin.Context) {
+	req := new(api.MonitorCheckHistoryListRequest)
+	if monitorBind(c, req) {
+		data, err := h.biz.ListCheckHistory(req)
+		monitorResult(c, data, err)
+	}
+}
+
 // DomainStats POST /api/v1/monitor/domains/stats 查询监控统计。
 func (h *MonitorHandler) DomainStats(c *gin.Context) {
 	req := new(struct{})
@@ -109,6 +118,14 @@ func (h *MonitorHandler) DeleteChannel(c *gin.Context) {
 	req := new(api.MonitorAlertChannelIDRequest)
 	if monitorBind(c, req) {
 		monitorResult(c, nil, h.biz.DeleteChannel(req))
+	}
+}
+
+// TestChannel POST /api/v1/monitor/channels/test 测试告警通道。
+func (h *MonitorHandler) TestChannel(c *gin.Context) {
+	req := new(api.MonitorAlertChannelTestRequest)
+	if monitorBind(c, req) {
+		monitorResult(c, nil, h.biz.TestChannel(req))
 	}
 }
 

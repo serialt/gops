@@ -32,6 +32,8 @@ type MonitorDomain struct {
 	CreatedAt         time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
 	UpdatedAt         time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
 	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
+	VerifyCertificate bool           `gorm:"column:verify_certificate;not null;default:TRUE" json:"verify_certificate"`
+	SslRootCa         string         `gorm:"column:ssl_root_ca;not null;default:''" json:"ssl_root_ca"`
 }
 
 // TableName MonitorDomain's table name

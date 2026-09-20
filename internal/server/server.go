@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -55,7 +56,9 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	organizationHandler := handler.NewOrganizationHandler(biz.NewOrganizationBiz(db))
 	assetHandler := handler.NewAssetHandler(biz.NewAssetBiz(db, cfg.Server.AESKey))
 	systemConfigHandler := handler.NewSystemConfigHandler(biz.NewSystemConfigBiz(db, cfg.Server.AESKey))
-	monitorHandler := handler.NewMonitorHandler(biz.NewMonitorBiz(db))
+	monitorBiz := biz.NewMonitorBiz(db, cfg.Server.AESKey)
+	monitorHandler := handler.NewMonitorHandler(monitorBiz)
+	go monitorBiz.StartScheduler(context.Background())
 	nginxHandler := handler.NewNginxHandler(biz.NewNginxBiz(db))
 	taskHandler := handler.NewTaskHandler(biz.NewTaskBiz(db))
 	sslCertHandler := handler.NewSSLCertHandler(biz.NewSSLCertBiz(db))
@@ -130,10 +133,12 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	authorized.POST("/monitor/domains/update", monitorHandler.UpdateDomain)
 	authorized.POST("/monitor/domains/delete", monitorHandler.DeleteDomain)
 	authorized.POST("/monitor/domains/check", monitorHandler.CheckDomain)
+	authorized.POST("/monitor/domains/history", monitorHandler.ListCheckHistory)
 	authorized.POST("/monitor/domains/stats", monitorHandler.DomainStats)
 	authorized.POST("/monitor/channels/list", monitorHandler.ListChannels)
 	authorized.POST("/monitor/channels/save", monitorHandler.SaveChannel)
 	authorized.POST("/monitor/channels/delete", monitorHandler.DeleteChannel)
+	authorized.POST("/monitor/channels/test", monitorHandler.TestChannel)
 	authorized.POST("/monitor/receivers/list", monitorHandler.ListReceivers)
 	authorized.POST("/monitor/receivers/save", monitorHandler.SaveReceiver)
 	authorized.POST("/monitor/receivers/delete", monitorHandler.DeleteReceiver)

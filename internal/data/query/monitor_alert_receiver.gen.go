@@ -36,6 +36,15 @@ func newMonitorAlertReceiver(db *gorm.DB, opts ...gen.DOOption) monitorAlertRece
 	_monitorAlertReceiver.CreatedAt = field.NewTime(tableName, "created_at")
 	_monitorAlertReceiver.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_monitorAlertReceiver.DeletedAt = field.NewField(tableName, "deleted_at")
+	_monitorAlertReceiver.WechatID = field.NewString(tableName, "wechat_id")
+	_monitorAlertReceiver.DingtalkID = field.NewString(tableName, "dingtalk_id")
+	_monitorAlertReceiver.FeishuID = field.NewString(tableName, "feishu_id")
+	_monitorAlertReceiver.EnableEmail = field.NewBool(tableName, "enable_email")
+	_monitorAlertReceiver.EnableWebhook = field.NewBool(tableName, "enable_webhook")
+	_monitorAlertReceiver.EnableWechat = field.NewBool(tableName, "enable_wechat")
+	_monitorAlertReceiver.EnableDingtalk = field.NewBool(tableName, "enable_dingtalk")
+	_monitorAlertReceiver.EnableFeishu = field.NewBool(tableName, "enable_feishu")
+	_monitorAlertReceiver.EnableSystemMsg = field.NewBool(tableName, "enable_system_msg")
 
 	_monitorAlertReceiver.fillFieldMap()
 
@@ -45,16 +54,25 @@ func newMonitorAlertReceiver(db *gorm.DB, opts ...gen.DOOption) monitorAlertRece
 type monitorAlertReceiver struct {
 	monitorAlertReceiverDo monitorAlertReceiverDo
 
-	ALL       field.Asterisk
-	ID        field.Int64
-	Name      field.String
-	Email     field.String
-	Phone     field.String
-	Webhook   field.String
-	Enabled   field.Bool
-	CreatedAt field.Time
-	UpdatedAt field.Time
-	DeletedAt field.Field
+	ALL             field.Asterisk
+	ID              field.Int64
+	Name            field.String
+	Email           field.String
+	Phone           field.String
+	Webhook         field.String
+	Enabled         field.Bool
+	CreatedAt       field.Time
+	UpdatedAt       field.Time
+	DeletedAt       field.Field
+	WechatID        field.String
+	DingtalkID      field.String
+	FeishuID        field.String
+	EnableEmail     field.Bool
+	EnableWebhook   field.Bool
+	EnableWechat    field.Bool
+	EnableDingtalk  field.Bool
+	EnableFeishu    field.Bool
+	EnableSystemMsg field.Bool
 
 	fieldMap map[string]field.Expr
 }
@@ -80,6 +98,15 @@ func (m *monitorAlertReceiver) updateTableName(table string) *monitorAlertReceiv
 	m.CreatedAt = field.NewTime(table, "created_at")
 	m.UpdatedAt = field.NewTime(table, "updated_at")
 	m.DeletedAt = field.NewField(table, "deleted_at")
+	m.WechatID = field.NewString(table, "wechat_id")
+	m.DingtalkID = field.NewString(table, "dingtalk_id")
+	m.FeishuID = field.NewString(table, "feishu_id")
+	m.EnableEmail = field.NewBool(table, "enable_email")
+	m.EnableWebhook = field.NewBool(table, "enable_webhook")
+	m.EnableWechat = field.NewBool(table, "enable_wechat")
+	m.EnableDingtalk = field.NewBool(table, "enable_dingtalk")
+	m.EnableFeishu = field.NewBool(table, "enable_feishu")
+	m.EnableSystemMsg = field.NewBool(table, "enable_system_msg")
 
 	m.fillFieldMap()
 
@@ -108,7 +135,7 @@ func (m *monitorAlertReceiver) GetFieldByName(fieldName string) (field.OrderExpr
 }
 
 func (m *monitorAlertReceiver) fillFieldMap() {
-	m.fieldMap = make(map[string]field.Expr, 9)
+	m.fieldMap = make(map[string]field.Expr, 18)
 	m.fieldMap["id"] = m.ID
 	m.fieldMap["name"] = m.Name
 	m.fieldMap["email"] = m.Email
@@ -118,6 +145,15 @@ func (m *monitorAlertReceiver) fillFieldMap() {
 	m.fieldMap["created_at"] = m.CreatedAt
 	m.fieldMap["updated_at"] = m.UpdatedAt
 	m.fieldMap["deleted_at"] = m.DeletedAt
+	m.fieldMap["wechat_id"] = m.WechatID
+	m.fieldMap["dingtalk_id"] = m.DingtalkID
+	m.fieldMap["feishu_id"] = m.FeishuID
+	m.fieldMap["enable_email"] = m.EnableEmail
+	m.fieldMap["enable_webhook"] = m.EnableWebhook
+	m.fieldMap["enable_wechat"] = m.EnableWechat
+	m.fieldMap["enable_dingtalk"] = m.EnableDingtalk
+	m.fieldMap["enable_feishu"] = m.EnableFeishu
+	m.fieldMap["enable_system_msg"] = m.EnableSystemMsg
 }
 
 func (m monitorAlertReceiver) clone(db *gorm.DB) monitorAlertReceiver {
