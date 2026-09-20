@@ -176,6 +176,21 @@ func (h *KubernetesHandler) UpdateNode(c *gin.Context) {
 	response.OK(c, d)
 }
 
+// UpdateNamespace POST /api/v1/kubernetes/namespaces/update 更新 Kubernetes 命名空间标签。
+func (h *KubernetesHandler) UpdateNamespace(c *gin.Context) {
+	r := new(api.KubernetesNamespaceUpdateRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid namespace update request")
+		return
+	}
+	d, e := h.biz.UpdateNamespace(r)
+	if e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
 // GetClusterStats POST /api/v1/kubernetes/stats/get 查询 Kubernetes 集群统计。
 func (h *KubernetesHandler) GetClusterStats(c *gin.Context) {
 	r := new(api.KubernetesClusterStatsRequest)

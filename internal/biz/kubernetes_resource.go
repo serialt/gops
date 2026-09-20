@@ -39,9 +39,20 @@ func (b *KubernetesBiz) Nodes(r *api.KubernetesResourceListRequest) ([]*api.Kube
 	if e != nil {
 		return nil, e
 	}
+	pods, e := c.CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
+	if e != nil {
+		return nil, e
+	}
+	podCounts := make(map[string]int, len(rows.Items))
+	for _, pod := range pods.Items {
+		if pod.Spec.NodeName != "" {
+			podCounts[pod.Spec.NodeName]++
+		}
+	}
 	o := make([]*api.KubernetesNodeResponse, 0, len(rows.Items))
 	for _, n := range rows.Items {
 		item := nodeResponse(n)
+		item.PodCount = podCounts[n.Name]
 		keyword := strings.ToLower(strings.TrimSpace(r.Keyword))
 		if keyword != "" && !strings.Contains(strings.ToLower(item.Name), keyword) && !strings.Contains(strings.ToLower(item.InternalIP), keyword) && !strings.Contains(strings.ToLower(item.ExternalIP), keyword) {
 			continue
@@ -75,6 +86,12 @@ func (b *KubernetesBiz) UpdateNode(r *api.KubernetesNodeUpdateRequest) (*api.Kub
 	}
 	node.Labels = r.Labels
 	node.Spec.Unschedulable = !r.Schedulable
+	if r.Taints != nil {
+		node.Spec.Taints = make([]corev1.Taint, 0, len(*r.Taints))
+		for _, taint := range *r.Taints {
+			node.Spec.Taints = append(node.Spec.Taints, corev1.Taint{Key: taint.Key, Value: taint.Value, Effect: corev1.TaintEffect(taint.Effect)})
+		}
+	}
 	updated, err := c.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
@@ -176,6 +193,22 @@ func (b *KubernetesBiz) Namespaces(r *api.KubernetesResourceListRequest) ([]*api
 			CreatedAt: x.CreationTimestamp.Format("2006-01-02 15:04:05")})
 	}
 	return o, nil
+}
+func (b *KubernetesBiz) UpdateNamespace(r *api.KubernetesNamespaceUpdateRequest) (*api.KubernetesNamespaceResponse, error) {
+	c, err := b.client(r.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	namespace, err := c.CoreV1().Namespaces().Get(context.Background(), r.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	namespace.Labels = r.Labels
+	updated, err := c.CoreV1().Namespaces().Update(context.Background(), namespace, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return &api.KubernetesNamespaceResponse{Name: updated.Name, Status: string(updated.Status.Phase), Age: utils.CalculateAge(updated.CreationTimestamp.Time), Labels: updated.Labels, CreatedAt: updated.CreationTimestamp.Format("2006-01-02 15:04:05")}, nil
 }
 func (b *KubernetesBiz) Workloads(r *api.KubernetesResourceListRequest) ([]*api.KubernetesWorkloadResponse, error) {
 	c, e := b.client(r.ClusterID)

@@ -68,6 +68,7 @@ func Catalog() []Permission {
 		{Group: "Kubernetes", Name: "查看节点", Path: "/api/v1/kubernetes/nodes/list", Method: "POST"},
 		{Group: "Kubernetes", Name: "编辑节点", Path: "/api/v1/kubernetes/nodes/update", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看命名空间", Path: "/api/v1/kubernetes/namespaces/list", Method: "POST"},
+		{Group: "Kubernetes", Name: "编辑命名空间", Path: "/api/v1/kubernetes/namespaces/update", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看工作负载", Path: "/api/v1/kubernetes/workloads/list", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看 Pod", Path: "/api/v1/kubernetes/pods/list", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看集群统计", Path: "/api/v1/kubernetes/stats/get", Method: "POST"},

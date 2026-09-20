@@ -15,6 +15,12 @@ type KubernetesNodeUpdateRequest struct {
 	Name        string            `json:"name" binding:"required"`
 	Labels      map[string]string `json:"labels"`
 	Schedulable bool              `json:"schedulable"`
+	Taints      *[]TaintInfo      `json:"taints"`
+}
+type KubernetesNamespaceUpdateRequest struct {
+	ClusterID int64             `json:"cluster_id" binding:"required"`
+	Name      string            `json:"name" binding:"required"`
+	Labels    map[string]string `json:"labels"`
 }
 type KubernetesNodeResponse struct {
 	Name             string            `json:"name"`
