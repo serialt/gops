@@ -30,11 +30,22 @@ onMounted(() => { void load(); void loadCredentials(); void loadDatabaseTypes() 
                 <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="数据库名称" required><el-input v-model="form.name" placeholder="请输入数据库名称" /></el-form-item></el-col><el-col :xs="24" :sm="12"><el-form-item label="数据库类型" required><el-select v-model="form.db_type" placeholder="请选择数据库类型" clearable @change="applyDefaultPort"><el-option v-for="databaseType in databaseTypes" :key="databaseType.value" :label="databaseType.label" :value="databaseType.value" /></el-select></el-form-item></el-col></el-row>
                 <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="数据库地址" required><el-input v-model="form.host" placeholder="IP 地址或主机名" /></el-form-item></el-col><el-col :xs="24" :sm="12"><el-form-item label="端口"><el-input-number v-model="form.port" placeholder="请选择类型" :min="1" :max="65535" controls-position="right" :disabled="!form.db_type" /></el-form-item></el-col></el-row>
                 <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="用户名"><el-input v-model="form.username" placeholder="请输入用户名" /></el-form-item></el-col><el-col :xs="24" :sm="12"><el-form-item label="密码"><el-input v-model="form.password" type="password" show-password :placeholder="editingID ? '留空则不修改密码' : '请输入密码'" /></el-form-item></el-col></el-row>
-                <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="版本"><el-input v-model="form.version" placeholder="如：16.2" /></el-form-item></el-col><el-col :xs="24" :sm="12"><el-form-item label="认证凭据"><el-select v-model="form.credential_id" placeholder="选择或新建凭证" clearable><el-option v-for="credential in credentials" :key="credential.id" :label="credential.name" :value="credential.id" /></el-select></el-form-item></el-col></el-row>
+                <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="版本"><el-input v-model="form.version" placeholder="如：16.2" /></el-form-item></el-col><el-col :xs="24" :sm="12"><el-form-item label="认证凭据"><div class="credential-picker"><el-select v-model="form.credential_id" placeholder="选择凭据" clearable><el-option v-for="credential in credentials" :key="credential.id" :label="credential.name" :value="credential.id" /></el-select><el-button v-permission="'POST /api/v1/assets/credentials/create'" text type="primary" class="credential-create-button" @click="openCredentialCreate">新建凭据</el-button></div></el-form-item></el-col></el-row>
                 <el-form-item label="标签"><div class="tag-input"><el-tag v-for="tag in tagItems" :key="tag" closable @close="removeTag(tag)">{{ tag }}</el-tag><el-input v-model="tagDraft" placeholder="输入后按回车添加标签" @keyup.enter.prevent="addTag" @blur="addTag" /></div></el-form-item>
                 <el-form-item label="备注"><el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入备注信息" /></el-form-item>
             </el-form>
             <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template>
+        </el-dialog>
+        <el-dialog v-model="credentialDialogVisible" title="新建凭据" width="460px" append-to-body>
+            <el-form :model="credentialForm" label-width="82px" class="credential-form">
+                <el-form-item label="凭证名称" required><el-input v-model="credentialForm.name" placeholder="请输入凭证名称" /></el-form-item>
+                <el-form-item label="认证方式" required><el-radio-group v-model="credentialForm.credential_type"><el-radio value="password">密码</el-radio><el-radio value="key">密钥</el-radio></el-radio-group></el-form-item>
+                <el-form-item label="用户名"><el-input v-model="credentialForm.username" placeholder="如：root" /></el-form-item>
+                <el-form-item v-if="credentialForm.credential_type === 'password'" label="密码" required><el-input v-model="credentialForm.password" type="password" show-password /></el-form-item>
+                <el-form-item v-else label="私钥" required><el-input v-model="credentialForm.private_key" type="textarea" :rows="3" placeholder="请输入私钥内容" /></el-form-item>
+                <el-form-item v-if="credentialForm.credential_type === 'key'" label="密钥口令"><el-input v-model="credentialForm.passphrase" type="password" show-password /></el-form-item>
+            </el-form>
+            <template #footer><el-button @click="credentialDialogVisible = false">取消</el-button><el-button type="primary" @click="saveCredential">创建并选择</el-button></template>
         </el-dialog>
     </div>
 </template>
@@ -52,6 +63,10 @@ onMounted(() => { void load(); void loadCredentials(); void loadDatabaseTypes() 
     .db-form :deep(.el-form-item__label) { color: var(--text); font-size: 12px; font-weight: 600; }
     .db-form :deep(.el-input__wrapper), .db-form :deep(.el-textarea__inner) { box-shadow: 0 0 0 1px var(--line) inset; }
     .db-form :deep(.el-input-number) { width: 100%; }
+    .credential-picker { display: flex; align-items: center; gap: 6px; width: 100%; }
+    .credential-picker :deep(.el-select) { flex: 1; min-width: 0; }
+    .credential-picker :deep(.credential-create-button) { flex: none; min-width: auto; padding: 4px 8px; border: 1px solid var(--primary); background: var(--primary) !important; color: #fff !important; font-size: 11px; font-weight: 600; box-shadow: none; }
+    .credential-picker :deep(.credential-create-button:hover) { background: var(--primary-strong) !important; border-color: var(--primary-strong); transform: none; }
     .tag-input { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: 100%; min-height: 32px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; }
     .tag-input :deep(.el-tag) { border-radius: 5px; }
     .tag-input :deep(.el-input) { flex: 1; min-width: 140px; }
