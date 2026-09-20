@@ -5,7 +5,7 @@ import type { ColDef } from 'ag-grid-community'
 import { Delete, FolderOpened, Monitor, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { applyKubernetesObject, deleteKubernetesNode, drainKubernetesNode, getKubernetesClusterStats, getKubernetesObject, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesPods, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
+import { applyKubernetesObject, deleteKubernetesNode, deleteKubernetesObject, drainKubernetesNode, getKubernetesClusterStats, getKubernetesObject, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesPods, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
 const route = useRoute(); const kind = computed(() => String(route.meta.kubernetesResource || 'nodes')); const title = computed(() => kind.value === 'nodes' ? '节点管理' : kind.value === 'namespaces' ? '命名空间' : kind.value === 'pods' ? 'Pod 管理' : '工作负载'); const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), keyword = ref(''), rows = ref<any[]>([])
 const statusFilter = ref(''), roleFilter = ref(''), namespaceStatus = ref(''), refreshing = ref(false)
 const nodeDialog = ref(false), nodeSaving = ref(false), nodeForm = ref({ name: '', labels: '', schedulable: true })
@@ -13,6 +13,7 @@ const namespaceLabelDialog = ref(false), namespaceLabelEditing = ref(false), nam
 const nodeLabelDialog = ref(false), nodeLabelEditing = ref(false), nodeLabelSaving = ref(false), selectedLabelNode = ref<KubernetesNode | null>(null), nodeLabelRows = ref<{ key:string; value:string }[]>([])
 const nodeTaintDialog = ref(false), nodeTaintEditing = ref(false), nodeTaintSaving = ref(false), selectedTaintNode = ref<KubernetesNode | null>(null), nodeTaintRows = ref<KubernetesTaint[]>([])
 const nodeMenu = ref({ visible:false, x:0, y:0, node:null as KubernetesNode | null }), nodeYamlDialog = ref(false), nodeYamlSaving = ref(false), nodeYaml = ref('')
+const namespaceMenu = ref({ visible:false, x:0, y:0, namespace:null as KubernetesNamespace | null }), namespaceYamlDialog = ref(false), namespaceYamlSaving = ref(false), namespaceYaml = ref('')
 const nodeStats = ref({ total: 0, healthy: 0, pods: 0, podCapacity: 0, cpu: 0 })
 const namespaceStats = ref({ total: 0, healthy: 0, labels: 0, averageAge: '0d' })
 const isNodeReady = (status: unknown) => ['ready', '就绪', '正常'].includes(String(status || '').toLowerCase())
@@ -69,6 +70,12 @@ async function openNodeYaml() { const node = nodeMenu.value.node; closeNodeMenu(
 async function saveNodeYaml() { nodeYamlSaving.value = true; try { await applyKubernetesObject({ cluster_id: clusterID.value, resource: 'nodes', yaml: nodeYaml.value }); ElMessage.success('节点 YAML 保存成功'); nodeYamlDialog.value = false; await load() } finally { nodeYamlSaving.value = false } }
 async function setNodeSchedulable(schedulable: boolean) { const node = nodeMenu.value.node; closeNodeMenu(); if (!node) return; await updateKubernetesNode({ cluster_id: clusterID.value, name: node.name, labels: node.labels || {}, schedulable, taints: node.taints || [] }); ElMessage.success(schedulable ? '节点已设为可调度' : '节点已设为不可调度'); await load() }
 async function drainNode() { const node = nodeMenu.value.node; closeNodeMenu(); if (!node) return; try { await ElMessageBox.confirm(`排空节点“${node.name}”将驱逐节点上的非 DaemonSet Pod，并将节点设为不可调度。确定继续吗？`, '节点排空', { type: 'warning', confirmButtonText: '确认排空', cancelButtonText: '取消' }) } catch { return }; await drainKubernetesNode(clusterID.value, node.name); ElMessage.success('节点排空完成'); await load() }
+function openNamespaceActionMenu(namespace: KubernetesNamespace, button: HTMLElement) { const rect = button.getBoundingClientRect(); namespaceMenu.value = { visible:true, x:Math.max(8, rect.right - 150), y:rect.bottom + 4, namespace } }
+function closeNamespaceMenu() { namespaceMenu.value.visible = false }
+function modifyNamespace() { const namespace = namespaceMenu.value.namespace; closeNamespaceMenu(); if (!namespace) return; openNamespaceLabels(namespace); startNamespaceLabelEdit() }
+async function openNamespaceYaml() { const namespace = namespaceMenu.value.namespace; closeNamespaceMenu(); if (!namespace) return; const { data } = await getKubernetesObject({ cluster_id:clusterID.value, resource:'namespaces', name:namespace.name }); namespaceYaml.value = data.data.yaml; namespaceYamlDialog.value = true }
+async function saveNamespaceYaml() { namespaceYamlSaving.value = true; try { await applyKubernetesObject({ cluster_id:clusterID.value, resource:'namespaces', yaml:namespaceYaml.value }); ElMessage.success('命名空间 YAML 保存成功'); namespaceYamlDialog.value = false; await load() } finally { namespaceYamlSaving.value = false } }
+async function removeNamespace(namespace: KubernetesNamespace) { try { await ElMessageBox.confirm(`删除命名空间“${namespace.name}”将同时删除其中的全部资源，且无法恢复。确定继续吗？`, '删除命名空间', { type:'warning', confirmButtonText:'确认删除', cancelButtonText:'取消' }) } catch { return }; await deleteKubernetesObject({ cluster_id:clusterID.value, resource:'namespaces', name:namespace.name }); ElMessage.success('命名空间删除成功'); await load() }
 function openNamespaceLabels(namespace: KubernetesNamespace) { selectedNamespace.value = namespace; namespaceLabelRows.value = Object.entries(namespace.labels || {}).map(([key, value]) => ({ key, value })); namespaceLabelEditing.value = false; namespaceLabelDialog.value = true }
 function startNamespaceLabelEdit() { namespaceLabelEditing.value = true; if (!namespaceLabelRows.value.length) namespaceLabelRows.value.push({ key: '', value: '' }) }
 function addNamespaceLabel() { namespaceLabelRows.value.push({ key: '', value: '' }) }
@@ -117,9 +124,11 @@ const adaptiveColumns = computed<ColDef[]>(() => {
     if (kind.value === 'namespaces') {
         const statusIndex = source.findIndex(column => column.field === 'status')
         source.splice(statusIndex + 1, 0, { field: 'labels', headerName: '标签', cellRenderer: (p: any) => { const labels = p.value || {}; const wrap = document.createElement('span'); const icon = document.createElement('span'); const badge = document.createElement('span'); wrap.className = 'namespace-label-count'; icon.className = 'namespace-label-icon'; icon.textContent = '◇'; badge.className = 'namespace-label-badge'; badge.textContent = String(Object.keys(labels).length); wrap.title = '查看命名空间标签'; wrap.onclick = () => openNamespaceLabels(p.data); wrap.append(icon, badge); return wrap } })
+        source.push({ headerName:'操作', pinned:'right', width:150, cellRenderer:(p:any) => { const wrap=document.createElement('div'); const editButton=document.createElement('button'); const deleteButton=document.createElement('button'); wrap.className='node-action-group'; editButton.className='grid-action-btn edit'; editButton.textContent='编辑'; editButton.onclick=()=>openNamespaceActionMenu(p.data,editButton); deleteButton.className='grid-action-btn delete'; deleteButton.textContent='删除'; deleteButton.onclick=()=>removeNamespace(p.data); wrap.append(editButton,deleteButton); return wrap } })
     }
     return source.map(column => {
-    if (column.headerName === '操作') return { ...column, width: 150, minWidth: 150, maxWidth: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); const editButton = document.createElement('button'); const deleteButton = document.createElement('button'); wrap.className = 'node-action-group'; editButton.className = 'grid-action-btn edit'; editButton.textContent = '编辑'; editButton.onclick = () => openNodeActionMenu(p.data, editButton); deleteButton.className = 'grid-action-btn delete'; deleteButton.textContent = '删除'; deleteButton.onclick = () => removeNode(p.data); wrap.append(editButton, deleteButton); return wrap } }
+    if (column.headerName === '操作' && kind.value === 'nodes') return { ...column, width: 150, minWidth: 150, maxWidth: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); const editButton = document.createElement('button'); const deleteButton = document.createElement('button'); wrap.className = 'node-action-group'; editButton.className = 'grid-action-btn edit'; editButton.textContent = '编辑'; editButton.onclick = () => openNodeActionMenu(p.data, editButton); deleteButton.className = 'grid-action-btn delete'; deleteButton.textContent = '删除'; deleteButton.onclick = () => removeNode(p.data); wrap.append(editButton, deleteButton); return wrap } }
+    if (column.headerName === '操作') return { ...column, width:150, minWidth:150, maxWidth:150 }
     if (kind.value === 'namespaces' && column.field === 'status') return { ...column, cellRenderer: (p: any) => { const healthy = ['active', '正常'].includes(String(p.value || '').toLowerCase()); const tag = document.createElement('span'); tag.className = `node-status ${healthy ? 'is-ready' : 'is-abnormal'}`; tag.textContent = healthy ? '正常' : p.value; return tag } }
     if (kind.value === 'namespaces' && (column.field === 'name' || column.field === 'created_at')) return { ...column, minWidth: undefined }
     return column
@@ -127,7 +136,7 @@ const adaptiveColumns = computed<ColDef[]>(() => {
 })
 </script>
 <template>
-    <section class="page">
+    <section class="page" :class="{ 'node-page': kind === 'nodes', 'compact-page': kind === 'namespaces' }">
         <div v-if="kind === 'nodes'" class="node-header">
             <div class="node-heading"><div class="node-heading-icon"><el-icon><Monitor /></el-icon></div><div><strong>节点管理</strong><span>管理 Kubernetes 集群节点，监控节点状态和资源使用</span></div></div>
             <div class="node-header-actions"><el-select v-model="clusterID" placeholder="选择集群"><el-option v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" /></el-select><el-button type="primary" :icon="Refresh" :loading="refreshing" @click="refresh">刷新</el-button></div>
@@ -157,7 +166,9 @@ const adaptiveColumns = computed<ColDef[]>(() => {
         <div v-else-if="kind === 'namespaces'" class="node-filters"><el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索命名空间" clearable/><el-select v-model="namespaceStatus" placeholder="命名空间状态" clearable><el-option label="正常" value="Active"/><el-option label="终止中" value="Terminating"/></el-select></div>
         <AppDataGrid class="grid" :row-data="displayRows" :column-defs="adaptiveColumns" pagination />
         <div v-if="nodeMenu.visible" class="node-action-menu" :style="{left:`${nodeMenu.x}px`,top:`${nodeMenu.y}px`}" @mouseleave="closeNodeMenu"><button @click="openNodeShell">Shell</button><button @click="openNodeYaml">YAML</button><div class="menu-divider"></div><button @click="drainNode">节点排空</button><button @click="setNodeSchedulable(false)">设为不可调度</button><button @click="setNodeSchedulable(true)">设为可调度</button></div>
+        <div v-if="namespaceMenu.visible" class="node-action-menu namespace-action-menu" :style="{left:`${namespaceMenu.x}px`,top:`${namespaceMenu.y}px`}" @mouseleave="closeNamespaceMenu"><button @click="modifyNamespace">修改</button><button @click="openNamespaceYaml">YAML</button></div>
         <el-dialog v-model="nodeYamlDialog" :title="`节点 YAML · ${nodeMenu.node?.name || ''}`" width="60%" destroy-on-close><el-input v-model="nodeYaml" type="textarea" :rows="22" class="yaml-editor"/><template #footer><el-button @click="nodeYamlDialog=false">取消</el-button><el-button type="primary" :loading="nodeYamlSaving" @click="saveNodeYaml">保存</el-button></template></el-dialog>
+        <el-dialog v-model="namespaceYamlDialog" :title="`命名空间 YAML · ${namespaceMenu.namespace?.name || ''}`" width="60%" destroy-on-close><el-input v-model="namespaceYaml" type="textarea" :rows="22" class="yaml-editor"/><template #footer><el-button @click="namespaceYamlDialog=false">取消</el-button><el-button type="primary" :loading="namespaceYamlSaving" @click="saveNamespaceYaml">保存</el-button></template></el-dialog>
         <el-dialog v-model="nodeDialog" title="编辑节点" width="520px" destroy-on-close><el-form label-width="90px"><el-form-item label="节点名称"><el-input v-model="nodeForm.name" disabled/></el-form-item><el-form-item label="允许调度"><el-switch v-model="nodeForm.schedulable"/></el-form-item><el-form-item label="节点标签"><el-input v-model="nodeForm.labels" type="textarea" :rows="10" placeholder="请输入 JSON 格式的节点标签"/></el-form-item></el-form><template #footer><el-button @click="nodeDialog=false">取消</el-button><el-button type="primary" :loading="nodeSaving" @click="saveNode">保存</el-button></template></el-dialog>
         <el-dialog v-model="namespaceLabelDialog" class="namespace-label-dialog" :title="namespaceLabelEditing ? '编辑命名空间标签' : '命名空间标签'" width="60%" destroy-on-close>
             <div v-if="!namespaceLabelEditing" class="namespace-label-view"><div class="namespace-label-head"><strong>Key</strong><strong>Value</strong></div><div v-for="item in namespaceLabelRows" :key="item.key" class="namespace-label-view-row"><code>{{ item.key }}</code><span>{{ item.value || '-' }}</span></div><el-empty v-if="!namespaceLabelRows.length" description="暂无标签" :image-size="54"/></div>
@@ -185,6 +196,23 @@ const adaptiveColumns = computed<ColDef[]>(() => {
         gap: 12px;
         min-height: 0
     }
+
+    .node-page { gap:2px }
+    .node-page .stats { order:1 }
+    .node-page .node-header { order:2 }
+    .node-page .node-filters { order:3 }
+    .node-page .grid { order:4 }
+    .node-page .stat-card { padding:10px 12px }
+    .node-page .node-header { padding:10px 14px }
+    .node-page .node-filters { padding:8px 12px }
+    .compact-page { gap:2px }
+    .compact-page .stat-card { padding:10px 12px }
+    .compact-page .node-header { padding:10px 14px }
+    .compact-page .node-filters { padding:8px 12px }
+    .compact-page .stats { order:1 }
+    .compact-page .node-header { order:2 }
+    .compact-page .node-filters { order:3 }
+    .compact-page .grid { order:4 }
 
     .toolbar {
         display: flex;
