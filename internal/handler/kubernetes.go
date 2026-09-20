@@ -176,6 +176,34 @@ func (h *KubernetesHandler) UpdateNode(c *gin.Context) {
 	response.OK(c, d)
 }
 
+// DeleteNode POST /api/v1/kubernetes/nodes/delete 删除 Kubernetes 节点。
+func (h *KubernetesHandler) DeleteNode(c *gin.Context) {
+	r := new(api.KubernetesNodeDeleteRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid node delete request")
+		return
+	}
+	if e := h.biz.DeleteNode(r); e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// DrainNode POST /api/v1/kubernetes/nodes/drain 排空 Kubernetes 节点。
+func (h *KubernetesHandler) DrainNode(c *gin.Context) {
+	r := new(api.KubernetesNodeDeleteRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid node drain request")
+		return
+	}
+	if e := h.biz.DrainNode(r); e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
 // UpdateNamespace POST /api/v1/kubernetes/namespaces/update 更新 Kubernetes 命名空间标签。
 func (h *KubernetesHandler) UpdateNamespace(c *gin.Context) {
 	r := new(api.KubernetesNamespaceUpdateRequest)

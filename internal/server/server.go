@@ -163,6 +163,8 @@ func RegisterRoute(ctx context.Context, r *gin.Engine, db *gorm.DB, cfg *config.
 	authorized.POST("/kubernetes/clusters/config", kubernetesHandler.GetClusterConfig)
 	authorized.POST("/kubernetes/nodes/list", kubernetesHandler.ListNodes)
 	authorized.POST("/kubernetes/nodes/update", kubernetesHandler.UpdateNode)
+	authorized.POST("/kubernetes/nodes/delete", kubernetesHandler.DeleteNode)
+	authorized.POST("/kubernetes/nodes/drain", kubernetesHandler.DrainNode)
 	authorized.POST("/kubernetes/namespaces/list", kubernetesHandler.ListNamespaces)
 	authorized.POST("/kubernetes/namespaces/update", kubernetesHandler.UpdateNamespace)
 	authorized.POST("/kubernetes/workloads/list", kubernetesHandler.ListWorkloads)

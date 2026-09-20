@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -97,6 +98,51 @@ func (b *KubernetesBiz) UpdateNode(r *api.KubernetesNodeUpdateRequest) (*api.Kub
 		return nil, err
 	}
 	return nodeResponse(*updated), nil
+}
+func (b *KubernetesBiz) DeleteNode(r *api.KubernetesNodeDeleteRequest) error {
+	c, err := b.client(r.ClusterID)
+	if err != nil {
+		return err
+	}
+	return c.CoreV1().Nodes().Delete(context.Background(), r.Name, metav1.DeleteOptions{})
+}
+func (b *KubernetesBiz) DrainNode(r *api.KubernetesNodeDeleteRequest) error {
+	c, err := b.client(r.ClusterID)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	node, err := c.CoreV1().Nodes().Get(ctx, r.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	node.Spec.Unschedulable = true
+	if _, err = c.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+	pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{FieldSelector: "spec.nodeName=" + r.Name})
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods.Items {
+		if pod.Annotations[corev1.MirrorPodAnnotationKey] != "" {
+			continue
+		}
+		daemonSet := false
+		for _, owner := range pod.OwnerReferences {
+			if owner.Kind == "DaemonSet" {
+				daemonSet = true
+				break
+			}
+		}
+		if daemonSet {
+			continue
+		}
+		if err = c.CoreV1().Pods(pod.Namespace).EvictV1(ctx, &policyv1.Eviction{ObjectMeta: metav1.ObjectMeta{Name: pod.Name, Namespace: pod.Namespace}}); err != nil {
+			return fmt.Errorf("evict pod %s/%s: %w", pod.Namespace, pod.Name, err)
+		}
+	}
+	return nil
 }
 func nodeResponse(n corev1.Node) *api.KubernetesNodeResponse {
 	status := "未知"

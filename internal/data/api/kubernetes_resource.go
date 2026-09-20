@@ -17,6 +17,10 @@ type KubernetesNodeUpdateRequest struct {
 	Schedulable bool              `json:"schedulable"`
 	Taints      *[]TaintInfo      `json:"taints"`
 }
+type KubernetesNodeDeleteRequest struct {
+	ClusterID int64  `json:"cluster_id" binding:"required"`
+	Name      string `json:"name" binding:"required"`
+}
 type KubernetesNamespaceUpdateRequest struct {
 	ClusterID int64             `json:"cluster_id" binding:"required"`
 	Name      string            `json:"name" binding:"required"`

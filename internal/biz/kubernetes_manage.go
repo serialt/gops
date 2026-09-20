@@ -28,7 +28,7 @@ func k8sSpec(group, version, resource, kind string, namespaced bool) kubernetesR
 }
 
 var kubernetesResourceCatalog = map[string]kubernetesResourceSpec{
-	"namespaces": k8sSpec("", "v1", "namespaces", "Namespace", false), "pods": k8sSpec("", "v1", "pods", "Pod", true),
+	"nodes": k8sSpec("", "v1", "nodes", "Node", false), "namespaces": k8sSpec("", "v1", "namespaces", "Namespace", false), "pods": k8sSpec("", "v1", "pods", "Pod", true),
 	"deployments": k8sSpec("apps", "v1", "deployments", "Deployment", true), "statefulsets": k8sSpec("apps", "v1", "statefulsets", "StatefulSet", true), "daemonsets": k8sSpec("apps", "v1", "daemonsets", "DaemonSet", true),
 	"jobs": k8sSpec("batch", "v1", "jobs", "Job", true), "cronjobs": k8sSpec("batch", "v1", "cronjobs", "CronJob", true),
 	"services": k8sSpec("", "v1", "services", "Service", true), "ingresses": k8sSpec("networking.k8s.io", "v1", "ingresses", "Ingress", true), "endpoints": k8sSpec("", "v1", "endpoints", "Endpoints", true), "networkpolicies": k8sSpec("networking.k8s.io", "v1", "networkpolicies", "NetworkPolicy", true),

@@ -3,15 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { ColDef } from 'ag-grid-community'
 import { Delete, FolderOpened, Monitor, Refresh, Search } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { getKubernetesClusterStats, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesPods, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
+import { applyKubernetesObject, deleteKubernetesNode, drainKubernetesNode, getKubernetesClusterStats, getKubernetesObject, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesPods, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
 const route = useRoute(); const kind = computed(() => String(route.meta.kubernetesResource || 'nodes')); const title = computed(() => kind.value === 'nodes' ? '节点管理' : kind.value === 'namespaces' ? '命名空间' : kind.value === 'pods' ? 'Pod 管理' : '工作负载'); const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), keyword = ref(''), rows = ref<any[]>([])
 const statusFilter = ref(''), roleFilter = ref(''), namespaceStatus = ref(''), refreshing = ref(false)
 const nodeDialog = ref(false), nodeSaving = ref(false), nodeForm = ref({ name: '', labels: '', schedulable: true })
 const namespaceLabelDialog = ref(false), namespaceLabelEditing = ref(false), namespaceLabelSaving = ref(false), selectedNamespace = ref<KubernetesNamespace | null>(null), namespaceLabelRows = ref<{ key:string; value:string }[]>([])
 const nodeLabelDialog = ref(false), nodeLabelEditing = ref(false), nodeLabelSaving = ref(false), selectedLabelNode = ref<KubernetesNode | null>(null), nodeLabelRows = ref<{ key:string; value:string }[]>([])
 const nodeTaintDialog = ref(false), nodeTaintEditing = ref(false), nodeTaintSaving = ref(false), selectedTaintNode = ref<KubernetesNode | null>(null), nodeTaintRows = ref<KubernetesTaint[]>([])
+const nodeMenu = ref({ visible:false, x:0, y:0, node:null as KubernetesNode | null }), nodeYamlDialog = ref(false), nodeYamlSaving = ref(false), nodeYaml = ref('')
 const nodeStats = ref({ total: 0, healthy: 0, pods: 0, podCapacity: 0, cpu: 0 })
 const namespaceStats = ref({ total: 0, healthy: 0, labels: 0, averageAge: '0d' })
 const isNodeReady = (status: unknown) => ['ready', '就绪', '正常'].includes(String(status || '').toLowerCase())
@@ -55,6 +56,19 @@ async function saveNode() {
     nodeSaving.value = true
     try { await updateKubernetesNode({ cluster_id: clusterID.value, name: nodeForm.value.name, labels, schedulable: nodeForm.value.schedulable }); ElMessage.success('节点更新成功'); nodeDialog.value = false; await load() } finally { nodeSaving.value = false }
 }
+async function removeNode(node: KubernetesNode) {
+    try { await ElMessageBox.confirm(`删除节点“${node.name}”后，该节点将从 Kubernetes 集群中移除。确定继续吗？`, '删除节点', { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }) } catch { return }
+    await deleteKubernetesNode(clusterID.value, node.name)
+    ElMessage.success('节点删除成功')
+    await load()
+}
+function openNodeActionMenu(node: KubernetesNode, button: HTMLElement) { const rect = button.getBoundingClientRect(); nodeMenu.value = { visible: true, x: Math.max(8, rect.right - 180), y: rect.bottom + 4, node } }
+function closeNodeMenu() { nodeMenu.value.visible = false }
+function openNodeShell() { closeNodeMenu(); ElMessage.info('Shell 需要先在目标集群部署并配置 CloudTTY') }
+async function openNodeYaml() { const node = nodeMenu.value.node; closeNodeMenu(); if (!node) return; const { data } = await getKubernetesObject({ cluster_id: clusterID.value, resource: 'nodes', name: node.name }); nodeYaml.value = data.data.yaml; nodeYamlDialog.value = true }
+async function saveNodeYaml() { nodeYamlSaving.value = true; try { await applyKubernetesObject({ cluster_id: clusterID.value, resource: 'nodes', yaml: nodeYaml.value }); ElMessage.success('节点 YAML 保存成功'); nodeYamlDialog.value = false; await load() } finally { nodeYamlSaving.value = false } }
+async function setNodeSchedulable(schedulable: boolean) { const node = nodeMenu.value.node; closeNodeMenu(); if (!node) return; await updateKubernetesNode({ cluster_id: clusterID.value, name: node.name, labels: node.labels || {}, schedulable, taints: node.taints || [] }); ElMessage.success(schedulable ? '节点已设为可调度' : '节点已设为不可调度'); await load() }
+async function drainNode() { const node = nodeMenu.value.node; closeNodeMenu(); if (!node) return; try { await ElMessageBox.confirm(`排空节点“${node.name}”将驱逐节点上的非 DaemonSet Pod，并将节点设为不可调度。确定继续吗？`, '节点排空', { type: 'warning', confirmButtonText: '确认排空', cancelButtonText: '取消' }) } catch { return }; await drainKubernetesNode(clusterID.value, node.name); ElMessage.success('节点排空完成'); await load() }
 function openNamespaceLabels(namespace: KubernetesNamespace) { selectedNamespace.value = namespace; namespaceLabelRows.value = Object.entries(namespace.labels || {}).map(([key, value]) => ({ key, value })); namespaceLabelEditing.value = false; namespaceLabelDialog.value = true }
 function startNamespaceLabelEdit() { namespaceLabelEditing.value = true; if (!namespaceLabelRows.value.length) namespaceLabelRows.value.push({ key: '', value: '' }) }
 function addNamespaceLabel() { namespaceLabelRows.value.push({ key: '', value: '' }) }
@@ -105,7 +119,7 @@ const adaptiveColumns = computed<ColDef[]>(() => {
         source.splice(statusIndex + 1, 0, { field: 'labels', headerName: '标签', cellRenderer: (p: any) => { const labels = p.value || {}; const wrap = document.createElement('span'); const icon = document.createElement('span'); const badge = document.createElement('span'); wrap.className = 'namespace-label-count'; icon.className = 'namespace-label-icon'; icon.textContent = '◇'; badge.className = 'namespace-label-badge'; badge.textContent = String(Object.keys(labels).length); wrap.title = '查看命名空间标签'; wrap.onclick = () => openNamespaceLabels(p.data); wrap.append(icon, badge); return wrap } })
     }
     return source.map(column => {
-    if (column.headerName === '操作') return { ...column, width: 100, minWidth: 100, maxWidth: 100 }
+    if (column.headerName === '操作') return { ...column, width: 150, minWidth: 150, maxWidth: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); const editButton = document.createElement('button'); const deleteButton = document.createElement('button'); wrap.className = 'node-action-group'; editButton.className = 'grid-action-btn edit'; editButton.textContent = '编辑'; editButton.onclick = () => openNodeActionMenu(p.data, editButton); deleteButton.className = 'grid-action-btn delete'; deleteButton.textContent = '删除'; deleteButton.onclick = () => removeNode(p.data); wrap.append(editButton, deleteButton); return wrap } }
     if (kind.value === 'namespaces' && column.field === 'status') return { ...column, cellRenderer: (p: any) => { const healthy = ['active', '正常'].includes(String(p.value || '').toLowerCase()); const tag = document.createElement('span'); tag.className = `node-status ${healthy ? 'is-ready' : 'is-abnormal'}`; tag.textContent = healthy ? '正常' : p.value; return tag } }
     if (kind.value === 'namespaces' && (column.field === 'name' || column.field === 'created_at')) return { ...column, minWidth: undefined }
     return column
@@ -142,6 +156,8 @@ const adaptiveColumns = computed<ColDef[]>(() => {
         <div v-if="kind === 'nodes'" class="node-filters"><el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索节点名称或 IP" clearable/><el-select v-model="statusFilter" placeholder="节点状态" clearable><el-option label="正常" value="Ready"/><el-option label="异常" value="NotReady"/></el-select><el-select v-model="roleFilter" placeholder="节点角色" clearable><el-option label="Master" value="master"/><el-option label="Worker" value="worker"/></el-select></div>
         <div v-else-if="kind === 'namespaces'" class="node-filters"><el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索命名空间" clearable/><el-select v-model="namespaceStatus" placeholder="命名空间状态" clearable><el-option label="正常" value="Active"/><el-option label="终止中" value="Terminating"/></el-select></div>
         <AppDataGrid class="grid" :row-data="displayRows" :column-defs="adaptiveColumns" pagination />
+        <div v-if="nodeMenu.visible" class="node-action-menu" :style="{left:`${nodeMenu.x}px`,top:`${nodeMenu.y}px`}" @mouseleave="closeNodeMenu"><button @click="openNodeShell">Shell</button><button @click="openNodeYaml">YAML</button><div class="menu-divider"></div><button @click="drainNode">节点排空</button><button @click="setNodeSchedulable(false)">设为不可调度</button><button @click="setNodeSchedulable(true)">设为可调度</button></div>
+        <el-dialog v-model="nodeYamlDialog" :title="`节点 YAML · ${nodeMenu.node?.name || ''}`" width="60%" destroy-on-close><el-input v-model="nodeYaml" type="textarea" :rows="22" class="yaml-editor"/><template #footer><el-button @click="nodeYamlDialog=false">取消</el-button><el-button type="primary" :loading="nodeYamlSaving" @click="saveNodeYaml">保存</el-button></template></el-dialog>
         <el-dialog v-model="nodeDialog" title="编辑节点" width="520px" destroy-on-close><el-form label-width="90px"><el-form-item label="节点名称"><el-input v-model="nodeForm.name" disabled/></el-form-item><el-form-item label="允许调度"><el-switch v-model="nodeForm.schedulable"/></el-form-item><el-form-item label="节点标签"><el-input v-model="nodeForm.labels" type="textarea" :rows="10" placeholder="请输入 JSON 格式的节点标签"/></el-form-item></el-form><template #footer><el-button @click="nodeDialog=false">取消</el-button><el-button type="primary" :loading="nodeSaving" @click="saveNode">保存</el-button></template></el-dialog>
         <el-dialog v-model="namespaceLabelDialog" class="namespace-label-dialog" :title="namespaceLabelEditing ? '编辑命名空间标签' : '命名空间标签'" width="60%" destroy-on-close>
             <div v-if="!namespaceLabelEditing" class="namespace-label-view"><div class="namespace-label-head"><strong>Key</strong><strong>Value</strong></div><div v-for="item in namespaceLabelRows" :key="item.key" class="namespace-label-view-row"><code>{{ item.key }}</code><span>{{ item.value || '-' }}</span></div><el-empty v-if="!namespaceLabelRows.length" description="暂无标签" :image-size="54"/></div>
@@ -211,6 +227,10 @@ const adaptiveColumns = computed<ColDef[]>(() => {
     .grid :deep(.node-role) { color:var(--primary); background:color-mix(in srgb,var(--primary) 7%,white); border:1px solid color-mix(in srgb,var(--primary) 28%,white) }
     .grid :deep(.grid-action-btn) { border:1px solid var(--primary); border-radius:8px; padding:4px 9px; background:#f7f8ff; color:var(--primary); font:inherit; font-size:11px; line-height:1.25; cursor:pointer; box-shadow:0 1px 3px rgba(24,34,53,.08) }
     .grid :deep(.grid-action-btn:hover) { background:var(--primary-soft) }
+    .grid :deep(.node-action-group) { display:flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap }
+    .grid :deep(.grid-action-btn.delete) { border-color:#ffd5d5; background:#fff7f7; color:#ef6262 }
+    .grid :deep(.grid-action-btn.delete:hover) { background:#ffecec }
+    .node-action-menu{position:fixed;z-index:5000;display:flex;width:180px;flex-direction:column;padding:6px;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:0 8px 24px rgba(24,34,53,.18)}.node-action-menu button{padding:9px 12px;border:0;border-radius:6px;background:#fff;color:var(--text);font:inherit;text-align:left;cursor:pointer}.node-action-menu button:hover{background:var(--primary-soft);color:var(--primary)}.node-action-menu .menu-divider{height:1px;margin:5px -6px;background:var(--line)}.yaml-editor :deep(.el-textarea__inner){font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
     .grid :deep(.ag-pinned-right-cols-container .ag-cell) { display:flex; align-items:center; justify-content:center; padding-right:4px; padding-left:4px }
     .grid :deep(.namespace-label-count) { position:relative; display:inline-flex; width:30px; height:28px; align-items:center; justify-content:flex-start; color:#c99818; cursor:help }
     .grid :deep(.namespace-label-icon) { font-size:25px; line-height:1; transform:rotate(-45deg) }
