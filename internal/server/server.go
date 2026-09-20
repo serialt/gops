@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"gops/internal/biz"
 	"gops/internal/config"
@@ -37,7 +38,7 @@ var whitelist = []string{
 	"/api/v1/auth/mfa/login",
 }
 
-func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine, error) {
+func RegisterRoute(ctx context.Context, r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine, error) {
 
 	casbinService, err := casbinx.New(db)
 	if err != nil {
@@ -58,11 +59,13 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	systemConfigHandler := handler.NewSystemConfigHandler(biz.NewSystemConfigBiz(db, cfg.Server.AESKey))
 	monitorBiz := biz.NewMonitorBiz(db, cfg.Server.AESKey)
 	monitorHandler := handler.NewMonitorHandler(monitorBiz)
-	go monitorBiz.StartScheduler(context.Background())
+	go monitorBiz.StartScheduler(ctx)
 	nginxHandler := handler.NewNginxHandler(biz.NewNginxBiz(db))
 	taskHandler := handler.NewTaskHandler(biz.NewTaskBiz(db))
 	sslCertHandler := handler.NewSSLCertHandler(biz.NewSSLCertBiz(db))
-	kubernetesHandler := handler.NewKubernetesHandler(biz.NewKubernetesBiz(db))
+	kubernetesBiz := biz.NewKubernetesBiz(db)
+	kubernetesHandler := handler.NewKubernetesHandler(kubernetesBiz)
+	go kubernetesBiz.StartStatusScheduler(ctx, 6*time.Hour)
 	auditHandler := handler.NewAuditHandler(biz.NewAuditBiz(db))
 
 	r.Use(gin.Logger(), gin.Recovery())
@@ -155,9 +158,19 @@ func RegisterRoute(r *gin.Engine, db *gorm.DB, cfg *config.Config) (*gin.Engine,
 	authorized.POST("/kubernetes/clusters/list", kubernetesHandler.ListClusters)
 	authorized.POST("/kubernetes/clusters/save", kubernetesHandler.SaveCluster)
 	authorized.POST("/kubernetes/clusters/delete", kubernetesHandler.DeleteCluster)
+	authorized.POST("/kubernetes/clusters/test", kubernetesHandler.TestCluster)
+	authorized.POST("/kubernetes/clusters/sync", kubernetesHandler.SyncClusters)
+	authorized.POST("/kubernetes/clusters/config", kubernetesHandler.GetClusterConfig)
 	authorized.POST("/kubernetes/nodes/list", kubernetesHandler.ListNodes)
 	authorized.POST("/kubernetes/namespaces/list", kubernetesHandler.ListNamespaces)
 	authorized.POST("/kubernetes/workloads/list", kubernetesHandler.ListWorkloads)
+	authorized.POST("/kubernetes/pods/list", kubernetesHandler.ListPods)
+	authorized.POST("/kubernetes/stats/get", kubernetesHandler.GetClusterStats)
+	authorized.POST("/kubernetes/events/list", kubernetesHandler.ListEvents)
+	authorized.POST("/kubernetes/resources/list", kubernetesHandler.ListKubernetesObjects)
+	authorized.POST("/kubernetes/resources/get", kubernetesHandler.GetKubernetesObject)
+	authorized.POST("/kubernetes/resources/apply", kubernetesHandler.ApplyKubernetesObject)
+	authorized.POST("/kubernetes/resources/delete", kubernetesHandler.DeleteKubernetesObject)
 	authorized.POST("/audit/operation-logs/list", auditHandler.ListOperationLogs)
 	authorized.POST("/audit/login-logs/list", auditHandler.ListLoginLogs)
 	authorized.POST("/audit/data-logs/list", auditHandler.ListDataLogs)
@@ -175,9 +188,14 @@ func NewGinEngine(
 	}
 
 	r = gin.New()
+	schedulerCtx, cancelSchedulers := context.WithCancel(context.Background())
 	whitelistMap := lo.KeyBy(whitelist, func(item string) string { return item })
 	middleware.RegisterMiddleware(r, cfg, whitelistMap)
-	RegisterRoute(r, db, cfg)
+	if _, err := RegisterRoute(schedulerCtx, r, db, cfg); err != nil {
+		cancelSchedulers()
+		panic(err)
+	}
+	cleanup = cancelSchedulers
 	return
 }
 

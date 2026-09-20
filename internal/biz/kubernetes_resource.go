@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -65,14 +66,57 @@ func nodeResponse(n corev1.Node) *api.KubernetesNodeResponse {
 			roles = append(roles, strings.TrimPrefix(k, p))
 		}
 	}
-	ip := ""
+	ip, externalIP := "", ""
 	for _, a := range n.Status.Addresses {
 		if a.Type == corev1.NodeInternalIP {
 			ip = a.Address
-			break
+		} else if a.Type == corev1.NodeExternalIP {
+			externalIP = a.Address
 		}
 	}
-	return &api.KubernetesNodeResponse{Name: n.Name, Status: status, Roles: strings.Join(roles, ","), Version: n.Status.NodeInfo.KubeletVersion, InternalIP: ip, CreatedAt: n.CreationTimestamp.Format("2006-01-02 15:04:05")}
+	taints := make([]api.TaintInfo, 0, len(n.Spec.Taints))
+	for _, t := range n.Spec.Taints {
+		taints = append(taints, api.TaintInfo{Key: t.Key, Value: t.Value, Effect: string(t.Effect)})
+	}
+	conditions := make([]api.NodeCondition, 0, len(n.Status.Conditions))
+	for _, c := range n.Status.Conditions {
+		conditions = append(conditions, api.NodeCondition{Type: string(c.Type), Status: string(c.Status), LastHeartbeatTime: c.LastHeartbeatTime.Format("2006-01-02 15:04:05"), LastTransitionTime: c.LastTransitionTime.Format("2006-01-02 15:04:05"), Reason: c.Reason, Message: c.Message})
+	}
+	return &api.KubernetesNodeResponse{Name: n.Name, Status: status, Roles: strings.Join(roles, ","), Age: utils.CalculateAge(n.CreationTimestamp.Time), Version: n.Status.NodeInfo.KubeletVersion, InternalIP: ip, ExternalIP: externalIP, OSImage: n.Status.NodeInfo.OSImage, KernelVersion: n.Status.NodeInfo.KernelVersion, ContainerRuntime: n.Status.NodeInfo.ContainerRuntimeVersion, Labels: n.Labels, Annotations: n.Annotations, CPUCapacity: n.Status.Capacity.Cpu().String(), MemoryCapacity: n.Status.Capacity.Memory().String(), PodCapacity: int(n.Status.Capacity.Pods().Value()), Schedulable: !n.Spec.Unschedulable, TaintCount: len(n.Spec.Taints), Taints: taints, PodCIDR: n.Spec.PodCIDR, ProviderID: n.Spec.ProviderID, Conditions: conditions, CreatedAt: n.CreationTimestamp.Format("2006-01-02 15:04:05")}
+}
+
+func (b *KubernetesBiz) Pods(r *api.KubernetesResourceListRequest) ([]*api.PodInfo, error) {
+	c, err := b.client(r.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	ns := r.Namespace
+	if ns == "" {
+		ns = metav1.NamespaceAll
+	}
+	rows, err := c.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*api.PodInfo, 0, len(rows.Items))
+	for _, p := range rows.Items {
+		if r.Keyword != "" && !strings.Contains(strings.ToLower(p.Name), strings.ToLower(r.Keyword)) {
+			continue
+		}
+		ready, restarts := 0, int32(0)
+		containers := make([]api.ContainerInfo, 0, len(p.Spec.Containers))
+		for _, x := range p.Status.ContainerStatuses {
+			if x.Ready {
+				ready++
+			}
+			restarts += x.RestartCount
+		}
+		for _, x := range p.Spec.Containers {
+			containers = append(containers, api.ContainerInfo{Name: x.Name})
+		}
+		out = append(out, &api.PodInfo{Name: p.Name, Namespace: p.Namespace, Ready: fmt.Sprintf("%d/%d", ready, len(p.Spec.Containers)), Status: string(p.Status.Phase), Phase: string(p.Status.Phase), Restarts: restarts, Age: utils.CalculateAge(p.CreationTimestamp.Time), IP: p.Status.PodIP, Node: p.Spec.NodeName, Labels: p.Labels, Containers: containers})
+	}
+	return out, nil
 }
 func (b *KubernetesBiz) Namespaces(r *api.KubernetesResourceListRequest) ([]*api.KubernetesNamespaceResponse, error) {
 	c, e := b.client(r.ClusterID)
@@ -106,18 +150,119 @@ func (b *KubernetesBiz) Workloads(r *api.KubernetesResourceListRequest) ([]*api.
 	if ns == "" {
 		ns = metav1.NamespaceAll
 	}
-	rows, e := c.AppsV1().Deployments(ns).List(context.Background(), metav1.ListOptions{})
+	deployments, e := c.AppsV1().Deployments(ns).List(context.Background(), metav1.ListOptions{})
 	if e != nil {
 		return nil, e
 	}
-	o := make([]*api.KubernetesWorkloadResponse, 0, len(rows.Items))
-	for _, x := range rows.Items {
+	statefulSets, e := c.AppsV1().StatefulSets(ns).List(context.Background(), metav1.ListOptions{})
+	if e != nil {
+		return nil, e
+	}
+	daemonSets, e := c.AppsV1().DaemonSets(ns).List(context.Background(), metav1.ListOptions{})
+	if e != nil {
+		return nil, e
+	}
+	jobs, e := c.BatchV1().Jobs(ns).List(context.Background(), metav1.ListOptions{})
+	if e != nil {
+		return nil, e
+	}
+	cronJobs, e := c.BatchV1().CronJobs(ns).List(context.Background(), metav1.ListOptions{})
+	if e != nil {
+		return nil, e
+	}
+	o := make([]*api.KubernetesWorkloadResponse, 0, len(deployments.Items)+len(statefulSets.Items)+len(daemonSets.Items)+len(jobs.Items)+len(cronJobs.Items))
+	for _, x := range deployments.Items {
 		if r.Keyword != "" && !strings.Contains(strings.ToLower(x.Name), strings.ToLower(r.Keyword)) {
 			continue
 		}
 		o = append(o, workloadResponse(x))
 	}
+	appendWorkload := func(namespace, name, kind, ready, status string, created metav1.Time) {
+		if r.Keyword == "" || strings.Contains(strings.ToLower(name), strings.ToLower(r.Keyword)) {
+			o = append(o, &api.KubernetesWorkloadResponse{Namespace: namespace, Name: name, Kind: kind, Ready: ready, Status: status, CreatedAt: created.Format("2006-01-02 15:04:05")})
+		}
+	}
+	for _, x := range statefulSets.Items {
+		appendWorkload(x.Namespace, x.Name, "StatefulSet", fmt.Sprintf("%d/%d", x.Status.ReadyReplicas, x.Status.Replicas), "Running", x.CreationTimestamp)
+	}
+	for _, x := range daemonSets.Items {
+		appendWorkload(x.Namespace, x.Name, "DaemonSet", fmt.Sprintf("%d/%d", x.Status.NumberReady, x.Status.DesiredNumberScheduled), "Running", x.CreationTimestamp)
+	}
+	for _, x := range jobs.Items {
+		completions := int32(1)
+		if x.Spec.Completions != nil {
+			completions = *x.Spec.Completions
+		}
+		appendWorkload(x.Namespace, x.Name, "Job", fmt.Sprintf("%d/%d", x.Status.Succeeded, completions), jobStatus(x), x.CreationTimestamp)
+	}
+	for _, x := range cronJobs.Items {
+		status := "Active"
+		if x.Spec.Suspend != nil && *x.Spec.Suspend {
+			status = "Suspended"
+		}
+		appendWorkload(x.Namespace, x.Name, "CronJob", fmt.Sprintf("%d active", len(x.Status.Active)), status, x.CreationTimestamp)
+	}
 	return o, nil
+}
+func jobStatus(x batchv1.Job) string {
+	if x.Status.Failed > 0 {
+		return "Failed"
+	}
+	if x.Status.Succeeded > 0 {
+		return "Completed"
+	}
+	return "Running"
+}
+
+func (b *KubernetesBiz) Stats(r *api.KubernetesClusterStatsRequest) (*api.ClusterStats, error) {
+	c, err := b.client(r.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	deployments, _ := c.AppsV1().Deployments(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	daemonSets, _ := c.AppsV1().DaemonSets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	statefulSets, _ := c.AppsV1().StatefulSets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	jobs, _ := c.BatchV1().Jobs(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	result := &api.ClusterStats{NodeCount: len(nodes.Items), PodCount: len(pods.Items), WorkloadCount: len(deployments.Items) + len(daemonSets.Items) + len(statefulSets.Items) + len(jobs.Items)}
+	for _, n := range nodes.Items {
+		result.CPUCapacity += float64(n.Status.Capacity.Cpu().MilliValue()) / 1000
+		result.MemoryCapacity += float64(n.Status.Capacity.Memory().Value())
+		result.CPUAllocatable += float64(n.Status.Allocatable.Cpu().MilliValue()) / 1000
+		result.MemoryAllocatable += float64(n.Status.Allocatable.Memory().Value())
+	}
+	return result, nil
+}
+
+func (b *KubernetesBiz) Events(r *api.KubernetesResourceListRequest) ([]*api.EventInfo, error) {
+	c, err := b.client(r.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	ns := r.Namespace
+	if ns == "" {
+		ns = metav1.NamespaceAll
+	}
+	rows, err := c.CoreV1().Events(ns).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*api.EventInfo, 0, len(rows.Items))
+	for _, x := range rows.Items {
+		if r.Keyword != "" && !strings.Contains(strings.ToLower(x.Message), strings.ToLower(r.Keyword)) {
+			continue
+		}
+		out = append(out, &api.EventInfo{Type: x.Type, Reason: x.Reason, Message: x.Message, Source: x.Source.Component, Count: x.Count, FirstTimestamp: x.FirstTimestamp.Format("2006-01-02 15:04:05"), LastTimestamp: x.LastTimestamp.Format("2006-01-02 15:04:05"), InvolvedObject: api.InvolvedObjectInfo{Kind: x.InvolvedObject.Kind, Name: x.InvolvedObject.Name, Namespace: x.InvolvedObject.Namespace}})
+	}
+	return out, nil
 }
 func workloadResponse(x appsv1.Deployment) *api.KubernetesWorkloadResponse {
 	status := "未知"

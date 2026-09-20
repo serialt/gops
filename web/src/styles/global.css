@@ -171,6 +171,57 @@ select {
   background: #f4fbf1 !important;
 }
 
+.app-data-grid .grid-action.credential {
+  border-color: #d8dcef !important;
+  color: #5e6680 !important;
+  background: #f8f9fc !important;
+}
+
+.app-data-grid .grid-action.sync {
+  border-color: #bcdff6 !important;
+  color: #2878c8 !important;
+  background: #f0f8ff !important;
+}
+
+.app-data-grid .grid-action.compact {
+  padding: 3px 4px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  box-shadow: none !important;
+}
+
+.app-data-grid .grid-action-group.compact {
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.app-data-grid .grid-action-group {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.app-data-grid .grid-action:hover {
+  filter: brightness(.98);
+}
+
+.app-data-grid .grid-action.edit:hover {
+  background: var(--primary-soft) !important;
+}
+
+.app-data-grid .grid-action.permission:hover {
+  background: #eaf8e6 !important;
+}
+
+.app-data-grid .grid-action.delete:hover {
+  background: #ffecec !important;
+}
+
 /* 状态标签不继承 AG Grid 的行高，始终保持紧凑并在单元格内居中。 */
 .app-data-grid .grid-status {
   display: inline-flex !important;

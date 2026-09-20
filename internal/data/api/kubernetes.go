@@ -19,6 +19,19 @@ type KubernetesClusterRequest struct {
 type KubernetesClusterIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
 }
+type KubernetesClusterTestResponse struct {
+	Status  string `json:"status"`
+	Version string `json:"version"`
+}
+type KubernetesClusterSyncResponse struct {
+	Total   int      `json:"total"`
+	Success int      `json:"success"`
+	Failed  int      `json:"failed"`
+	Errors  []string `json:"errors"`
+}
+type KubernetesClusterConfigResponse struct {
+	KubeConfig string `json:"kube_config"`
+}
 type KubernetesClusterResponse struct {
 	ID          int64     `json:"id"`
 	Name        string    `json:"name"`

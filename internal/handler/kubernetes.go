@@ -61,6 +61,46 @@ func (h *KubernetesHandler) DeleteCluster(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// TestCluster POST /api/v1/kubernetes/clusters/test 测试 Kubernetes 集群连接并同步状态。
+func (h *KubernetesHandler) TestCluster(c *gin.Context) {
+	r := new(api.KubernetesClusterIDRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid cluster id")
+		return
+	}
+	d, e := h.biz.Test(r)
+	if e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
+// SyncClusters POST /api/v1/kubernetes/clusters/sync 同步全部 Kubernetes 集群状态。
+func (h *KubernetesHandler) SyncClusters(c *gin.Context) {
+	d, e := h.biz.SyncAll(c.Request.Context())
+	if e != nil {
+		response.Error(c, 500, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
+// GetClusterConfig POST /api/v1/kubernetes/clusters/config 获取 Kubernetes 集群凭证。
+func (h *KubernetesHandler) GetClusterConfig(c *gin.Context) {
+	r := new(api.KubernetesClusterIDRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid cluster id")
+		return
+	}
+	d, e := h.biz.Config(r)
+	if e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
 // ListNodes POST /api/v1/kubernetes/nodes/list 查询 Kubernetes 节点。
 func (h *KubernetesHandler) ListNodes(c *gin.Context) {
 	r := new(api.KubernetesResourceListRequest)
@@ -99,6 +139,51 @@ func (h *KubernetesHandler) ListWorkloads(c *gin.Context) {
 		return
 	}
 	d, e := h.biz.Workloads(r)
+	if e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
+// ListPods POST /api/v1/kubernetes/pods/list 查询 Kubernetes Pod。
+func (h *KubernetesHandler) ListPods(c *gin.Context) {
+	r := new(api.KubernetesResourceListRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid pod query")
+		return
+	}
+	d, e := h.biz.Pods(r)
+	if e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
+// GetClusterStats POST /api/v1/kubernetes/stats/get 查询 Kubernetes 集群统计。
+func (h *KubernetesHandler) GetClusterStats(c *gin.Context) {
+	r := new(api.KubernetesClusterStatsRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid cluster id")
+		return
+	}
+	d, e := h.biz.Stats(r)
+	if e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
+// ListEvents POST /api/v1/kubernetes/events/list 查询 Kubernetes 事件。
+func (h *KubernetesHandler) ListEvents(c *gin.Context) {
+	r := new(api.KubernetesResourceListRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid event query")
+		return
+	}
+	d, e := h.biz.Events(r)
 	if e != nil {
 		response.Error(c, 400, e.Error())
 		return

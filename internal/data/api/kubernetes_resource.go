@@ -5,6 +5,9 @@ type KubernetesResourceListRequest struct {
 	Keyword   string `json:"keyword"`
 	Namespace string `json:"namespace"`
 }
+type KubernetesClusterStatsRequest struct {
+	ClusterID int64 `json:"cluster_id" binding:"required"`
+}
 type KubernetesNodeResponse struct {
 	Name             string            `json:"name"`
 	Status           string            `json:"status"`

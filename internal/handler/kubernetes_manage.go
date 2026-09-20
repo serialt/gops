@@ -1,0 +1,66 @@
+package handler
+
+import (
+	"github.com/gin-gonic/gin"
+	"gops/internal/data/api"
+	"gops/internal/pkg/response"
+)
+
+// ListKubernetesObjects POST /api/v1/kubernetes/resources/list 查询 Kubernetes 白名单资源。
+func (h *KubernetesHandler) ListKubernetesObjects(c *gin.Context) {
+	r := new(api.KubernetesObjectRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid resource query")
+		return
+	}
+	data, err := h.biz.ListObjects(r)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetKubernetesObject POST /api/v1/kubernetes/resources/get 获取 Kubernetes 资源 YAML。
+func (h *KubernetesHandler) GetKubernetesObject(c *gin.Context) {
+	r := new(api.KubernetesObjectRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid resource query")
+		return
+	}
+	data, err := h.biz.GetObjectYAML(r)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// ApplyKubernetesObject POST /api/v1/kubernetes/resources/apply 创建或更新 Kubernetes 资源。
+func (h *KubernetesHandler) ApplyKubernetesObject(c *gin.Context) {
+	r := new(api.KubernetesObjectRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid resource data")
+		return
+	}
+	data, err := h.biz.ApplyObject(r)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// DeleteKubernetesObject POST /api/v1/kubernetes/resources/delete 删除 Kubernetes 资源。
+func (h *KubernetesHandler) DeleteKubernetesObject(c *gin.Context) {
+	r := new(api.KubernetesObjectRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid resource data")
+		return
+	}
+	if err := h.biz.DeleteObject(r); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}

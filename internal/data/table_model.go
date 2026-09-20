@@ -32,6 +32,8 @@ func gopsTable(g *gen.Generator) {
 	auditLoginLog := g.GenerateModel("audit_login_log")
 	auditDataLog := g.GenerateModel("audit_data_log")
 	kubernetesCluster := g.GenerateModel("kubernetes_cluster")
+	kubernetesTerminalSession := g.GenerateModel("kubernetes_terminal_session")
+	kubernetesClusterInspection := g.GenerateModel("kubernetes_cluster_inspection")
 	userRole := g.GenerateModel("user_role")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
 		&field.RelateConfig{
@@ -72,6 +74,8 @@ func gopsTable(g *gen.Generator) {
 		sslDNSProvider,
 		auditOperationLog, auditLoginLog, auditDataLog,
 		kubernetesCluster,
+		kubernetesTerminalSession,
+		kubernetesClusterInspection,
 	)
 
 }

@@ -15,9 +15,9 @@ const TableNameSystemConfig = "system_config"
 // SystemConfig mapped from table <system_config>
 type SystemConfig struct {
 	ConfigKey   string         `gorm:"column:config_key;primaryKey" json:"config_key"`
-	ConfigValue string         `gorm:"column:config_value;not null;default:''" json:"config_value"`
-	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	ConfigValue string         `gorm:"column:config_value;type:TEXT" json:"config_value"`
+	CreatedAt   time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
