@@ -254,7 +254,7 @@ func (b *KubernetesBiz) GetObjectYAML(r *api.KubernetesObjectRequest) (*api.Kube
 	if err != nil {
 		return nil, err
 	}
-	unstructured.RemoveNestedField(item.Object, "metadata", "managedFields")
+	cleanObjectForYAML(item)
 	data, err := json.Marshal(item.Object)
 	if err != nil {
 		return nil, err
@@ -264,6 +264,20 @@ func (b *KubernetesBiz) GetObjectYAML(r *api.KubernetesObjectRequest) (*api.Kube
 		return nil, err
 	}
 	return &api.KubernetesYAMLResponse{YAML: string(content)}, nil
+}
+
+func cleanObjectForYAML(item *unstructured.Unstructured) {
+	for _, field := range []string{"uid", "resourceVersion", "generation", "creationTimestamp", "managedFields", "selfLink"} {
+		unstructured.RemoveNestedField(item.Object, "metadata", field)
+	}
+	unstructured.RemoveNestedField(item.Object, "status")
+	annotations := item.GetAnnotations()
+	delete(annotations, "kubectl.kubernetes.io/last-applied-configuration")
+	if len(annotations) == 0 {
+		unstructured.RemoveNestedField(item.Object, "metadata", "annotations")
+	} else {
+		item.SetAnnotations(annotations)
+	}
 }
 
 func (b *KubernetesBiz) ApplyObject(r *api.KubernetesObjectRequest) (*api.KubernetesObjectResponse, error) {
