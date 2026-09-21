@@ -155,6 +155,8 @@ function handleSelectionChanged(event: any) {
 <style scoped>
 .app-data-grid-shell { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; }
 .app-data-grid { flex: 1; width: 100%; min-height: 0; --ag-font-size: 11px; --ag-font-family: inherit; --ag-border-color: var(--line); --ag-header-background-color: #fafafa; --ag-row-border-color: var(--line); --ag-background-color: #fff; --ag-odd-row-background-color: #fafafa; --ag-header-foreground-color: var(--text); --ag-foreground-color: var(--text); --ag-row-hover-color: #f0f0f0; }
+.app-data-grid :deep(.ag-cell-focus), .app-data-grid :deep(.ag-cell-range-selected) { border-radius: 6px; }
+.app-data-grid :deep(.ag-checkbox-input-wrapper), .app-data-grid :deep(.ag-checkbox-input-wrapper::after) { border-radius: 5px; }
 .grid-pagination { display: flex; justify-content: flex-end; min-height: 30px; padding: 2px 0 0; overflow-x: auto; }
 .grid-pagination :deep(.el-pagination) { flex-wrap: nowrap; min-width: max-content; font-size: 10px; --el-pagination-font-size: 10px; }
 .grid-pagination :deep(.el-pagination .el-select .el-input__wrapper), .grid-pagination :deep(.el-pagination .el-input__wrapper), .grid-pagination :deep(.el-pagination .el-input__inner) { font-size: 10px; }
