@@ -15,6 +15,7 @@
     "ag-grid-vue3": "^36.1.0",
     "axios": "^1.11.0",
     "element-plus": "^2.11.0",
+    "monaco-editor": "^0.56.0",
     "pinia": "^3.0.3",
     "tdesign-vue-next": "^1.20.6",
     "vue": "^3.5.20",
