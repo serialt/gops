@@ -27,6 +27,14 @@ type KubernetesObjectResponse struct {
 	Restarts         int64                     `json:"restarts,omitempty"`
 	PodIP            string                    `json:"pod_ip,omitempty"`
 	Node             string                    `json:"node,omitempty"`
+	ServiceType      string                    `json:"service_type,omitempty"`
+	ClusterIP        string                    `json:"cluster_ip,omitempty"`
+	ExternalIP       string                    `json:"external_ip,omitempty"`
+	Ports            []string                  `json:"ports,omitempty"`
+	EndpointCount    int64                     `json:"endpoint_count,omitempty"`
+	Hosts            []string                  `json:"hosts,omitempty"`
+	Addresses        []string                  `json:"addresses,omitempty"`
+	PolicyTypes      []string                  `json:"policy_types,omitempty"`
 }
 
 type KubernetesResourceValues struct {

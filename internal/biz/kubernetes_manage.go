@@ -191,6 +191,69 @@ spec:
           memory: 64Mi
 `
 
+const serviceYAMLTemplate = `apiVersion: v1
+kind: Service
+metadata:
+  name: example
+  namespace: %s
+spec:
+  type: ClusterIP
+  selector:
+    app: example
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+`
+
+const ingressYAMLTemplate = `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: example
+  namespace: %s
+spec:
+  rules:
+    - host: example.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: example
+                port:
+                  number: 80
+`
+
+const endpointsYAMLTemplate = `apiVersion: v1
+kind: Endpoints
+metadata:
+  name: example
+  namespace: %s
+subsets:
+  - addresses:
+      - ip: 10.0.0.10
+    ports:
+      - name: http
+        port: 80
+        protocol: TCP
+`
+
+const networkPolicyYAMLTemplate = `apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: example
+  namespace: %s
+spec:
+  podSelector:
+    matchLabels:
+      app: example
+  policyTypes:
+    - Ingress
+    - Egress
+`
+
 func (b *KubernetesBiz) dynamicClient(clusterID int64) (dynamic.Interface, error) {
 	var cluster model.KubernetesCluster
 	if err := b.db.First(&cluster, clusterID).Error; err != nil {
@@ -243,6 +306,14 @@ func (b *KubernetesBiz) ResourceTemplate(r *api.KubernetesObjectRequest) (*api.K
 		content = fmt.Sprintf(cronJobYAMLTemplate, namespace)
 	case "pods":
 		content = fmt.Sprintf(podYAMLTemplate, namespace)
+	case "services":
+		content = fmt.Sprintf(serviceYAMLTemplate, namespace)
+	case "ingresses":
+		content = fmt.Sprintf(ingressYAMLTemplate, namespace)
+	case "endpoints":
+		content = fmt.Sprintf(endpointsYAMLTemplate, namespace)
+	case "networkpolicies":
+		content = fmt.Sprintf(networkPolicyYAMLTemplate, namespace)
 	default:
 		content = prefix
 	}
@@ -279,9 +350,99 @@ func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.Kube
 		}
 		row := &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(item), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}
 		fillWorkloadObject(row, item)
+		fillNetworkObject(row, item)
 		out = append(out, row)
 	}
 	return out, nil
+}
+
+func fillNetworkObject(row *api.KubernetesObjectResponse, item unstructured.Unstructured) {
+	switch row.Kind {
+	case "Service":
+		row.ServiceType, _, _ = unstructured.NestedString(item.Object, "spec", "type")
+		row.ClusterIP, _, _ = unstructured.NestedString(item.Object, "spec", "clusterIP")
+		loadBalancer, _, _ := unstructured.NestedSlice(item.Object, "status", "loadBalancer", "ingress")
+		row.ExternalIP = firstNetworkAddress(loadBalancer)
+		ports, _, _ := unstructured.NestedSlice(item.Object, "spec", "ports")
+		for _, raw := range ports {
+			port, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			protocol, _ := port["protocol"].(string)
+			if protocol == "" {
+				protocol = "TCP"
+			}
+			value, target := fmt.Sprint(port["port"]), fmt.Sprint(port["targetPort"])
+			if target == "" || target == "<nil>" {
+				target = value
+			}
+			row.Ports = append(row.Ports, fmt.Sprintf("%s: %s → %s", protocol, value, target))
+		}
+	case "Ingress":
+		rules, _, _ := unstructured.NestedSlice(item.Object, "spec", "rules")
+		for _, raw := range rules {
+			if rule, ok := raw.(map[string]interface{}); ok {
+				if host, ok := rule["host"].(string); ok && host != "" {
+					row.Hosts = append(row.Hosts, host)
+				}
+			}
+		}
+		loadBalancer, _, _ := unstructured.NestedSlice(item.Object, "status", "loadBalancer", "ingress")
+		for _, raw := range loadBalancer {
+			if value := networkAddress(raw); value != "" {
+				row.Addresses = append(row.Addresses, value)
+			}
+		}
+	case "Endpoints":
+		subsets, _, _ := unstructured.NestedSlice(item.Object, "subsets")
+		for _, raw := range subsets {
+			subset, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if addresses, ok := subset["addresses"].([]interface{}); ok {
+				row.EndpointCount += int64(len(addresses))
+				for _, address := range addresses {
+					if value := networkAddress(address); value != "" {
+						row.Addresses = append(row.Addresses, value)
+					}
+				}
+			}
+			if ports, ok := subset["ports"].([]interface{}); ok {
+				for _, portRaw := range ports {
+					if port, ok := portRaw.(map[string]interface{}); ok {
+						row.Ports = append(row.Ports, fmt.Sprintf("%v: %v", port["protocol"], port["port"]))
+					}
+				}
+			}
+		}
+	case "NetworkPolicy":
+		row.PolicyTypes, _, _ = unstructured.NestedStringSlice(item.Object, "spec", "policyTypes")
+	}
+}
+
+func firstNetworkAddress(values []interface{}) string {
+	for _, raw := range values {
+		if value := networkAddress(raw); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func networkAddress(raw interface{}) string {
+	value, ok := raw.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	if ip, ok := value["ip"].(string); ok && ip != "" {
+		return ip
+	}
+	if hostname, ok := value["hostname"].(string); ok {
+		return hostname
+	}
+	return ""
 }
 
 func fillWorkloadObject(row *api.KubernetesObjectResponse, item unstructured.Unstructured) {
