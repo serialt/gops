@@ -17,8 +17,34 @@ let contentSubscription: monaco.IDisposable | undefined
 onMounted(() => {
   if (!host.value) return
   model = monaco.editor.createModel(props.modelValue, 'yaml')
+  monaco.editor.defineTheme('kubernetes-yaml-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'type', foreground: '6F42C1', fontStyle: 'bold' },
+      { token: 'keyword', foreground: '6F42C1', fontStyle: 'bold' },
+      { token: 'string', foreground: '238636' },
+      { token: 'number', foreground: '0969DA' },
+      { token: 'number.float', foreground: '0969DA' },
+      { token: 'comment', foreground: '7D8590', fontStyle: 'italic' },
+      { token: 'operators', foreground: 'CF5700' },
+      { token: 'tag', foreground: 'CF222E' },
+      { token: 'namespace', foreground: '8250DF' },
+    ],
+    colors: {
+      'editor.background': '#FFFFFF',
+      'editor.foreground': '#24292F',
+      'editorLineNumber.foreground': '#9AA0AA',
+      'editorLineNumber.activeForeground': '#635BFF',
+      'editor.lineHighlightBackground': '#F7F7FF',
+      'editorIndentGuide.background1': '#E6E8EE',
+      'editorIndentGuide.activeBackground1': '#A9A4FF',
+      'editor.selectionBackground': '#DCD9FF',
+    },
+  })
   editor = monaco.editor.create(host.value, {
     model,
+    theme: 'kubernetes-yaml-light',
     automaticLayout: true,
     minimap: { enabled: true },
     lineNumbers: 'on',
