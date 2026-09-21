@@ -319,6 +319,43 @@ func (b *KubernetesBiz) Workloads(r *api.KubernetesResourceListRequest) ([]*api.
 	}
 	return o, nil
 }
+
+func (b *KubernetesBiz) WorkloadStats(r *api.KubernetesResourceListRequest) (*api.KubernetesWorkloadStatsResponse, error) {
+	c, err := b.client(r.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	namespace := r.Namespace
+	if namespace == "" {
+		namespace = metav1.NamespaceAll
+	}
+	ctx := context.Background()
+	deployments, err := c.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	statefulSets, err := c.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	daemonSets, err := c.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	jobs, err := c.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	cronJobs, err := c.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	pods, err := c.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return &api.KubernetesWorkloadStatsResponse{Deployment: int64(len(deployments.Items)), StatefulSet: int64(len(statefulSets.Items)), DaemonSet: int64(len(daemonSets.Items)), Job: int64(len(jobs.Items)), CronJob: int64(len(cronJobs.Items)), Pod: int64(len(pods.Items))}, nil
+}
 func jobStatus(x batchv1.Job) string {
 	if x.Status.Failed > 0 {
 		return "Failed"

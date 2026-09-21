@@ -36,6 +36,21 @@ func (h *KubernetesHandler) GetKubernetesObject(c *gin.Context) {
 	response.OK(c, data)
 }
 
+// GetKubernetesResourceTemplate POST /api/v1/kubernetes/resources/template 获取 Kubernetes 资源创建模板。
+func (h *KubernetesHandler) GetKubernetesResourceTemplate(c *gin.Context) {
+	r := new(api.KubernetesObjectRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid resource template query")
+		return
+	}
+	data, err := h.biz.ResourceTemplate(r)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
 // ApplyKubernetesObject POST /api/v1/kubernetes/resources/apply 创建或更新 Kubernetes 资源。
 func (h *KubernetesHandler) ApplyKubernetesObject(c *gin.Context) {
 	r := new(api.KubernetesObjectRequest)

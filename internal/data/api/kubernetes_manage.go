@@ -10,13 +10,28 @@ type KubernetesObjectRequest struct {
 }
 
 type KubernetesObjectResponse struct {
-	Name      string            `json:"name"`
-	Namespace string            `json:"namespace"`
-	Kind      string            `json:"kind"`
-	Status    string            `json:"status"`
-	Age       string            `json:"age"`
-	Labels    map[string]string `json:"labels"`
-	CreatedAt string            `json:"created_at"`
+	Name             string                    `json:"name"`
+	Namespace        string                    `json:"namespace"`
+	Kind             string                    `json:"kind"`
+	Status           string                    `json:"status"`
+	Age              string                    `json:"age"`
+	Labels           map[string]string         `json:"labels"`
+	CreatedAt        string                    `json:"created_at"`
+	Ready            string                    `json:"ready,omitempty"`
+	Images           []string                  `json:"images,omitempty"`
+	Requests         *KubernetesResourceValues `json:"requests,omitempty"`
+	Limits           *KubernetesResourceValues `json:"limits,omitempty"`
+	Schedule         string                    `json:"schedule,omitempty"`
+	LastScheduleTime string                    `json:"last_schedule_time,omitempty"`
+	Suspended        bool                      `json:"suspended,omitempty"`
+	Restarts         int64                     `json:"restarts,omitempty"`
+	PodIP            string                    `json:"pod_ip,omitempty"`
+	Node             string                    `json:"node,omitempty"`
+}
+
+type KubernetesResourceValues struct {
+	CPU    string `json:"cpu"`
+	Memory string `json:"memory"`
 }
 
 type KubernetesYAMLResponse struct {

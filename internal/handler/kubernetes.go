@@ -146,6 +146,21 @@ func (h *KubernetesHandler) ListWorkloads(c *gin.Context) {
 	response.OK(c, d)
 }
 
+// WorkloadStats POST /api/v1/kubernetes/workloads/stats 查询 Kubernetes 工作负载统计。
+func (h *KubernetesHandler) WorkloadStats(c *gin.Context) {
+	r := new(api.KubernetesResourceListRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid workload stats query")
+		return
+	}
+	d, e := h.biz.WorkloadStats(r)
+	if e != nil {
+		response.Error(c, 400, e.Error())
+		return
+	}
+	response.OK(c, d)
+}
+
 // ListPods POST /api/v1/kubernetes/pods/list 查询 Kubernetes Pod。
 func (h *KubernetesHandler) ListPods(c *gin.Context) {
 	r := new(api.KubernetesResourceListRequest)

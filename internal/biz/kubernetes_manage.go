@@ -57,6 +57,45 @@ func resourceSpec(name string) (kubernetesResourceSpec, error) {
 	return spec, nil
 }
 
+func (b *KubernetesBiz) ResourceTemplate(r *api.KubernetesObjectRequest) (*api.KubernetesYAMLResponse, error) {
+	spec, err := resourceSpec(r.Resource)
+	if err != nil {
+		return nil, err
+	}
+	namespace := r.Namespace
+	if namespace == "" {
+		namespace = "default"
+	}
+	metadata := "metadata:\n  name: example\n"
+	if spec.namespaced {
+		metadata += fmt.Sprintf("  namespace: %s\n", namespace)
+	}
+	apiVersion := spec.gvr.Version
+	if spec.gvr.Group != "" {
+		apiVersion = spec.gvr.Group + "/" + spec.gvr.Version
+	}
+	prefix := fmt.Sprintf("apiVersion: %s\nkind: %s\n%s", apiVersion, spec.kind, metadata)
+	container := "      containers:\n        - name: example\n          image: nginx:latest\n"
+	var content string
+	switch r.Resource {
+	case "deployments":
+		content = prefix + "spec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: example\n  template:\n    metadata:\n      labels:\n        app: example\n    spec:\n" + container
+	case "statefulsets":
+		content = prefix + "spec:\n  serviceName: example\n  replicas: 1\n  selector:\n    matchLabels:\n      app: example\n  template:\n    metadata:\n      labels:\n        app: example\n    spec:\n" + container
+	case "daemonsets":
+		content = prefix + "spec:\n  selector:\n    matchLabels:\n      app: example\n  template:\n    metadata:\n      labels:\n        app: example\n    spec:\n" + container
+	case "jobs":
+		content = prefix + "spec:\n  template:\n    spec:\n      restartPolicy: Never\n" + container
+	case "cronjobs":
+		content = prefix + "spec:\n  schedule: \"*/5 * * * *\"\n  jobTemplate:\n    spec:\n      template:\n        spec:\n          restartPolicy: OnFailure\n          containers:\n            - name: example\n              image: nginx:latest\n"
+	case "pods":
+		content = prefix + "spec:\n  containers:\n    - name: example\n      image: nginx:latest\n"
+	default:
+		content = prefix
+	}
+	return &api.KubernetesYAMLResponse{YAML: content}, nil
+}
+
 func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.KubernetesObjectResponse, error) {
 	spec, err := resourceSpec(r.Resource)
 	if err != nil {
@@ -85,9 +124,103 @@ func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.Kube
 		if r.Keyword != "" && !strings.Contains(strings.ToLower(item.GetName()), strings.ToLower(r.Keyword)) {
 			continue
 		}
-		out = append(out, &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(item), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")})
+		row := &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(item), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}
+		fillWorkloadObject(row, item)
+		out = append(out, row)
 	}
 	return out, nil
+}
+
+func fillWorkloadObject(row *api.KubernetesObjectResponse, item unstructured.Unstructured) {
+	if desired, found, _ := unstructured.NestedInt64(item.Object, "spec", "replicas"); found {
+		ready, _, _ := unstructured.NestedInt64(item.Object, "status", "readyReplicas")
+		row.Ready = fmt.Sprintf("%d/%d", ready, desired)
+	}
+	if item.GetKind() == "DaemonSet" || row.Kind == "DaemonSet" {
+		desired, _, _ := unstructured.NestedInt64(item.Object, "status", "desiredNumberScheduled")
+		ready, _, _ := unstructured.NestedInt64(item.Object, "status", "numberReady")
+		row.Ready = fmt.Sprintf("%d/%d", ready, desired)
+	}
+	if row.Kind == "Job" {
+		desired, found, _ := unstructured.NestedInt64(item.Object, "spec", "completions")
+		if !found {
+			desired = 1
+		}
+		ready, _, _ := unstructured.NestedInt64(item.Object, "status", "succeeded")
+		row.Ready = fmt.Sprintf("%d/%d", ready, desired)
+	}
+	if row.Kind == "CronJob" {
+		row.Schedule, _, _ = unstructured.NestedString(item.Object, "spec", "schedule")
+		row.Suspended, _, _ = unstructured.NestedBool(item.Object, "spec", "suspend")
+		row.LastScheduleTime, _, _ = unstructured.NestedString(item.Object, "status", "lastScheduleTime")
+	}
+	containers, found, _ := unstructured.NestedSlice(item.Object, "spec", "template", "spec", "containers")
+	if row.Kind == "Pod" {
+		containers, found, _ = unstructured.NestedSlice(item.Object, "spec", "containers")
+	}
+	requests := &api.KubernetesResourceValues{}
+	limits := &api.KubernetesResourceValues{}
+	for _, raw := range containers {
+		container, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if image, ok := container["image"].(string); ok {
+			row.Images = append(row.Images, image)
+		}
+		resources, _ := container["resources"].(map[string]interface{})
+		addResourceValues(requests, resources["requests"])
+		addResourceValues(limits, resources["limits"])
+	}
+	if found {
+		row.Requests, row.Limits = requests, limits
+	}
+	if row.Kind == "Pod" {
+		row.Ready = podReady(item)
+		row.PodIP, _, _ = unstructured.NestedString(item.Object, "status", "podIP")
+		row.Node, _, _ = unstructured.NestedString(item.Object, "spec", "nodeName")
+		statuses, _, _ := unstructured.NestedSlice(item.Object, "status", "containerStatuses")
+		for _, raw := range statuses {
+			if status, ok := raw.(map[string]interface{}); ok {
+				if value, ok := status["restartCount"].(int64); ok {
+					row.Restarts += value
+				}
+			}
+		}
+	}
+}
+
+func addResourceValues(target *api.KubernetesResourceValues, raw interface{}) {
+	values, ok := raw.(map[string]interface{})
+	if !ok {
+		return
+	}
+	if value, ok := values["cpu"].(string); ok {
+		target.CPU = joinResource(target.CPU, value)
+	}
+	if value, ok := values["memory"].(string); ok {
+		target.Memory = joinResource(target.Memory, value)
+	}
+}
+
+func joinResource(current, value string) string {
+	if current == "" {
+		return value
+	}
+	return current + " + " + value
+}
+
+func podReady(item unstructured.Unstructured) string {
+	statuses, _, _ := unstructured.NestedSlice(item.Object, "status", "containerStatuses")
+	ready := 0
+	for _, raw := range statuses {
+		if status, ok := raw.(map[string]interface{}); ok {
+			if value, _ := status["ready"].(bool); value {
+				ready++
+			}
+		}
+	}
+	return fmt.Sprintf("%d/%d", ready, len(statuses))
 }
 
 func objectStatus(item unstructured.Unstructured) string {

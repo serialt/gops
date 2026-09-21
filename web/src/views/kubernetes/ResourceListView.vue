@@ -8,6 +8,48 @@ import AppDataGrid from '@/components/AppDataGrid.vue'
 import { applyKubernetesObject, deleteKubernetesNode, deleteKubernetesObject, drainKubernetesNode, getKubernetesClusterStats, getKubernetesObject, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesPods, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
 const route = useRoute(); const kind = computed(() => String(route.meta.kubernetesResource || 'nodes')); const title = computed(() => kind.value === 'nodes' ? '节点管理' : kind.value === 'namespaces' ? '命名空间' : kind.value === 'pods' ? 'Pod 管理' : '工作负载'); const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), keyword = ref(''), rows = ref<any[]>([])
 const statusFilter = ref(''), roleFilter = ref(''), namespaceStatus = ref(''), refreshing = ref(false)
+const cloudTTYDialog = ref(false)
+const cloudTTYCommand = `# 1. 安装并等待 Pod 运行起来
+helm repo add cloudtty https://cloudtty.github.io/cloudtty
+helm repo update
+helm install cloudtty-operator cloudtty/cloudtty \\
+  --version 0.5.0 \\
+  --create-namespace \\
+  --namespace cloudtty-system
+
+# 2. 创建 cloudshell.yaml
+cat <<'EOF' > cloudshell.yaml
+apiVersion: cloudshell.cloudtty.io/v1alpha1
+kind: CloudShell
+metadata:
+  name: permanent-terminal
+  namespace: cloudtty-system
+spec:
+  commandAction: "bash -il"
+  exposureMode: NodePort
+  once: false
+  cleanup: false
+  ttlSecondsAfterStarted: 315360000
+  urlArg: true
+  env:
+    - name: TTYD_WRITABLE
+      value: "true"
+    - name: TTYD_SERVER_BUFFER_SIZE
+      value: "4096"
+    - name: TTYD_CLIENT_BUFFER_SIZE
+      value: "4096"
+  ttydClientOptions:
+    fontSize: "14"
+    fontFamily: "Monaco, Menlo, Consolas, 'Courier New', monospace"
+    cursorBlink: "true"
+    rendererType: "canvas"
+  image: "cloudshell/cloudshell:latest"
+EOF
+
+kubectl apply -f cloudshell.yaml
+
+# 3. 观察 CloudShell 状态并获取访问入口
+kubectl get cloudshell -n cloudtty-system -w`
 const nodeDialog = ref(false), nodeSaving = ref(false), nodeForm = ref({ name: '', labels: '', schedulable: true })
 const namespaceLabelDialog = ref(false), namespaceLabelEditing = ref(false), namespaceLabelSaving = ref(false), selectedNamespace = ref<KubernetesNamespace | null>(null), namespaceLabelRows = ref<{ key:string; value:string }[]>([])
 const nodeLabelDialog = ref(false), nodeLabelEditing = ref(false), nodeLabelSaving = ref(false), selectedLabelNode = ref<KubernetesNode | null>(null), nodeLabelRows = ref<{ key:string; value:string }[]>([])
@@ -43,12 +85,19 @@ async function load() {
         calculateNamespaceStats(allResult?.data.data || rows.value)
         return
     }
-    const r = kind.value === 'pods' ? await listKubernetesPods(clusterID.value, keyword.value) : await listKubernetesWorkloads(clusterID.value, keyword.value)
+    if (kind.value === 'pods') {
+        const r = await listKubernetesPods(clusterID.value, keyword.value)
+        rows.value = r.data.data
+        return
+    }
+    const r = await listKubernetesWorkloads(clusterID.value, keyword.value)
     rows.value = r.data.data
 }
 watch([clusterID, keyword, kind, statusFilter, roleFilter, namespaceStatus], load); loadClusters().then(load)
 const displayRows = computed(() => rows.value)
 async function refresh() { refreshing.value = true; try { await load() } finally { refreshing.value = false } }
+async function copyCloudTTYCommand() { await navigator.clipboard.writeText(cloudTTYCommand); ElMessage.success('部署命令已复制') }
+function finishCloudTTYDeployment() { cloudTTYDialog.value = false; ElMessage.success('已记录 CloudTTY 部署完成') }
 function editNode(node: KubernetesNode) { nodeForm.value = { name: node.name, labels: JSON.stringify(node.labels || {}, null, 2), schedulable: node.schedulable }; nodeDialog.value = true }
 async function saveNode() {
     let labels: Record<string, string>
@@ -162,7 +211,7 @@ const adaptiveColumns = computed<ColDef[]>(() => {
             <div class="stat-card pods"><div class="stat-icon">◇</div><div class="stat-content"><span>标签总数</span><strong>{{ namespaceStats.labels }}</strong></div></div>
             <div class="stat-card cpu"><div class="stat-icon">⌁</div><div class="stat-content"><span>平均运行时间</span><strong>{{ namespaceStats.averageAge }}</strong></div></div>
         </div>
-        <div v-if="kind === 'nodes'" class="node-filters"><el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索节点名称或 IP" clearable/><el-select v-model="statusFilter" placeholder="节点状态" clearable><el-option label="正常" value="Ready"/><el-option label="异常" value="NotReady"/></el-select><el-select v-model="roleFilter" placeholder="节点角色" clearable><el-option label="Master" value="master"/><el-option label="Worker" value="worker"/></el-select></div>
+        <div v-if="kind === 'nodes'" class="node-filters"><el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索节点名称或 IP" clearable/><el-select v-model="statusFilter" placeholder="节点状态" clearable><el-option label="正常" value="Ready"/><el-option label="异常" value="NotReady"/></el-select><el-select v-model="roleFilter" placeholder="节点角色" clearable><el-option label="Master" value="master"/><el-option label="Worker" value="worker"/></el-select><el-button type="primary" plain @click="cloudTTYDialog = true">部署 CloudTTY</el-button></div>
         <div v-else-if="kind === 'namespaces'" class="node-filters"><el-input v-model="keyword" :prefix-icon="Search" placeholder="搜索命名空间" clearable/><el-select v-model="namespaceStatus" placeholder="命名空间状态" clearable><el-option label="正常" value="Active"/><el-option label="终止中" value="Terminating"/></el-select></div>
         <AppDataGrid class="grid" :row-data="displayRows" :column-defs="adaptiveColumns" pagination />
         <div v-if="nodeMenu.visible" class="node-action-menu" :style="{left:`${nodeMenu.x}px`,top:`${nodeMenu.y}px`}" @mouseleave="closeNodeMenu"><button @click="openNodeShell">Shell</button><button @click="openNodeYaml">YAML</button><div class="menu-divider"></div><button @click="drainNode">节点排空</button><button @click="setNodeSchedulable(false)">设为不可调度</button><button @click="setNodeSchedulable(true)">设为可调度</button></div>
@@ -170,6 +219,14 @@ const adaptiveColumns = computed<ColDef[]>(() => {
         <el-dialog v-model="nodeYamlDialog" :title="`节点 YAML · ${nodeMenu.node?.name || ''}`" width="60%" destroy-on-close><el-input v-model="nodeYaml" type="textarea" :rows="22" class="yaml-editor"/><template #footer><el-button @click="nodeYamlDialog=false">取消</el-button><el-button type="primary" :loading="nodeYamlSaving" @click="saveNodeYaml">保存</el-button></template></el-dialog>
         <el-dialog v-model="namespaceYamlDialog" :title="`命名空间 YAML · ${namespaceMenu.namespace?.name || ''}`" width="60%" destroy-on-close><el-input v-model="namespaceYaml" type="textarea" :rows="22" class="yaml-editor"/><template #footer><el-button @click="namespaceYamlDialog=false">取消</el-button><el-button type="primary" :loading="namespaceYamlSaving" @click="saveNamespaceYaml">保存</el-button></template></el-dialog>
         <el-dialog v-model="nodeDialog" title="编辑节点" width="520px" destroy-on-close><el-form label-width="90px"><el-form-item label="节点名称"><el-input v-model="nodeForm.name" disabled/></el-form-item><el-form-item label="允许调度"><el-switch v-model="nodeForm.schedulable"/></el-form-item><el-form-item label="节点标签"><el-input v-model="nodeForm.labels" type="textarea" :rows="10" placeholder="请输入 JSON 格式的节点标签"/></el-form-item></el-form><template #footer><el-button @click="nodeDialog=false">取消</el-button><el-button type="primary" :loading="nodeSaving" @click="saveNode">保存</el-button></template></el-dialog>
+        <el-dialog v-model="cloudTTYDialog" class="cloudtty-dialog" title="部署 CloudTTY" width="min(980px, 82vw)" top="4vh" :close-on-click-modal="false" destroy-on-close>
+            <div class="cloudtty-content">
+                <el-alert type="info" :closable="false" show-icon><template #title>CloudTTY 是一个 Kubernetes Web Terminal 解决方案</template><div class="cloudtty-intro">可提供节点 Shell、文件上传/下载、多标签页和会话审计录制能力。</div></el-alert>
+                <section class="cloudtty-steps"><strong>部署步骤</strong><ol><li class="active">复制下方命令</li><li>在集群控制节点执行命令</li><li>等待部署完成（约 2–3 分钟）</li><li>点击“我已完成部署”检查部署状态</li></ol></section>
+                <section class="cloudtty-command"><div class="command-title"><strong>部署命令</strong><el-button type="primary" plain @click="copyCloudTTYCommand">复制命令</el-button></div><pre><code>{{ cloudTTYCommand }}</code></pre></section>
+            </div>
+            <template #footer><el-button @click="cloudTTYDialog = false">关闭</el-button><el-button type="success" @click="finishCloudTTYDeployment">我已完成部署</el-button></template>
+        </el-dialog>
         <el-dialog v-model="namespaceLabelDialog" class="namespace-label-dialog" :title="namespaceLabelEditing ? '编辑命名空间标签' : '命名空间标签'" width="60%" destroy-on-close>
             <div v-if="!namespaceLabelEditing" class="namespace-label-view"><div class="namespace-label-head"><strong>Key</strong><strong>Value</strong></div><div v-for="item in namespaceLabelRows" :key="item.key" class="namespace-label-view-row"><code>{{ item.key }}</code><span>{{ item.value || '-' }}</span></div><el-empty v-if="!namespaceLabelRows.length" description="暂无标签" :image-size="54"/></div>
             <div v-else class="namespace-label-editor"><div class="namespace-label-editor-title"><span>编辑 {{ selectedNamespace?.name }} 的标签</span><strong>共 {{ namespaceLabelRows.length }} 个标签</strong></div><div v-for="(item,index) in namespaceLabelRows" :key="index" class="namespace-label-edit-row"><span class="row-index">{{ index + 1 }}</span><el-input v-model="item.key" placeholder="Key"/><span>=</span><el-input v-model="item.value" placeholder="Value"/><el-button type="danger" plain @click="removeNamespaceLabel(index)">删除</el-button></div><el-button class="add-label-button" plain @click="addNamespaceLabel">＋ 添加标签</el-button></div>
@@ -249,6 +306,7 @@ const adaptiveColumns = computed<ColDef[]>(() => {
     .node-filters { justify-content:flex-start; padding:10px 14px }
     .node-filters .el-input { width:240px }
     .node-filters .el-select { width:150px }
+    .node-filters .el-button { margin-left:0; white-space:nowrap }
     .grid :deep(.node-status),.grid :deep(.node-role) { display:inline-flex; align-items:center; justify-content:center; padding:3px 9px; border-radius:5px; font-size:11px; line-height:1.2 }
     .grid :deep(.node-status.is-ready) { color:#247d31; background:#eaf7e8; border:1px solid #9bd393 }
     .grid :deep(.node-status.is-abnormal) { color:#b54747; background:#fff0f0; border:1px solid #efb1b1 }
@@ -264,6 +322,18 @@ const adaptiveColumns = computed<ColDef[]>(() => {
     .grid :deep(.namespace-label-icon) { font-size:25px; line-height:1; transform:rotate(-45deg) }
     .grid :deep(.namespace-label-badge) { position:absolute; top:0; right:0; display:flex; min-width:16px; height:16px; align-items:center; justify-content:center; padding:0 3px; border-radius:8px; background:#d7a91f; color:#3d3107; font-size:9px; font-weight:700; line-height:16px }
     .namespace-label-dialog :deep(.el-dialog),.namespace-label-dialog :deep(.el-dialog__header),.namespace-label-dialog :deep(.el-dialog__body),.namespace-label-dialog :deep(.el-dialog__footer) { background:#fff }
+    :global(.cloudtty-dialog),:global(.cloudtty-dialog .el-dialog__header),:global(.cloudtty-dialog .el-dialog__body),:global(.cloudtty-dialog .el-dialog__footer) { background:#fff }
+    .cloudtty-dialog :deep(.el-dialog__body) { max-height:78vh; padding-top:10px; overflow:auto }
+    .cloudtty-content { display:flex; flex-direction:column; gap:14px; color:var(--text) }
+    .cloudtty-intro { padding-top:5px; color:var(--text-soft); font-size:11px }
+    .cloudtty-steps { display:grid; grid-template-columns:90px minmax(0,1fr); align-items:start; gap:12px; padding:4px 2px }
+    .cloudtty-steps>strong { padding-top:3px }
+    .cloudtty-steps ol { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style-position:inside; color:var(--text-soft) }
+    .cloudtty-steps li { padding:8px 10px; border:1px solid var(--line); border-radius:7px; background:#fff }
+    .cloudtty-steps li.active { color:var(--primary); border-color:color-mix(in srgb,var(--primary) 35%,white); background:color-mix(in srgb,var(--primary) 5%,white) }
+    .cloudtty-command { min-width:0 }
+    .command-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px }
+    .cloudtty-command pre { max-height:48vh; margin:0; padding:16px 18px; overflow:auto; border:1px solid #252b37; border-radius:8px; background:#0e1117; color:#f4cc45; font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space:pre }
     .namespace-label-head,.namespace-label-view-row { display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:20px; padding:10px 14px; border-bottom:1px solid var(--line) }
     .namespace-label-head { color:var(--text-soft) }.namespace-label-view-row code { width:max-content; max-width:100%; padding:5px 9px; border:1px solid #ead79b; border-radius:6px; background:#fff; color:#9a7312; overflow-wrap:anywhere }
     .namespace-label-editor { display:flex; flex-direction:column; gap:12px }.namespace-label-editor-title { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--text) }.namespace-label-editor-title strong { color:#a77910 }
@@ -287,5 +357,8 @@ const adaptiveColumns = computed<ColDef[]>(() => {
         .node-header { align-items:flex-start; flex-direction:column }
         .node-header-actions,.node-filters { width:100%; flex-wrap:wrap }
         .node-header-actions .el-select,.node-filters .el-input,.node-filters .el-select { width:100% }
+        .node-filters .el-button { width:100% }
+        .cloudtty-steps { grid-template-columns:1fr }
+        .cloudtty-steps ol { grid-template-columns:1fr }
     }
 </style>

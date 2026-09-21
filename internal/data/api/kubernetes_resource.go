@@ -87,6 +87,14 @@ type KubernetesWorkloadResponse struct {
 	Status    string `json:"status"`
 	CreatedAt string `json:"created_at"`
 }
+type KubernetesWorkloadStatsResponse struct {
+	Deployment  int64 `json:"deployment"`
+	StatefulSet int64 `json:"stateful_set"`
+	DaemonSet   int64 `json:"daemon_set"`
+	Job         int64 `json:"job"`
+	CronJob     int64 `json:"cron_job"`
+	Pod         int64 `json:"pod"`
+}
 
 // PodInfo Pod信息
 type PodInfo struct {
