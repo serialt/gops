@@ -7,7 +7,7 @@ import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
   getWorker: () => new EditorWorker(),
 }
 
-const props = withDefaults(defineProps<{ modelValue: string; minHeight?: string }>(), { minHeight: '440px' })
+const props = withDefaults(defineProps<{ modelValue: string; minHeight?: string }>(), { minHeight: '500px' })
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const host = ref<HTMLDivElement>()
 let editor: monaco.editor.IStandaloneCodeEditor | undefined
@@ -65,6 +65,7 @@ onMounted(() => {
     lineHeight: 20,
     contextmenu: true,
     smoothScrolling: true,
+    scrollbar: { verticalScrollbarSize: 4, horizontalScrollbarSize: 4, useShadows: false },
   })
   contentSubscription = model.onDidChangeContent(() => emit('update:modelValue', model?.getValue() ?? ''))
 })

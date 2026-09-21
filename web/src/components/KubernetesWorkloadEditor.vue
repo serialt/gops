@@ -7,7 +7,7 @@ import KubernetesContainerConfig from '@/components/KubernetesContainerConfig.vu
 type Pair = { key: string; value: string }
 type Container = Record<string, any> & { name?: string; image?: string; imagePullPolicy?: string; command?: string[]; args?: string[]; env?: Array<{ name: string; value?: string }> }
 
-const props = defineProps<{ modelValue: boolean; yaml: string; saving?: boolean }>()
+const props = defineProps<{ modelValue: boolean; yaml: string; saving?: boolean; createMode?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; save: [yaml: string] }>()
 const visible = computed({ get: () => props.modelValue, set: value => emit('update:modelValue', value) })
 const activeTab = ref('containers')
@@ -101,13 +101,13 @@ onBeforeUnmount(stopSidebarResize)
 </script>
 
 <template>
-  <el-dialog v-model="visible" title="编辑工作负载" width="min(1040px,calc(100vw - 32px))" class="workload-editor-dialog" align-center :close-on-click-modal="false" destroy-on-close>
+  <el-dialog v-model="visible" :title="createMode ? '创建工作负载' : '编辑工作负载'" width="min(1040px,calc(100vw - 32px))" class="workload-editor-dialog" align-center :close-on-click-modal="false" destroy-on-close>
     <div ref="editorRoot" class="workload-editor" :class="{ 'sidebar-collapsed': sidebarCollapsed }" :style="{ gridTemplateColumns: sidebarCollapsed ? '0 2px minmax(0,1fr)' : `${sidebarWidth}px 2px minmax(0,1fr)` }">
       <aside class="basic-panel">
         <header><span>▣</span><strong>基础信息</strong></header>
         <div class="basic-content">
-          <label>名称<el-input v-model="metadata.name" disabled/></label>
-          <label>命名空间<el-input v-model="metadata.namespace" disabled/></label>
+          <label>名称<el-input v-model="metadata.name" :disabled="!createMode" placeholder="请输入工作负载名称"/></label>
+          <label>命名空间<el-input v-model="metadata.namespace" :disabled="!createMode" placeholder="请输入命名空间"/></label>
           <label v-if="supportsReplicas">副本数<el-input-number v-model="workloadSpec.replicas" :min="0" :max="1000"/></label>
           <section class="pair-section"><div><strong>标签</strong><el-button link :icon="Plus" @click="addPair(labels)">添加</el-button></div><div v-for="(item,index) in labels" :key="index" class="pair-row"><el-input v-model="item.key" placeholder="key"/><span>=</span><el-input v-model="item.value" placeholder="value"/><el-button link type="danger" :icon="Delete" @click="labels.splice(index,1)"/></div><el-empty v-if="!labels.length" description="暂无标签" :image-size="42"/></section>
           <section class="pair-section"><div><strong>注解</strong><el-button link :icon="Plus" @click="addPair(annotations)">添加</el-button></div><div v-for="(item,index) in annotations" :key="index" class="pair-row"><el-input v-model="item.key" placeholder="key"/><span>=</span><el-input v-model="item.value" placeholder="value"/><el-button link type="danger" :icon="Delete" @click="annotations.splice(index,1)"/></div><el-empty v-if="!annotations.length" description="暂无注解" :image-size="42"/></section>

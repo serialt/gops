@@ -441,6 +441,50 @@ select {
   background: #fafafa;
 }
 
+/* YAML 编辑器以完整视口居中，并采用紧凑弹窗间距。 */
+.el-overlay-dialog:has(.yaml-editor-dialog) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.el-overlay:has(.el-dialog) .yaml-editor-dialog {
+  max-height: calc(100vh - 8px);
+  margin: 0 !important;
+  transform: none !important;
+}
+
+.yaml-editor-dialog .el-dialog__header {
+  padding: 6px 8px 4px;
+}
+
+.yaml-editor-dialog .el-dialog__body {
+  padding: 4px;
+}
+
+.yaml-editor-dialog .el-dialog__footer {
+  padding: 4px 8px 6px;
+}
+
+.yaml-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.yaml-dialog-footer > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.yaml-dialog-footer .el-button + .el-button {
+  margin-left: 0;
+}
+
 .el-menu {
   border-right: 0 !important;
 }
