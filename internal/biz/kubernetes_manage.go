@@ -9,6 +9,7 @@ import (
 	"gops/internal/data/api"
 	"gops/internal/data/model"
 	"gops/internal/pkg/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,6 +37,159 @@ var kubernetesResourceCatalog = map[string]kubernetesResourceSpec{
 	"persistentvolumeclaims": k8sSpec("", "v1", "persistentvolumeclaims", "PersistentVolumeClaim", true), "persistentvolumes": k8sSpec("", "v1", "persistentvolumes", "PersistentVolume", false), "storageclasses": k8sSpec("storage.k8s.io", "v1", "storageclasses", "StorageClass", false),
 	"serviceaccounts": k8sSpec("", "v1", "serviceaccounts", "ServiceAccount", true), "roles": k8sSpec("rbac.authorization.k8s.io", "v1", "roles", "Role", true), "rolebindings": k8sSpec("rbac.authorization.k8s.io", "v1", "rolebindings", "RoleBinding", true), "clusterroles": k8sSpec("rbac.authorization.k8s.io", "v1", "clusterroles", "ClusterRole", false), "clusterrolebindings": k8sSpec("rbac.authorization.k8s.io", "v1", "clusterrolebindings", "ClusterRoleBinding", false),
 }
+
+const deploymentYAMLTemplate = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: %s
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21.0
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+`
+
+const statefulSetYAMLTemplate = `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nginx-statefulset
+  namespace: %s
+spec:
+  serviceName: nginx-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21.0
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: www
+          mountPath: /usr/share/nginx/html
+  volumeClaimTemplates:
+  - metadata:
+      name: www
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+`
+
+const daemonSetYAMLTemplate = `apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-daemonset
+  namespace: %s
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+    spec:
+      containers:
+      - name: fluentd
+        image: fluentd:v1.14.0
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+`
+
+const jobYAMLTemplate = `apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi-job
+  namespace: %s
+spec:
+  template:
+    spec:
+      containers:
+      - name: pi
+        image: perl:5.34.0
+        command: ["perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+      restartPolicy: Never
+  backoffLimit: 4
+`
+
+const cronJobYAMLTemplate = `apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello-cronjob
+  namespace: %s
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Allow
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: hello
+            image: busybox:1.36
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the Kubernetes cluster
+          restartPolicy: OnFailure
+`
+
+const podYAMLTemplate = `apiVersion: v1
+kind: Pod
+metadata:
+  name: debug
+  namespace: %s
+spec:
+  containers:
+    - name: debug
+      image: nicolaka/netshoot
+      command:
+        - /bin/sh
+      args:
+        - '-c'
+        - sleep 100000
+      resources:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+`
 
 func (b *KubernetesBiz) dynamicClient(clusterID int64) (dynamic.Interface, error) {
 	var cluster model.KubernetesCluster
@@ -75,21 +229,20 @@ func (b *KubernetesBiz) ResourceTemplate(r *api.KubernetesObjectRequest) (*api.K
 		apiVersion = spec.gvr.Group + "/" + spec.gvr.Version
 	}
 	prefix := fmt.Sprintf("apiVersion: %s\nkind: %s\n%s", apiVersion, spec.kind, metadata)
-	container := "      containers:\n        - name: example\n          image: nginx:latest\n"
 	var content string
 	switch r.Resource {
 	case "deployments":
-		content = prefix + "spec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: example\n  template:\n    metadata:\n      labels:\n        app: example\n    spec:\n" + container
+		content = fmt.Sprintf(deploymentYAMLTemplate, namespace)
 	case "statefulsets":
-		content = prefix + "spec:\n  serviceName: example\n  replicas: 1\n  selector:\n    matchLabels:\n      app: example\n  template:\n    metadata:\n      labels:\n        app: example\n    spec:\n" + container
+		content = fmt.Sprintf(statefulSetYAMLTemplate, namespace)
 	case "daemonsets":
-		content = prefix + "spec:\n  selector:\n    matchLabels:\n      app: example\n  template:\n    metadata:\n      labels:\n        app: example\n    spec:\n" + container
+		content = fmt.Sprintf(daemonSetYAMLTemplate, namespace)
 	case "jobs":
-		content = prefix + "spec:\n  template:\n    spec:\n      restartPolicy: Never\n" + container
+		content = fmt.Sprintf(jobYAMLTemplate, namespace)
 	case "cronjobs":
-		content = prefix + "spec:\n  schedule: \"*/5 * * * *\"\n  jobTemplate:\n    spec:\n      template:\n        spec:\n          restartPolicy: OnFailure\n          containers:\n            - name: example\n              image: nginx:latest\n"
+		content = fmt.Sprintf(cronJobYAMLTemplate, namespace)
 	case "pods":
-		content = prefix + "spec:\n  containers:\n    - name: example\n      image: nginx:latest\n"
+		content = fmt.Sprintf(podYAMLTemplate, namespace)
 	default:
 		content = prefix
 	}
