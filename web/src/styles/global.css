@@ -75,7 +75,7 @@ select {
   min-height: calc(100dvh - 1px);
 }
 
-.page-container.table-shell > .section-card {
+.page-container.table-shell>.section-card {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -221,7 +221,19 @@ select {
   line-height: 1.2;
   white-space: nowrap;
   pointer-events: none;
+  cursor: pointer;
   box-shadow: 0 3px 8px rgba(24, 34, 53, .18);
+}
+
+.app-data-grid .ag-tooltip {
+  pointer-events: auto;
+  user-select: text;
+  white-space: pre-line;
+  cursor: pointer;
+}
+
+.app-data-grid [title] {
+  cursor: pointer !important;
 }
 
 .app-data-grid .grid-action-group.compact {
