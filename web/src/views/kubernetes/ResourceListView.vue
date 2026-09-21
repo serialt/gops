@@ -5,6 +5,7 @@ import type { ColDef } from 'ag-grid-community'
 import { Delete, FolderOpened, Monitor, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppDataGrid from '@/components/AppDataGrid.vue'
+import KubernetesLabelDialog from '@/components/KubernetesLabelDialog.vue'
 import { applyKubernetesObject, deleteKubernetesNode, deleteKubernetesObject, drainKubernetesNode, getKubernetesClusterStats, getKubernetesObject, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesPods, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
 const route = useRoute(); const kind = computed(() => String(route.meta.kubernetesResource || 'nodes')); const title = computed(() => kind.value === 'nodes' ? '节点管理' : kind.value === 'namespaces' ? '命名空间' : kind.value === 'pods' ? 'Pod 管理' : '工作负载'); const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), keyword = ref(''), rows = ref<any[]>([])
 const statusFilter = ref(''), roleFilter = ref(''), namespaceStatus = ref(''), refreshing = ref(false)
@@ -51,8 +52,8 @@ kubectl apply -f cloudshell.yaml
 # 3. 观察 CloudShell 状态并获取访问入口
 kubectl get cloudshell -n cloudtty-system -w`
 const nodeDialog = ref(false), nodeSaving = ref(false), nodeForm = ref({ name: '', labels: '', schedulable: true })
-const namespaceLabelDialog = ref(false), namespaceLabelEditing = ref(false), namespaceLabelSaving = ref(false), selectedNamespace = ref<KubernetesNamespace | null>(null), namespaceLabelRows = ref<{ key:string; value:string }[]>([])
-const nodeLabelDialog = ref(false), nodeLabelEditing = ref(false), nodeLabelSaving = ref(false), selectedLabelNode = ref<KubernetesNode | null>(null), nodeLabelRows = ref<{ key:string; value:string }[]>([])
+const namespaceLabelDialog = ref(false), namespaceLabelSaving = ref(false), selectedNamespace = ref<KubernetesNamespace | null>(null)
+const nodeLabelDialog = ref(false), nodeLabelSaving = ref(false), selectedLabelNode = ref<KubernetesNode | null>(null)
 const nodeTaintDialog = ref(false), nodeTaintEditing = ref(false), nodeTaintSaving = ref(false), selectedTaintNode = ref<KubernetesNode | null>(null), nodeTaintRows = ref<KubernetesTaint[]>([])
 const nodeMenu = ref({ visible:false, x:0, y:0, node:null as KubernetesNode | null }), nodeYamlDialog = ref(false), nodeYamlSaving = ref(false), nodeYaml = ref('')
 const namespaceMenu = ref({ visible:false, x:0, y:0, namespace:null as KubernetesNamespace | null }), namespaceYamlDialog = ref(false), namespaceYamlSaving = ref(false), namespaceYaml = ref('')
@@ -121,32 +122,14 @@ async function setNodeSchedulable(schedulable: boolean) { const node = nodeMenu.
 async function drainNode() { const node = nodeMenu.value.node; closeNodeMenu(); if (!node) return; try { await ElMessageBox.confirm(`排空节点“${node.name}”将驱逐节点上的非 DaemonSet Pod，并将节点设为不可调度。确定继续吗？`, '节点排空', { type: 'warning', confirmButtonText: '确认排空', cancelButtonText: '取消' }) } catch { return }; await drainKubernetesNode(clusterID.value, node.name); ElMessage.success('节点排空完成'); await load() }
 function openNamespaceActionMenu(namespace: KubernetesNamespace, button: HTMLElement) { const rect = button.getBoundingClientRect(); namespaceMenu.value = { visible:true, x:Math.max(8, rect.right - 150), y:rect.bottom + 4, namespace } }
 function closeNamespaceMenu() { namespaceMenu.value.visible = false }
-function modifyNamespace() { const namespace = namespaceMenu.value.namespace; closeNamespaceMenu(); if (!namespace) return; openNamespaceLabels(namespace); startNamespaceLabelEdit() }
+function modifyNamespace() { const namespace = namespaceMenu.value.namespace; closeNamespaceMenu(); if (!namespace) return; openNamespaceLabels(namespace) }
 async function openNamespaceYaml() { const namespace = namespaceMenu.value.namespace; closeNamespaceMenu(); if (!namespace) return; const { data } = await getKubernetesObject({ cluster_id:clusterID.value, resource:'namespaces', name:namespace.name }); namespaceYaml.value = data.data.yaml; namespaceYamlDialog.value = true }
 async function saveNamespaceYaml() { namespaceYamlSaving.value = true; try { await applyKubernetesObject({ cluster_id:clusterID.value, resource:'namespaces', yaml:namespaceYaml.value }); ElMessage.success('命名空间 YAML 保存成功'); namespaceYamlDialog.value = false; await load() } finally { namespaceYamlSaving.value = false } }
 async function removeNamespace(namespace: KubernetesNamespace) { try { await ElMessageBox.confirm(`删除命名空间“${namespace.name}”将同时删除其中的全部资源，且无法恢复。确定继续吗？`, '删除命名空间', { type:'warning', confirmButtonText:'确认删除', cancelButtonText:'取消' }) } catch { return }; await deleteKubernetesObject({ cluster_id:clusterID.value, resource:'namespaces', name:namespace.name }); ElMessage.success('命名空间删除成功'); await load() }
-function openNamespaceLabels(namespace: KubernetesNamespace) { selectedNamespace.value = namespace; namespaceLabelRows.value = Object.entries(namespace.labels || {}).map(([key, value]) => ({ key, value })); namespaceLabelEditing.value = false; namespaceLabelDialog.value = true }
-function startNamespaceLabelEdit() { namespaceLabelEditing.value = true; if (!namespaceLabelRows.value.length) namespaceLabelRows.value.push({ key: '', value: '' }) }
-function addNamespaceLabel() { namespaceLabelRows.value.push({ key: '', value: '' }) }
-function removeNamespaceLabel(index: number) { namespaceLabelRows.value.splice(index, 1) }
-async function saveNamespaceLabels() {
-    if (!selectedNamespace.value) return
-    const labels: Record<string,string> = {}
-    for (const item of namespaceLabelRows.value) { const key = item.key.trim(); if (!key) { ElMessage.warning('标签 Key 不能为空'); return }; if (key in labels) { ElMessage.warning(`标签 Key 重复：${key}`); return }; labels[key] = item.value }
-    namespaceLabelSaving.value = true
-    try { await updateKubernetesNamespace({ cluster_id: clusterID.value, name: selectedNamespace.value.name, labels }); ElMessage.success('命名空间标签更新成功'); namespaceLabelDialog.value = false; await load() } finally { namespaceLabelSaving.value = false }
-}
-function openNodeLabels(node: KubernetesNode) { selectedLabelNode.value = node; nodeLabelRows.value = Object.entries(node.labels || {}).map(([key, value]) => ({ key, value })); nodeLabelEditing.value = false; nodeLabelDialog.value = true }
-function startNodeLabelEdit() { nodeLabelEditing.value = true; if (!nodeLabelRows.value.length) nodeLabelRows.value.push({ key: '', value: '' }) }
-function addNodeLabel() { nodeLabelRows.value.push({ key: '', value: '' }) }
-function removeNodeLabel(index: number) { nodeLabelRows.value.splice(index, 1) }
-async function saveNodeLabels() {
-    if (!selectedLabelNode.value) return
-    const labels: Record<string,string> = {}
-    for (const item of nodeLabelRows.value) { const key = item.key.trim(); if (!key) { ElMessage.warning('标签 Key 不能为空'); return }; if (key in labels) { ElMessage.warning(`标签 Key 重复：${key}`); return }; labels[key] = item.value }
-    nodeLabelSaving.value = true
-    try { await updateKubernetesNode({ cluster_id: clusterID.value, name: selectedLabelNode.value.name, labels, schedulable: selectedLabelNode.value.schedulable }); ElMessage.success('节点标签更新成功'); nodeLabelDialog.value = false; await load() } finally { nodeLabelSaving.value = false }
-}
+function openNamespaceLabels(namespace: KubernetesNamespace) { selectedNamespace.value = namespace; namespaceLabelDialog.value = true }
+function openNodeLabels(node: KubernetesNode) { selectedLabelNode.value = node; nodeLabelDialog.value = true }
+async function saveNamespaceLabelsFromDialog(labels:Record<string,string>){if(!selectedNamespace.value)return;namespaceLabelSaving.value=true;try{await updateKubernetesNamespace({cluster_id:clusterID.value,name:selectedNamespace.value.name,labels});namespaceLabelDialog.value=false;ElMessage.success('命名空间标签更新成功');await load()}finally{namespaceLabelSaving.value=false}}
+async function saveNodeLabelsFromDialog(labels:Record<string,string>){if(!selectedLabelNode.value)return;nodeLabelSaving.value=true;try{await updateKubernetesNode({cluster_id:clusterID.value,name:selectedLabelNode.value.name,labels,schedulable:selectedLabelNode.value.schedulable});nodeLabelDialog.value=false;ElMessage.success('节点标签更新成功');await load()}finally{nodeLabelSaving.value=false}}
 function openNodeTaints(node: KubernetesNode) { selectedTaintNode.value = node; nodeTaintRows.value = (node.taints || []).map(item => ({ ...item })); nodeTaintEditing.value = false; nodeTaintDialog.value = true }
 function startNodeTaintEdit() { nodeTaintEditing.value = true; if (!nodeTaintRows.value.length) nodeTaintRows.value.push({ key: '', value: '', effect: 'NoSchedule' }) }
 function addNodeTaint() { nodeTaintRows.value.push({ key: '', value: '', effect: 'NoSchedule' }) }
@@ -227,16 +210,8 @@ const adaptiveColumns = computed<ColDef[]>(() => {
             </div>
             <template #footer><el-button @click="cloudTTYDialog = false">关闭</el-button><el-button type="success" @click="finishCloudTTYDeployment">我已完成部署</el-button></template>
         </el-dialog>
-        <el-dialog v-model="namespaceLabelDialog" class="namespace-label-dialog" :title="namespaceLabelEditing ? '编辑命名空间标签' : '命名空间标签'" width="60%" destroy-on-close>
-            <div v-if="!namespaceLabelEditing" class="namespace-label-view"><div class="namespace-label-head"><strong>Key</strong><strong>Value</strong></div><div v-for="item in namespaceLabelRows" :key="item.key" class="namespace-label-view-row"><code>{{ item.key }}</code><span>{{ item.value || '-' }}</span></div><el-empty v-if="!namespaceLabelRows.length" description="暂无标签" :image-size="54"/></div>
-            <div v-else class="namespace-label-editor"><div class="namespace-label-editor-title"><span>编辑 {{ selectedNamespace?.name }} 的标签</span><strong>共 {{ namespaceLabelRows.length }} 个标签</strong></div><div v-for="(item,index) in namespaceLabelRows" :key="index" class="namespace-label-edit-row"><span class="row-index">{{ index + 1 }}</span><el-input v-model="item.key" placeholder="Key"/><span>=</span><el-input v-model="item.value" placeholder="Value"/><el-button type="danger" plain @click="removeNamespaceLabel(index)">删除</el-button></div><el-button class="add-label-button" plain @click="addNamespaceLabel">＋ 添加标签</el-button></div>
-            <template #footer><el-button @click="namespaceLabelDialog=false">{{ namespaceLabelEditing ? '取消' : '关闭' }}</el-button><el-button v-if="!namespaceLabelEditing" type="primary" @click="startNamespaceLabelEdit">编辑标签</el-button><el-button v-else type="primary" :loading="namespaceLabelSaving" @click="saveNamespaceLabels">保存更改</el-button></template>
-        </el-dialog>
-        <el-dialog v-model="nodeLabelDialog" class="namespace-label-dialog" :title="nodeLabelEditing ? '编辑节点标签' : '节点标签'" width="60%" destroy-on-close>
-            <div v-if="!nodeLabelEditing" class="namespace-label-view"><div class="namespace-label-head"><strong>Key</strong><strong>Value</strong></div><div v-for="item in nodeLabelRows" :key="item.key" class="namespace-label-view-row"><code>{{ item.key }}</code><span>{{ item.value || '-' }}</span></div><el-empty v-if="!nodeLabelRows.length" description="暂无标签" :image-size="54"/></div>
-            <div v-else class="namespace-label-editor"><div class="namespace-label-editor-title"><span>编辑 {{ selectedLabelNode?.name }} 的标签</span><strong>共 {{ nodeLabelRows.length }} 个标签</strong></div><div v-for="(item,index) in nodeLabelRows" :key="index" class="namespace-label-edit-row"><span class="row-index">{{ index + 1 }}</span><el-input v-model="item.key" placeholder="Key"/><span>=</span><el-input v-model="item.value" placeholder="Value"/><el-button type="danger" plain @click="removeNodeLabel(index)">删除</el-button></div><el-button class="add-label-button" plain @click="addNodeLabel">＋ 添加标签</el-button></div>
-            <template #footer><el-button @click="nodeLabelDialog=false">{{ nodeLabelEditing ? '取消' : '关闭' }}</el-button><el-button v-if="!nodeLabelEditing" type="primary" @click="startNodeLabelEdit">编辑标签</el-button><el-button v-else type="primary" :loading="nodeLabelSaving" @click="saveNodeLabels">保存更改</el-button></template>
-        </el-dialog>
+        <KubernetesLabelDialog v-model="namespaceLabelDialog" :title="`${selectedNamespace?.name||''} 标签`" :labels="selectedNamespace?.labels||{}" :saving="namespaceLabelSaving" @save="saveNamespaceLabelsFromDialog"/>
+        <KubernetesLabelDialog v-model="nodeLabelDialog" :title="`${selectedLabelNode?.name||''} 标签`" :labels="selectedLabelNode?.labels||{}" :saving="nodeLabelSaving" @save="saveNodeLabelsFromDialog"/>
         <el-dialog v-model="nodeTaintDialog" class="namespace-label-dialog" :title="nodeTaintEditing ? '编辑节点污点' : '节点污点'" width="60%" destroy-on-close>
             <div v-if="!nodeTaintEditing" class="namespace-label-view"><div class="node-taint-head"><strong>Key</strong><strong>Value</strong><strong>Effect</strong></div><div v-for="item in nodeTaintRows" :key="`${item.key}:${item.effect}`" class="node-taint-view-row"><code>{{ item.key }}</code><span>{{ item.value || '-' }}</span><span>{{ item.effect }}</span></div><el-empty v-if="!nodeTaintRows.length" description="暂无污点" :image-size="54"/></div>
             <div v-else class="namespace-label-editor"><div class="namespace-label-editor-title"><span>编辑 {{ selectedTaintNode?.name }} 的污点</span><strong>共 {{ nodeTaintRows.length }} 个污点</strong></div><div v-for="(item,index) in nodeTaintRows" :key="index" class="node-taint-edit-row"><span class="taint-row-index">{{ index + 1 }}</span><div class="taint-field"><label>KEY</label><el-input v-model="item.key" placeholder="如: key1"/></div><span class="taint-separator">=</span><div class="taint-field"><label>VALUE</label><el-input v-model="item.value" placeholder="可选"/></div><span class="taint-separator">:</span><div class="taint-field effect-field"><label>EFFECT</label><el-select v-model="item.effect" popper-class="taint-effect-popper"><el-option label="NoSchedule" value="NoSchedule"><div class="taint-effect-option"><strong>NoSchedule</strong><span>Pod 不会被调度</span></div></el-option><el-option label="PreferNoSchedule" value="PreferNoSchedule"><div class="taint-effect-option"><strong>PreferNoSchedule</strong><span>尽量不调度</span></div></el-option><el-option label="NoExecute" value="NoExecute"><div class="taint-effect-option danger"><strong>NoExecute</strong><span>驱逐已有 Pod</span></div></el-option></el-select></div><el-button class="taint-delete" type="danger" circle :icon="Delete" @click="removeNodeTaint(index)"/></div><el-button class="add-taint-button" plain @click="addNodeTaint">＋ 添加污点</el-button></div>

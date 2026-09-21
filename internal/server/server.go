@@ -177,6 +177,7 @@ func RegisterRoute(ctx context.Context, r *gin.Engine, db *gorm.DB, cfg *config.
 	authorized.POST("/kubernetes/resources/template", kubernetesHandler.GetKubernetesResourceTemplate)
 	authorized.POST("/kubernetes/resources/apply", kubernetesHandler.ApplyKubernetesObject)
 	authorized.POST("/kubernetes/resources/delete", kubernetesHandler.DeleteKubernetesObject)
+	authorized.POST("/kubernetes/resources/labels/update", kubernetesHandler.UpdateKubernetesObjectLabels)
 	authorized.POST("/audit/operation-logs/list", auditHandler.ListOperationLogs)
 	authorized.POST("/audit/login-logs/list", auditHandler.ListLoginLogs)
 	authorized.POST("/audit/data-logs/list", auditHandler.ListDataLogs)

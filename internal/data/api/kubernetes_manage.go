@@ -37,3 +37,11 @@ type KubernetesResourceValues struct {
 type KubernetesYAMLResponse struct {
 	YAML string `json:"yaml"`
 }
+
+type KubernetesLabelUpdateRequest struct {
+	ClusterID int64             `json:"cluster_id" binding:"required"`
+	Resource  string            `json:"resource" binding:"required"`
+	Namespace string            `json:"namespace"`
+	Name      string            `json:"name" binding:"required"`
+	Labels    map[string]string `json:"labels"`
+}

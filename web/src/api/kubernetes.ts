@@ -25,3 +25,4 @@ export const getKubernetesObject=(data:KubernetesObjectRequest)=>request.post<{y
 export const getKubernetesResourceTemplate=(data:KubernetesObjectRequest)=>request.post<{yaml:string}>('/kubernetes/resources/template',data)
 export const applyKubernetesObject=(data:KubernetesObjectRequest)=>request.post<KubernetesObject>('/kubernetes/resources/apply',data)
 export const deleteKubernetesObject=(data:KubernetesObjectRequest)=>request.post<null>('/kubernetes/resources/delete',data)
+export const updateKubernetesObjectLabels=(data:{cluster_id:number;resource:string;namespace?:string;name:string;labels:Record<string,string>})=>request.post<KubernetesObject>('/kubernetes/resources/labels/update',data)

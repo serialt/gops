@@ -79,3 +79,18 @@ func (h *KubernetesHandler) DeleteKubernetesObject(c *gin.Context) {
 	}
 	response.OK(c, nil)
 }
+
+// UpdateKubernetesObjectLabels POST /api/v1/kubernetes/resources/labels/update 更新 Kubernetes 资源标签。
+func (h *KubernetesHandler) UpdateKubernetesObjectLabels(c *gin.Context) {
+	r := new(api.KubernetesLabelUpdateRequest)
+	if c.ShouldBindJSON(r) != nil {
+		response.Error(c, 400, "invalid resource labels")
+		return
+	}
+	data, err := h.biz.UpdateObjectLabels(r)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}

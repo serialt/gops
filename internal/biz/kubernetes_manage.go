@@ -338,3 +338,34 @@ func (b *KubernetesBiz) DeleteObject(r *api.KubernetesObjectRequest) error {
 	}
 	return resource.Delete(context.Background(), r.Name, metav1.DeleteOptions{})
 }
+
+func (b *KubernetesBiz) UpdateObjectLabels(r *api.KubernetesLabelUpdateRequest) (*api.KubernetesObjectResponse, error) {
+	spec, err := resourceSpec(r.Resource)
+	if err != nil {
+		return nil, err
+	}
+	client, err := b.dynamicClient(r.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	resource := client.Resource(spec.gvr)
+	var item *unstructured.Unstructured
+	if spec.namespaced {
+		item, err = resource.Namespace(r.Namespace).Get(context.Background(), r.Name, metav1.GetOptions{})
+	} else {
+		item, err = resource.Get(context.Background(), r.Name, metav1.GetOptions{})
+	}
+	if err != nil {
+		return nil, err
+	}
+	item.SetLabels(r.Labels)
+	if spec.namespaced {
+		item, err = resource.Namespace(r.Namespace).Update(context.Background(), item, metav1.UpdateOptions{})
+	} else {
+		item, err = resource.Update(context.Background(), item, metav1.UpdateOptions{})
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(*item), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}, nil
+}

@@ -81,6 +81,7 @@ func Catalog() []Permission {
 		{Group: "Kubernetes", Name: "获取资源创建模板", Path: "/api/v1/kubernetes/resources/template", Method: "POST"},
 		{Group: "Kubernetes", Name: "保存资源", Path: "/api/v1/kubernetes/resources/apply", Method: "POST"},
 		{Group: "Kubernetes", Name: "删除资源", Path: "/api/v1/kubernetes/resources/delete", Method: "POST"},
+		{Group: "Kubernetes", Name: "编辑资源标签", Path: "/api/v1/kubernetes/resources/labels/update", Method: "POST"},
 		{Group: "监控管理", Name: "查看域名监控", Path: "/api/v1/monitor/domains/list", Method: "POST"},
 		{Group: "监控管理", Name: "查看域名请求日志", Path: "/api/v1/monitor/domains/history", Method: "POST"},
 		{Group: "监控管理", Name: "查看告警通道", Path: "/api/v1/monitor/channels/list", Method: "POST"},
