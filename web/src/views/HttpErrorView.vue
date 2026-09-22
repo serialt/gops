@@ -74,7 +74,7 @@ function goBack() {
       </div>
 
       <div class="content">
-        <div class="brand"><span>Gops</span><strong>运维管理平台</strong></div>
+        <div class="brand"><span>Gops</span><strong>管理平台</strong></div>
         <p class="eyebrow">{{ content.eyebrow }}</p>
         <h1>{{ content.title }}</h1>
         <p class="description">{{ content.description }}</p>
