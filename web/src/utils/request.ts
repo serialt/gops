@@ -25,6 +25,14 @@ const request = axios.create({
 
 let isRedirecting = false
 
+function redirectToError(status: 401 | 403 | 429) {
+  const targetPath = `/${status}`
+  if (isRedirecting || location.pathname === targetPath) return
+  isRedirecting = true
+  const current = `${location.pathname}${location.search}${location.hash}`
+  location.assign(`${targetPath}?redirect=${encodeURIComponent(current)}`)
+}
+
 request.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
@@ -41,11 +49,11 @@ request.interceptors.response.use(
     const message = error.response?.data?.message || error.message || '请求失败'
     if (status === 401) {
       localStorage.removeItem('token')
-      if (!isRedirecting && location.pathname !== '/login') {
-        isRedirecting = true
-        ElMessage.error('登录已过期，请重新登录')
-        location.href = '/login'
-      }
+      if (location.pathname !== '/login') redirectToError(401)
+    } else if (status === 403) {
+      redirectToError(403)
+    } else if (status === 429) {
+      redirectToError(429)
     } else {
       ElMessage.error(message)
     }

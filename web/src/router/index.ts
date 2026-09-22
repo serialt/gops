@@ -2,7 +2,11 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes: RouteRecordRaw[] = [
-  { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
+  { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true, guestOnly: true } },
+  { path: '/401', name: 'unauthorized', component: () => import('@/views/HttpErrorView.vue'), props: { code: 401 }, meta: { public: true, title: '登录失效' } },
+  { path: '/403', name: 'forbidden', component: () => import('@/views/HttpErrorView.vue'), props: { code: 403 }, meta: { public: true, title: '无权限' } },
+  { path: '/404', name: 'not-found', component: () => import('@/views/HttpErrorView.vue'), props: { code: 404 }, meta: { public: true, title: '页面不存在' } },
+  { path: '/429', name: 'too-many-requests', component: () => import('@/views/HttpErrorView.vue'), props: { code: 429 }, meta: { public: true, title: '请求过于频繁' } },
   {
     path: '/',
     component: () => import('@/layouts/Layout.vue'),
@@ -38,17 +42,19 @@ const routes: RouteRecordRaw[] = [
       { path: 'audit/data', name: 'audit-data', component: () => import('@/views/audit/AuditLogsView.vue'), meta: { title: '数据日志', audit: 'data', permission: 'POST /api/v1/audit/data-logs/list' } },
       { path: 'ssl-cert/certificates', name: 'ssl-certificates', component: () => import('@/views/ssl-cert/CertificatesView.vue'), meta: { title: '证书管理', permission: 'POST /api/v1/ssl-cert/certificates/list' } },
       { path: 'system-config', name: 'system-config', component: () => import('@/views/SystemConfigView.vue'), meta: { title: '系统配置' } },
-      { path: '403', name: 'forbidden', component: () => import('@/views/ForbiddenView.vue'), meta: { title: '无权限' } },
     ],
   },
-  { path: '/:pathMatch(.*)*', redirect: '/' },
+  { path: '/:pathMatch(.*)*', name: 'catch-all', component: () => import('@/views/HttpErrorView.vue'), props: { code: 404 }, meta: { public: true, title: '页面不存在' } },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (to.meta.public) return auth.isLoggedIn ? '/' : true
+  if (to.meta.public) {
+    if (to.meta.guestOnly && auth.isLoggedIn) return '/'
+    return true
+  }
   if (!auth.isLoggedIn) return { path: '/login', query: { redirect: to.fullPath } }
   if (!auth.loaded) {
     try { await auth.fetchMe() } catch { auth.logout(); return '/login' }
