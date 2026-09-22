@@ -19,6 +19,15 @@ func NewAuthHandler(authBiz *biz.AuthBiz) *AuthHandler {
 	return &AuthHandler{biz: authBiz}
 }
 
+func (h *AuthHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/auth/me", h.Me)
+}
+
+func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
+	g.POST("/auth/login", h.Login)
+
+}
+
 // Login POST /api/v1/auth/login 用户登录。
 func (h *AuthHandler) Login(c *gin.Context) {
 	req := new(api.LoginRequest)

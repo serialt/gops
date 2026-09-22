@@ -18,6 +18,16 @@ func NewRoleHandler(roleBiz *biz.RoleBiz) *RoleHandler {
 	return &RoleHandler{biz: roleBiz}
 }
 
+func (h *RoleHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/roles/list", h.List)
+	g.POST("/roles/create", h.Create)
+	g.POST("/roles/update", h.Update)
+	g.POST("/roles/delete", h.Delete)
+	g.POST("/roles/permissions/get", h.GetPermissions)
+	g.POST("/roles/permissions/set", h.SetPermissions)
+	g.POST("/permissions/catalog", h.Catalog)
+}
+
 // List POST /api/v1/roles/list 查询角色列表。
 func (h *RoleHandler) List(c *gin.Context) {
 	result, err := h.biz.List()

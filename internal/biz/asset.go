@@ -2,6 +2,7 @@ package biz
 
 import (
 	"errors"
+	"log/slog"
 	"strings"
 
 	"gops/internal/data/api"
@@ -14,6 +15,7 @@ import (
 type AssetBiz struct {
 	db     *gorm.DB
 	aesKey string
+	log    *slog.Logger
 }
 
 var cloudProviderOptions = []*api.CloudProviderOptionResponse{
@@ -52,7 +54,9 @@ func cloudRegions(values ...string) []*api.CloudRegionOptionResponse {
 	return regions
 }
 
-func NewAssetBiz(db *gorm.DB, aesKey string) *AssetBiz { return &AssetBiz{db: db, aesKey: aesKey} }
+func NewAssetBiz(db *gorm.DB, aesKey string, log *slog.Logger) *AssetBiz {
+	return &AssetBiz{db: db, aesKey: aesKey, log: log}
+}
 
 // CloudProviderOptions 返回后端定义的云服务商与区域枚举。
 func (b *AssetBiz) CloudProviderOptions() []*api.CloudProviderOptionResponse {

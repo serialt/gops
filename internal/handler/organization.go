@@ -18,6 +18,13 @@ func NewOrganizationHandler(organizationBiz *biz.OrganizationBiz) *OrganizationH
 	return &OrganizationHandler{biz: organizationBiz}
 }
 
+func (h *OrganizationHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/organizations/list", h.List)
+	g.POST("/organizations/create", h.Create)
+	g.POST("/organizations/update", h.Update)
+	g.POST("/organizations/delete", h.Delete)
+	g.POST("/organizations/move", h.Move)
+}
 // List POST /api/v1/organizations/list 查询组织列表。
 func (h *OrganizationHandler) List(c *gin.Context) {
 	req := new(api.OrganizationQueryRequest)

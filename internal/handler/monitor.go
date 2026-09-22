@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"gops/internal/biz"
 	"gops/internal/data/api"
@@ -14,6 +15,32 @@ type MonitorHandler struct{ biz *biz.MonitorBiz }
 func NewMonitorHandler(monitorBiz *biz.MonitorBiz) *MonitorHandler {
 	return &MonitorHandler{biz: monitorBiz}
 }
+
+func (h *MonitorHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/monitor/domains/list", h.ListDomains)
+	g.POST("/monitor/domains/create", h.CreateDomain)
+	g.POST("/monitor/domains/update", h.UpdateDomain)
+	g.POST("/monitor/domains/delete", h.DeleteDomain)
+	g.POST("/monitor/domains/check", h.CheckDomain)
+	g.POST("/monitor/domains/history", h.ListCheckHistory)
+	g.POST("/monitor/domains/stats", h.DomainStats)
+
+	g.POST("/monitor/channels/list", h.ListChannels)
+	g.POST("/monitor/channels/save", h.SaveChannel)
+	g.POST("/monitor/channels/delete", h.DeleteChannel)
+	g.POST("/monitor/channels/test", h.TestChannel)
+
+	g.POST("/monitor/receivers/list", h.ListReceivers)
+	g.POST("/monitor/receivers/save", h.SaveReceiver)
+	g.POST("/monitor/receivers/delete", h.DeleteReceiver)
+
+	g.POST("/monitor/logs/list", h.ListLogs)
+}
+
+func (h *MonitorHandler) StartScheduler(ctx context.Context) {
+	h.biz.StartScheduler(ctx)
+}
+
 func monitorBind(c *gin.Context, req any) bool {
 	if c.ShouldBindJSON(req) != nil {
 		response.Error(c, 400, "invalid monitor request")

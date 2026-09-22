@@ -28,6 +28,39 @@ var terminalUpgrader = websocket.Upgrader{
 
 func NewAssetHandler(assetBiz *biz.AssetBiz) *AssetHandler { return &AssetHandler{biz: assetBiz} }
 
+func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/assets/groups/list", h.ListGroups)
+	g.POST("/assets/groups/create", h.CreateGroup)
+	g.POST("/assets/groups/update", h.UpdateGroup)
+	g.POST("/assets/groups/delete", h.DeleteGroup)
+
+	g.POST("/assets/credentials/list", h.ListCredentials)
+	g.POST("/assets/credentials/create", h.CreateCredential)
+	g.POST("/assets/credentials/update", h.UpdateCredential)
+	g.POST("/assets/credentials/delete", h.DeleteCredential)
+
+	g.POST("/assets/cloud-accounts/list", h.ListCloudAccounts)
+	g.POST("/assets/cloud-accounts/options", h.CloudProviderOptions)
+	g.POST("/assets/cloud-accounts/create", h.CreateCloudAccount)
+	g.POST("/assets/cloud-accounts/update", h.UpdateCloudAccount)
+	g.POST("/assets/cloud-accounts/delete", h.DeleteCloudAccount)
+
+	g.POST("/assets/hosts/list", h.ListHosts)
+	g.POST("/assets/hosts/create", h.CreateHost)
+	g.POST("/assets/hosts/update", h.UpdateHost)
+	g.POST("/assets/hosts/delete", h.DeleteHost)
+
+	g.POST("/assets/db-instances/options", h.DatabaseTypeOptions)
+	g.POST("/assets/db-instances/list", h.ListDBInstances)
+	g.POST("/assets/db-instances/create", h.CreateDBInstance)
+	g.POST("/assets/db-instances/update", h.UpdateDBInstance)
+	g.POST("/assets/db-instances/delete", h.DeleteDBInstance)
+
+	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
+	g.POST("/assets/terminal-sessions/recording", h.GetTerminalSessionRecording)
+	g.POST("/assets/terminal-sessions/delete", h.DeleteTerminalSession)
+}	
+
 // ConnectTerminal GET /api/v1/assets/terminal/connect/:id 建立 SSH WebSocket 终端连接。
 func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
 	hostID, err := strconv.ParseInt(c.Param("id"), 10, 64)

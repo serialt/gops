@@ -16,6 +16,12 @@ func NewSystemConfigHandler(systemConfigBiz *biz.SystemConfigBiz) *SystemConfigH
 	return &SystemConfigHandler{biz: systemConfigBiz}
 }
 
+func (h *SystemConfigHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/system-config/get", h.Get)
+	g.POST("/system-config/update", h.Update)
+	g.POST("/system-config/email/test", h.TestEmail)
+}
+
 // Get POST /api/v1/system-config/get 查询系统配置。
 func (h *SystemConfigHandler) Get(c *gin.Context) {
 	result, err := h.biz.Get()

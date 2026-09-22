@@ -19,6 +19,12 @@ func NewUserHandler(userBiz *biz.UserBiz) *UserHandler {
 	return &UserHandler{biz: userBiz}
 }
 
+func (h *UserHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/users/list", h.List)
+	g.POST("/users/create", h.Create)
+	g.POST("/users/update", h.Update)
+	g.POST("/users/delete", h.Delete)
+}
 // List POST /api/v1/users/list 查询用户列表。
 func (h *UserHandler) List(c *gin.Context) {
 	req := new(api.UserListRequest)

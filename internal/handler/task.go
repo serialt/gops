@@ -1,15 +1,21 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
 	"gops/internal/biz"
 	"gops/internal/data/api"
 	"gops/internal/pkg/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 type TaskHandler struct{ biz *biz.TaskBiz }
 
 func NewTaskHandler(b *biz.TaskBiz) *TaskHandler { return &TaskHandler{b} }
+
+func (h *TaskHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/tasks/jobs/list", h.ListJobs)
+	g.POST("/tasks/jobs/save", h.SaveJob)
+}
 
 // ListJobs POST /api/v1/tasks/jobs/list 查询任务作业。
 func (h *TaskHandler) ListJobs(c *gin.Context) {

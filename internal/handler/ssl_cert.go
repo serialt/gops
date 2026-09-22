@@ -11,6 +11,11 @@ type SSLCertHandler struct{ biz *biz.SSLCertBiz }
 
 func NewSSLCertHandler(b *biz.SSLCertBiz) *SSLCertHandler { return &SSLCertHandler{b} }
 
+func (h *SSLCertHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/ssl-cert/certificates/list", h.ListCertificates)
+	g.POST("/ssl-cert/certificates/save", h.SaveCertificate)
+}
+
 // ListCertificates POST /api/v1/ssl-cert/certificates/list 查询 SSL 证书。
 func (h *SSLCertHandler) ListCertificates(c *gin.Context) {
 	r := new(api.SSLCertificateListRequest)

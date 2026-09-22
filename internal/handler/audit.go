@@ -10,6 +10,13 @@ import (
 type AuditHandler struct{ biz *biz.AuditBiz }
 
 func NewAuditHandler(b *biz.AuditBiz) *AuditHandler { return &AuditHandler{b} }
+
+func (h *AuditHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/audit/operation-logs/list", h.ListOperationLogs)
+	g.POST("/audit/login-logs/list", h.ListLoginLogs)
+	g.POST("/audit/data-logs/list", h.ListDataLogs)
+}
+
 func auditBind(c *gin.Context, r any) bool {
 	if c.ShouldBindJSON(r) != nil {
 		response.Error(c, 400, "invalid audit request")

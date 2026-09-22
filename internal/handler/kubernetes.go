@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"gops/internal/biz"
 	"gops/internal/data/api"
 	"gops/internal/pkg/response"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,6 +14,42 @@ import (
 type KubernetesHandler struct{ biz *biz.KubernetesBiz }
 
 func NewKubernetesHandler(b *biz.KubernetesBiz) *KubernetesHandler { return &KubernetesHandler{b} }
+
+func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/kubernetes/clusters/list", h.ListClusters)
+	g.POST("/kubernetes/clusters/save", h.SaveCluster)
+	g.POST("/kubernetes/clusters/delete", h.DeleteCluster)
+	g.POST("/kubernetes/clusters/test", h.TestCluster)
+	g.POST("/kubernetes/clusters/sync", h.SyncClusters)
+	g.POST("/kubernetes/clusters/config", h.GetClusterConfig)
+	g.POST("/kubernetes/nodes/list", h.ListNodes)
+	g.POST("/kubernetes/nodes/update", h.UpdateNode)
+	g.POST("/kubernetes/nodes/delete", h.DeleteNode)
+	g.POST("/kubernetes/nodes/drain", h.DrainNode)
+	g.POST("/kubernetes/namespaces/list", h.ListNamespaces)
+	g.POST("/kubernetes/namespaces/update", h.UpdateNamespace)
+	g.POST("/kubernetes/workloads/list", h.ListWorkloads)
+	g.POST("/kubernetes/workloads/stats", h.WorkloadStats)
+	g.POST("/kubernetes/pods/list", h.ListPods)
+	g.POST("/kubernetes/stats/get", h.GetClusterStats)
+	g.POST("/kubernetes/events/list", h.ListEvents)
+	g.POST("/kubernetes/resources/list", h.ListKubernetesObjects)
+	g.POST("/kubernetes/resources/get", h.GetKubernetesObject)
+	g.POST("/kubernetes/resources/template", h.GetKubernetesResourceTemplate)
+	g.POST("/kubernetes/resources/apply", h.ApplyKubernetesObject)
+	g.POST("/kubernetes/resources/delete", h.DeleteKubernetesObject)
+	g.POST("/kubernetes/resources/labels/update", h.UpdateKubernetesObjectLabels)
+	g.POST("/kubernetes/inspections/start", h.StartInspection)
+	g.POST("/kubernetes/inspections/progress", h.GetInspectionProgress)
+	g.POST("/kubernetes/inspections/result", h.GetInspectionResult)
+	g.POST("/kubernetes/inspections/history", h.ListInspectionHistory)
+	g.POST("/kubernetes/inspections/delete", h.DeleteInspection)
+
+}
+
+func (h *KubernetesHandler) StartStatusScheduler(ctx context.Context, interval time.Duration) {
+	h.biz.StartStatusScheduler(ctx, interval)
+}
 
 // ListClusters POST /api/v1/kubernetes/clusters/list 查询 Kubernetes 集群。
 func (h *KubernetesHandler) ListClusters(c *gin.Context) {

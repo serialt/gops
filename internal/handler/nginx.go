@@ -11,6 +11,14 @@ import (
 type NginxHandler struct{ biz *biz.NginxBiz }
 
 func NewNginxHandler(b *biz.NginxBiz) *NginxHandler { return &NginxHandler{b} }
+
+func (h *NginxHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/nginx/sources/list", h.ListSources)
+	g.POST("/nginx/sources/save", h.SaveSource)
+	g.POST("/nginx/sources/delete", h.DeleteSource)
+	g.POST("/nginx/overview", h.Overview)
+	g.POST("/nginx/logs/list", h.ListLogs)
+}
 func nginxBind(c *gin.Context, r any) bool {
 	if c.ShouldBindJSON(r) != nil {
 		response.Error(c, 400, "invalid nginx request")

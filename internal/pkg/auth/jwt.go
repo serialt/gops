@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"gops/internal/config"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,8 +18,8 @@ type JWTManager struct {
 	expire time.Duration
 }
 
-func NewJWTManager(secret string, expire time.Duration) *JWTManager {
-	return &JWTManager{secret: []byte(secret), expire: expire}
+func NewJWTManager(cfg *config.Config) *JWTManager {
+	return &JWTManager{secret: []byte(cfg.Server.JwtSecret), expire: cfg.Server.JwtTimeout}
 }
 
 func (m *JWTManager) Generate(userID uint) (string, error) {
