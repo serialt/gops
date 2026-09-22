@@ -3,8 +3,9 @@ package webui
 
 import "embed"
 
-// Assets contains the production frontend build. The Makefile replaces the
-// fallback page in dist while compiling and restores it afterwards.
+// Assets contains the production frontend build and the development fallback.
+// The Makefile replaces the placeholder in dist while compiling and restores
+// it afterwards.
 //
-//go:embed all:dist
+//go:embed fallback.html all:dist
 var Assets embed.FS

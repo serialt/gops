@@ -1,12 +1,14 @@
 package server
 
 import (
+	"bytes"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
 
 	"gops/internal/webui"
+	loginassets "gops/web/src/assets/login"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,8 +20,8 @@ func registerFrontend(r *gin.Engine) {
 	if err != nil {
 		panic("open embedded frontend: " + err.Error())
 	}
-
 	fileServer := http.FileServer(http.FS(dist))
+	r.StaticFS("/__fallback", http.FS(loginassets.Assets))
 	r.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			c.JSON(http.StatusNotFound, gin.H{"code": http.StatusNotFound, "message": "route not found"})
@@ -41,6 +43,13 @@ func registerFrontend(r *gin.Engine) {
 		if readErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"code": http.StatusInternalServerError, "message": "frontend unavailable"})
 			return
+		}
+		if bytes.Contains(index, []byte("gops-fallback-placeholder")) {
+			index, readErr = fs.ReadFile(webui.Assets, "fallback.html")
+			if readErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"code": http.StatusInternalServerError, "message": "frontend fallback unavailable"})
+				return
+			}
 		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", index)
 	})
