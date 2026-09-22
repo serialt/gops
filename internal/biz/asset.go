@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"gops/internal/config"
 	"gops/internal/data/api"
 	"gops/internal/data/model"
 	"gops/internal/pkg/cryptox"
@@ -54,8 +55,8 @@ func cloudRegions(values ...string) []*api.CloudRegionOptionResponse {
 	return regions
 }
 
-func NewAssetBiz(db *gorm.DB, aesKey string, log *slog.Logger) *AssetBiz {
-	return &AssetBiz{db: db, aesKey: aesKey, log: log}
+func NewAssetBiz(db *gorm.DB, cfg *config.Config, log *slog.Logger) *AssetBiz {
+	return &AssetBiz{db: db, aesKey: cfg.Server.AESKey, log: log}
 }
 
 // CloudProviderOptions 返回后端定义的云服务商与区域枚举。

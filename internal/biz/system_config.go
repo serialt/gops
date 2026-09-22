@@ -9,6 +9,7 @@ import (
 	"net/smtp"
 	"strconv"
 
+	"gops/internal/config"
 	"gops/internal/data/api"
 	"gops/internal/data/model"
 	"gops/internal/pkg/cryptox"
@@ -31,8 +32,8 @@ type SystemConfigBiz struct {
 	aesKey string
 }
 
-func NewSystemConfigBiz(db *gorm.DB, aesKey string) *SystemConfigBiz {
-	return &SystemConfigBiz{db: db, aesKey: aesKey}
+func NewSystemConfigBiz(db *gorm.DB, cfg *config.Config) *SystemConfigBiz {
+	return &SystemConfigBiz{db: db, aesKey: cfg.Server.AESKey}
 }
 
 func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {

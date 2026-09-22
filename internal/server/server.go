@@ -19,6 +19,7 @@ import (
 )
 
 var ProviderSet = wire.NewSet(
+	casbinx.NewService,
 	auth.NewJWTManager,
 	handler.NewAuthHandler,
 	handler.NewDashboardHandler,
@@ -51,73 +52,10 @@ var whitelist = []string{
 	"/api/v1/auth/mfa/login",
 }
 
-func RegisterRoute(ctx context.Context, r *gin.Engine, db *gorm.DB, cfg *config.Config,
-	jwtManager *auth.JWTManager,
-	authHandler *handler.AuthHandler,
-	dashboardHandler *handler.DashboardHandler,
-	userHandler *handler.UserHandler,
-	roleHandler *handler.RoleHandler,
-	organizationHandler *handler.OrganizationHandler,
-	assetHandler *handler.AssetHandler,
-	systemConfigHandler *handler.SystemConfigHandler,
-	monitorHandler *handler.MonitorHandler,
-	nginxHandler *handler.NginxHandler,
-	taskHandler *handler.TaskHandler,
-	sslCertHandler *handler.SSLCertHandler,
-	kubernetesHandler *handler.KubernetesHandler,
-	auditHandler *handler.AuditHandler,
-) (*gin.Engine, error) {
-
-	casbinService, err := casbinx.New(db)
-	if err != nil {
-		return nil, fmt.Errorf("initialize casbin: %w", err)
-	}
-	if err := seed(db, casbinService); err != nil {
-		return nil, fmt.Errorf("seed data: %w", err)
-	}
-
-	// go monitorBiz.StartScheduler(ctx)
-
-	// go kubernetesBiz.StartStatusScheduler(ctx, 6*time.Hour)
-
-	r.Use(gin.Logger(), gin.Recovery())
-
-	r.POST("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-
-	api := r.Group("/api/v1")
-
-	authHandler.RegisterRoutesNologin(api)
-	protected := api.Group("")
-	protected.Use(middleware.Auth(jwtManager))
-	authHandler.RegisterRoutes(protected)
-
-	terminal := api.Group("")
-	terminal.Use(middleware.WebSocketAuth(jwtManager), middleware.Casbin(casbinService))
-	terminal.GET("/assets/terminal/connect/:id", assetHandler.ConnectTerminal)
-
-	authorized := protected.Group("")
-	authorized.Use(middleware.Casbin(casbinService))
-	dashboardHandler.RegisterRoutes(authorized)
-	userHandler.RegisterRoutes(authorized)
-	roleHandler.RegisterRoutes(authorized)
-	organizationHandler.RegisterRoutes(authorized)
-	assetHandler.RegisterRoutes(authorized)
-	systemConfigHandler.RegisterRoutes(authorized)
-	monitorHandler.RegisterRoutes(authorized)
-	nginxHandler.RegisterRoutes(authorized)
-	taskHandler.RegisterRoutes(authorized)
-	sslCertHandler.RegisterRoutes(authorized)
-	kubernetesHandler.RegisterRoutes(authorized)
-	auditHandler.RegisterRoutes(authorized)
-
-	return r, nil
-}
-
 func NewGinEngine(
 	cfg *config.Config,
 	db *gorm.DB,
+	casbinService *casbinx.Service,
 	jwtManager *auth.JWTManager,
 	authHandler *handler.AuthHandler,
 	dashboardHandler *handler.DashboardHandler,
@@ -143,11 +81,6 @@ func NewGinEngine(
 	whitelistMap := lo.KeyBy(whitelist, func(item string) string { return item })
 	middleware.RegisterMiddleware(r, cfg, whitelistMap)
 
-	casbinService, err := casbinx.New(db)
-	if err != nil {
-		cancelSchedulers()
-		panic(err)
-	}
 	if err := seed(db, casbinService); err != nil {
 		cancelSchedulers()
 		panic(err)

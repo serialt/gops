@@ -13,9 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"gops/internal/config"
 	"gops/internal/data/api"
 	"gops/internal/data/model"
 	"gops/internal/pkg/cryptox"
+
 	"gorm.io/gorm"
 )
 
@@ -25,8 +27,8 @@ type MonitorBiz struct {
 	aesKey string
 }
 
-func NewMonitorBiz(db *gorm.DB, aesKey string) *MonitorBiz {
-	return &MonitorBiz{db: db, client: &http.Client{Timeout: 15 * time.Second}, aesKey: aesKey}
+func NewMonitorBiz(db *gorm.DB, cfg *config.Config) *MonitorBiz {
+	return &MonitorBiz{db: db, client: &http.Client{Timeout: 15 * time.Second}, aesKey: cfg.Server.AESKey}
 }
 
 // StartScheduler periodically checks monitor entries whose next check time has arrived.

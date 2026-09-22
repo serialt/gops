@@ -61,7 +61,7 @@ backend:
 # Frontend files are copied into the Go package only for the duration of the
 # compile. This keeps generated assets out of the working tree while still
 # producing a single executable that contains the complete web application.
-build: clean frontend
+build: clean frontend wire
 	@set -eu; \
 		cleanup() { \
 			rm -rf $(EMBED_DIR); \

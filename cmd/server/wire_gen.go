@@ -7,8 +7,12 @@
 package main
 
 import (
+	"gops/internal/biz"
 	"gops/internal/config"
 	"gops/internal/data"
+	"gops/internal/handler"
+	"gops/internal/pkg/auth"
+	"gops/internal/pkg/casbinx"
 	"gops/internal/server"
 	"log/slog"
 	"net/http"
@@ -22,7 +26,39 @@ func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(
 	if err != nil {
 		return nil, nil, err
 	}
-	engine, cleanup2 := server.NewGinEngine(cfg, db)
+	service, err := casbinx.NewService(db)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	jwtManager := auth.NewJWTManager(cfg)
+	authBiz := biz.NewAuthBiz(db, jwtManager, service)
+	authHandler := handler.NewAuthHandler(authBiz)
+	dashboardBiz := biz.NewDashboardBiz(db)
+	dashboardHandler := handler.NewDashboardHandler(dashboardBiz)
+	userBiz := biz.NewUserBiz(db, service)
+	userHandler := handler.NewUserHandler(userBiz)
+	roleBiz := biz.NewRoleBiz(db, service)
+	roleHandler := handler.NewRoleHandler(roleBiz)
+	organizationBiz := biz.NewOrganizationBiz(db)
+	organizationHandler := handler.NewOrganizationHandler(organizationBiz)
+	assetBiz := biz.NewAssetBiz(db, cfg, log)
+	assetHandler := handler.NewAssetHandler(assetBiz)
+	systemConfigBiz := biz.NewSystemConfigBiz(db, cfg)
+	systemConfigHandler := handler.NewSystemConfigHandler(systemConfigBiz)
+	monitorBiz := biz.NewMonitorBiz(db, cfg)
+	monitorHandler := handler.NewMonitorHandler(monitorBiz)
+	nginxBiz := biz.NewNginxBiz(db)
+	nginxHandler := handler.NewNginxHandler(nginxBiz)
+	taskBiz := biz.NewTaskBiz(db)
+	taskHandler := handler.NewTaskHandler(taskBiz)
+	sslCertBiz := biz.NewSSLCertBiz(db)
+	sslCertHandler := handler.NewSSLCertHandler(sslCertBiz)
+	kubernetesBiz := biz.NewKubernetesBiz(db)
+	kubernetesHandler := handler.NewKubernetesHandler(kubernetesBiz)
+	auditBiz := biz.NewAuditBiz(db)
+	auditHandler := handler.NewAuditHandler(auditBiz)
+	engine, cleanup2 := server.NewGinEngine(cfg, db, service, jwtManager, authHandler, dashboardHandler, userHandler, roleHandler, organizationHandler, assetHandler, systemConfigHandler, monitorHandler, nginxHandler, taskHandler, sslCertHandler, kubernetesHandler, auditHandler)
 	httpServer, cleanup3, err := server.NewHTTPServer(engine, cfg)
 	if err != nil {
 		cleanup2()

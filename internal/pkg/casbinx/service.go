@@ -13,7 +13,7 @@ type Service struct {
 	Enforcer *casbin.Enforcer
 }
 
-func New(db *gorm.DB) (*Service, error) {
+func NewService(db *gorm.DB) (*Service, error) {
 	adapter, err := gormadapter.NewAdapterByDB(db)
 	if err != nil {
 		return nil, err
