@@ -124,7 +124,7 @@ migration-create:
 	@test -n "$(NAME)" || (echo "NAME is required, for example: make migration-create NAME=add_host_index"; exit 1)
 	go run $(CMD_PATH) -t create $(NAME) sql
 
-generate:
+gmodel:
 	go run $(CMD_PATH) -g
 
 clean:
