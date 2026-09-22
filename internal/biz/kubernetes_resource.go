@@ -7,8 +7,10 @@ import (
 	"gops/internal/data/model"
 	"gops/internal/pkg/utils"
 	"strings"
+	"time"
 
 	cache "github.com/patrickmn/go-cache"
+	"golang.org/x/sync/errgroup"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -25,29 +27,37 @@ func (b *KubernetesBiz) client(clusterID int64) (*kubernetes.Clientset, error) {
 		return cached, nil
 	}
 	b.cacheMutex.RUnlock()
-	var c model.KubernetesCluster
-	if err := b.db.First(&c, clusterID).Error; err != nil {
-		return nil, err
-	}
-	if c.KubeConfig == "" {
-		return nil, fmt.Errorf("cluster kubeconfig is empty")
-	}
-	cfg, err := clientcmd.RESTConfigFromKubeConfig([]byte(c.KubeConfig))
-	if err != nil {
-		return nil, fmt.Errorf("parse kubeconfig: %w", err)
-	}
-	client, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	b.cacheMutex.Lock()
-	if cached := b.clientsetCache[clusterID]; cached != nil {
+	value, err, _ := b.clientGroup.Do(fmt.Sprintf("clientset:%d", clusterID), func() (any, error) {
+		b.cacheMutex.RLock()
+		cached := b.clientsetCache[clusterID]
+		b.cacheMutex.RUnlock()
+		if cached != nil {
+			return cached, nil
+		}
+		var c model.KubernetesCluster
+		if err := b.db.Select("kube_config").First(&c, clusterID).Error; err != nil {
+			return nil, err
+		}
+		if c.KubeConfig == "" {
+			return nil, fmt.Errorf("cluster kubeconfig is empty")
+		}
+		cfg, err := clientcmd.RESTConfigFromKubeConfig([]byte(c.KubeConfig))
+		if err != nil {
+			return nil, fmt.Errorf("parse kubeconfig: %w", err)
+		}
+		client, err := kubernetes.NewForConfig(cfg)
+		if err != nil {
+			return nil, err
+		}
+		b.cacheMutex.Lock()
+		b.clientsetCache[clusterID] = client
 		b.cacheMutex.Unlock()
-		return cached, nil
+		return client, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	b.clientsetCache[clusterID] = client
-	b.cacheMutex.Unlock()
-	return client, nil
+	return value.(*kubernetes.Clientset), nil
 }
 func (b *KubernetesBiz) Nodes(r *api.KubernetesResourceListRequest) ([]*api.KubernetesNodeResponse, error) {
 	c, e := b.client(r.ClusterID)
@@ -355,29 +365,37 @@ func (b *KubernetesBiz) WorkloadStats(r *api.KubernetesResourceListRequest) (*ap
 	if namespace == "" {
 		namespace = metav1.NamespaceAll
 	}
-	ctx := context.Background()
-	deployments, err := c.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	statefulSets, err := c.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	daemonSets, err := c.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	jobs, err := c.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	cronJobs, err := c.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	pods, err := c.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	group, ctx := errgroup.WithContext(ctx)
+	var deployments *appsv1.DeploymentList
+	var statefulSets *appsv1.StatefulSetList
+	var daemonSets *appsv1.DaemonSetList
+	var jobs *batchv1.JobList
+	var cronJobs *batchv1.CronJobList
+	var pods *corev1.PodList
+	group.Go(func() (err error) {
+		deployments, err = c.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+		return err
+	})
+	group.Go(func() (err error) {
+		statefulSets, err = c.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+		return err
+	})
+	group.Go(func() (err error) {
+		daemonSets, err = c.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
+		return err
+	})
+	group.Go(func() (err error) {
+		jobs, err = c.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
+		return err
+	})
+	group.Go(func() (err error) {
+		cronJobs, err = c.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
+		return err
+	})
+	group.Go(func() (err error) { pods, err = c.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{}); return err })
+	if err := group.Wait(); err != nil {
 		return nil, err
 	}
 	result := &api.KubernetesWorkloadStatsResponse{Deployment: int64(len(deployments.Items)), StatefulSet: int64(len(statefulSets.Items)), DaemonSet: int64(len(daemonSets.Items)), Job: int64(len(jobs.Items)), CronJob: int64(len(cronJobs.Items)), Pod: int64(len(pods.Items))}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	cache "github.com/patrickmn/go-cache"
 	"gops/internal/data/api"
@@ -402,26 +403,34 @@ func (b *KubernetesBiz) dynamicClient(clusterID int64) (dynamic.Interface, error
 		return cached, nil
 	}
 	b.cacheMutex.RUnlock()
-	var cluster model.KubernetesCluster
-	if err := b.db.First(&cluster, clusterID).Error; err != nil {
-		return nil, k8sErr(err)
-	}
-	config, err := clientcmd.RESTConfigFromKubeConfig([]byte(cluster.KubeConfig))
-	if err != nil {
-		return nil, fmt.Errorf("parse kubeconfig: %w", err)
-	}
-	client, err := dynamic.NewForConfig(config)
+	value, err, _ := b.clientGroup.Do(fmt.Sprintf("dynamic:%d", clusterID), func() (any, error) {
+		b.cacheMutex.RLock()
+		cached := b.dynamicCache[clusterID]
+		b.cacheMutex.RUnlock()
+		if cached != nil {
+			return cached, nil
+		}
+		var cluster model.KubernetesCluster
+		if err := b.db.Select("kube_config").First(&cluster, clusterID).Error; err != nil {
+			return nil, k8sErr(err)
+		}
+		config, err := clientcmd.RESTConfigFromKubeConfig([]byte(cluster.KubeConfig))
+		if err != nil {
+			return nil, fmt.Errorf("parse kubeconfig: %w", err)
+		}
+		client, err := dynamic.NewForConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		b.cacheMutex.Lock()
+		b.dynamicCache[clusterID] = client
+		b.cacheMutex.Unlock()
+		return client, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	b.cacheMutex.Lock()
-	if cached := b.dynamicCache[clusterID]; cached != nil {
-		b.cacheMutex.Unlock()
-		return cached, nil
-	}
-	b.dynamicCache[clusterID] = client
-	b.cacheMutex.Unlock()
-	return client, nil
+	return value.(dynamic.Interface), nil
 }
 
 func resourceSpec(name string) (kubernetesResourceSpec, error) {
@@ -504,35 +513,54 @@ func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.Kube
 			}
 		}
 	}
-	client, err := b.dynamicClient(r.ClusterID)
-	if err != nil {
-		return nil, err
+	flightKey := cacheKey
+	if r.Refresh {
+		flightKey += ":refresh"
 	}
-	resource := client.Resource(spec.gvr)
-	var rows *unstructured.UnstructuredList
-	if spec.namespaced {
-		namespace := r.Namespace
-		if namespace == "" {
-			namespace = metav1.NamespaceAll
+	value, err, _ := b.resourceGroup.Do(flightKey, func() (any, error) {
+		if cacheable && !r.Refresh {
+			if cached, found := b.workloadCache.Get(cacheKey); found {
+				if values, ok := cached.([]*api.KubernetesObjectResponse); ok {
+					return values, nil
+				}
+			}
 		}
-		rows, err = resource.Namespace(namespace).List(context.Background(), metav1.ListOptions{})
-	} else {
-		rows, err = resource.List(context.Background(), metav1.ListOptions{})
-	}
+		client, err := b.dynamicClient(r.ClusterID)
+		if err != nil {
+			return nil, err
+		}
+		resource := client.Resource(spec.gvr)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		var rows *unstructured.UnstructuredList
+		if spec.namespaced {
+			namespace := r.Namespace
+			if namespace == "" {
+				namespace = metav1.NamespaceAll
+			}
+			rows, err = resource.Namespace(namespace).List(ctx, metav1.ListOptions{})
+		} else {
+			rows, err = resource.List(ctx, metav1.ListOptions{})
+		}
+		if err != nil {
+			return nil, err
+		}
+		out := make([]*api.KubernetesObjectResponse, 0, len(rows.Items))
+		for _, item := range rows.Items {
+			row := &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(item, spec.kind), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}
+			fillWorkloadObject(row, item)
+			fillNetworkObject(row, item)
+			out = append(out, row)
+		}
+		if cacheable {
+			b.workloadCache.Set(cacheKey, out, cache.DefaultExpiration)
+		}
+		return out, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*api.KubernetesObjectResponse, 0, len(rows.Items))
-	for _, item := range rows.Items {
-		row := &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(item, spec.kind), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}
-		fillWorkloadObject(row, item)
-		fillNetworkObject(row, item)
-		out = append(out, row)
-	}
-	if cacheable {
-		b.workloadCache.Set(cacheKey, out, cache.DefaultExpiration)
-	}
-	return filterKubernetesObjects(out, r.Keyword), nil
+	return filterKubernetesObjects(value.([]*api.KubernetesObjectResponse), r.Keyword), nil
 }
 
 func isWorkloadResource(resource string) bool {
@@ -563,7 +591,8 @@ func isStorageResource(resource string) bool {
 }
 
 func isCachedKubernetesResource(resource string) bool {
-	return isWorkloadResource(resource) || isConfigResource(resource) || isStorageResource(resource)
+	_, supported := kubernetesResourceCatalog[resource]
+	return supported && resource != "nodes" && resource != "namespaces"
 }
 
 func (b *KubernetesBiz) invalidateWorkloadCache(resource string) {

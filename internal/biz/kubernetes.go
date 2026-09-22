@@ -11,6 +11,7 @@ import (
 	"time"
 
 	cache "github.com/patrickmn/go-cache"
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -26,6 +27,8 @@ type KubernetesBiz struct {
 	metricsCache   map[uint]*metricsv.Clientset
 	workloadCache  *cache.Cache
 	cacheMutex     sync.RWMutex
+	resourceGroup  singleflight.Group
+	clientGroup    singleflight.Group
 }
 
 func NewKubernetesBiz(db *gorm.DB) *KubernetesBiz {
