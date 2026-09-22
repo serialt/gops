@@ -6,5 +6,5 @@ import "embed"
 // Assets contains the visuals shared by the Vue login page and the backend
 // fallback page.
 //
-//go:embed bg.svg illustration.svg
+//go:embed bg.png gops.svg illustration.svg
 var Assets embed.FS

@@ -35,7 +35,7 @@
       min-height: 100vh;
       overflow: hidden;
       background-color: #fff;
-      background-image: url('/__fallback/bg.svg');
+      background-image: url('/__fallback/bg.png');
       background-repeat: no-repeat;
       background-position: center;
       background-size: cover;
@@ -78,18 +78,11 @@
     }
 
     .logo {
-      display: inline-flex;
       width: 46px;
       height: 46px;
       flex: 0 0 auto;
-      align-items: center;
-      justify-content: center;
       border-radius: 12px;
-      background: linear-gradient(135deg, #6078f4, #7a57e8);
       box-shadow: 0 10px 24px rgba(48, 73, 180, .26);
-      color: #fff;
-      font-size: 16px;
-      font-weight: 800;
     }
 
     h1 {
@@ -129,7 +122,7 @@
     <section class="panel">
       <div class="content">
         <div class="heading">
-          <span class="logo">Gops</span>
+          <img class="logo" src="/__fallback/gops.svg" alt="Gops">
           <div>
             <h1>Service running</h1>
             <p class="subtitle">Gops backend service is running.</p>

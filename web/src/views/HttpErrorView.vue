@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import gopsLogoUrl from '@/assets/gops.svg'
 
 type ErrorCode = 401 | 403 | 404 | 429
 
@@ -74,7 +75,7 @@ function goBack() {
       </div>
 
       <div class="content">
-        <div class="brand"><span>Gops</span><strong>管理平台</strong></div>
+        <div class="brand"><img :src="gopsLogoUrl" alt="Gops" /><strong>管理平台</strong></div>
         <p class="eyebrow">{{ content.eyebrow }}</p>
         <h1>{{ content.title }}</h1>
         <p class="description">{{ content.description }}</p>
@@ -186,7 +187,7 @@ function goBack() {
 
 .content { display: flex; flex-direction: column; justify-content: center; padding: 52px; }
 .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 54px; color: #667085; font-size: 11px; }
-.brand span { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 10px; background: linear-gradient(135deg, #6078f4, #7a57e8); color: #fff; font-size: 13px; font-weight: 800; box-shadow: 0 8px 18px rgba(76, 83, 204, .2); }
+.brand img { width: 38px; height: 38px; border-radius: 10px; object-fit: contain; box-shadow: 0 8px 18px rgba(76, 83, 204, .2); }
 .brand strong { color: #475467; font-weight: 600; }
 .eyebrow { margin: 0 0 10px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
 h1 { margin: 0; font-size: 30px; line-height: 1.25; }

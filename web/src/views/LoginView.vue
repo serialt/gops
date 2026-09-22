@@ -3,7 +3,7 @@ import { reactive, ref } from 'vue'
 import { Lock, UserFilled } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import illustrationUrl from '@/assets/login/illustration.svg'
-import backgroundUrl from '@/assets/login/bg.svg'
+import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 

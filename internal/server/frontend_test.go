@@ -44,6 +44,22 @@ func TestRegisterFrontendServesFallbackIllustration(t *testing.T) {
 	}
 }
 
+func TestRegisterFrontendServesFallbackLogo(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	registerFrontend(r)
+
+	recorder := httptest.NewRecorder()
+	r.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/__fallback/gops.svg", nil))
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	if !strings.Contains(recorder.Header().Get("Content-Type"), "image/svg+xml") {
+		t.Fatalf("expected SVG response, got %q", recorder.Header().Get("Content-Type"))
+	}
+}
+
 func TestRegisterFrontendKeepsAPI404(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
