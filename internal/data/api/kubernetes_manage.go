@@ -7,6 +7,7 @@ type KubernetesObjectRequest struct {
 	Name      string `json:"name"`
 	Keyword   string `json:"keyword"`
 	YAML      string `json:"yaml"`
+	Refresh   bool   `json:"refresh"`
 }
 
 type KubernetesObjectResponse struct {

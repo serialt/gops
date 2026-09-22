@@ -8,6 +8,7 @@ import (
 	"gops/internal/pkg/utils"
 	"strings"
 
+	cache "github.com/patrickmn/go-cache"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +19,12 @@ import (
 )
 
 func (b *KubernetesBiz) client(clusterID int64) (*kubernetes.Clientset, error) {
+	b.cacheMutex.RLock()
+	if cached := b.clientsetCache[clusterID]; cached != nil {
+		b.cacheMutex.RUnlock()
+		return cached, nil
+	}
+	b.cacheMutex.RUnlock()
 	var c model.KubernetesCluster
 	if err := b.db.First(&c, clusterID).Error; err != nil {
 		return nil, err
@@ -29,7 +36,18 @@ func (b *KubernetesBiz) client(clusterID int64) (*kubernetes.Clientset, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse kubeconfig: %w", err)
 	}
-	return kubernetes.NewForConfig(cfg)
+	client, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	b.cacheMutex.Lock()
+	if cached := b.clientsetCache[clusterID]; cached != nil {
+		b.cacheMutex.Unlock()
+		return cached, nil
+	}
+	b.clientsetCache[clusterID] = client
+	b.cacheMutex.Unlock()
+	return client, nil
 }
 func (b *KubernetesBiz) Nodes(r *api.KubernetesResourceListRequest) ([]*api.KubernetesNodeResponse, error) {
 	c, e := b.client(r.ClusterID)
@@ -321,6 +339,14 @@ func (b *KubernetesBiz) Workloads(r *api.KubernetesResourceListRequest) ([]*api.
 }
 
 func (b *KubernetesBiz) WorkloadStats(r *api.KubernetesResourceListRequest) (*api.KubernetesWorkloadStatsResponse, error) {
+	cacheKey := fmt.Sprintf("workload:stats:%d:%s", r.ClusterID, r.Namespace)
+	if !r.Refresh {
+		if cached, found := b.workloadCache.Get(cacheKey); found {
+			if value, ok := cached.(*api.KubernetesWorkloadStatsResponse); ok {
+				return value, nil
+			}
+		}
+	}
 	c, err := b.client(r.ClusterID)
 	if err != nil {
 		return nil, err
@@ -354,7 +380,9 @@ func (b *KubernetesBiz) WorkloadStats(r *api.KubernetesResourceListRequest) (*ap
 	if err != nil {
 		return nil, err
 	}
-	return &api.KubernetesWorkloadStatsResponse{Deployment: int64(len(deployments.Items)), StatefulSet: int64(len(statefulSets.Items)), DaemonSet: int64(len(daemonSets.Items)), Job: int64(len(jobs.Items)), CronJob: int64(len(cronJobs.Items)), Pod: int64(len(pods.Items))}, nil
+	result := &api.KubernetesWorkloadStatsResponse{Deployment: int64(len(deployments.Items)), StatefulSet: int64(len(statefulSets.Items)), DaemonSet: int64(len(daemonSets.Items)), Job: int64(len(jobs.Items)), CronJob: int64(len(cronJobs.Items)), Pod: int64(len(pods.Items))}
+	b.workloadCache.Set(cacheKey, result, cache.DefaultExpiration)
+	return result, nil
 }
 func jobStatus(x batchv1.Job) string {
 	if x.Status.Failed > 0 {

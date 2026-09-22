@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef, type RowSelectionOptions, type SelectionColumnDef } from 'ag-grid-community'
 
@@ -10,6 +10,7 @@ const props = defineProps<{
   columnDefs: ColDef[]
   pagination?: boolean
   rowHeight?: number
+  getRowId?: (row: unknown) => string
 }>()
 const emit = defineEmits<{
   selectionChanged: [rows: unknown[]]
@@ -57,8 +58,12 @@ const pagedRows = computed(() => {
 })
 const domLayout = computed(() => props.pagination ? 'normal' : 'autoHeight')
 
+const firstDataRow = computed<Record<string, unknown> | undefined>(() =>
+  props.rowData.find((row): row is Record<string, unknown> => typeof row === 'object' && row !== null),
+)
+
 function hasTimestampField(field: 'created_at' | 'updated_at') {
-  return props.rowData.some((row) => typeof row === 'object' && row !== null && field in row)
+  return Boolean(firstDataRow.value && field in firstDataRow.value)
 }
 
 function formatTimestamp(value: unknown) {
@@ -97,13 +102,21 @@ const normalizedColumnDefs = computed<ColDef[]>(() => {
   })
 })
 
+let resizeFrame = 0
 function resizeColumns(event: any) {
-  requestAnimationFrame(() => {
+  cancelAnimationFrame(resizeFrame)
+  resizeFrame = requestAnimationFrame(() => {
     // 先按内容压缩普通列；再只把余量分配给最后一个数据列。
     const columns = event.api.getColumns().filter((column: any) => !column.isPinned() && column.getColDef().suppressSizeToFit && !column.getColDef().width)
     event.api.autoSizeColumns(columns)
     event.api.sizeColumnsToFit()
   })
+}
+
+onBeforeUnmount(() => cancelAnimationFrame(resizeFrame))
+
+function resolveRowId(params: any) {
+  return props.getRowId!(params.data)
 }
 
 function fillRemainingSpace(event: any) {
@@ -128,10 +141,12 @@ function handleSelectionChanged(event: any) {
       :selection-column-def="selectionColumnDef"
       :locale-text="localeText"
       :animate-rows="false"
+      :get-row-id="getRowId ? resolveRowId : undefined"
       :row-height="rowHeight"
+      :row-buffer="5"
       :dom-layout="domLayout"
       :enable-cell-text-selection="true"
-      :ensure-dom-order="true"
+      :ensure-dom-order="false"
       :tooltip-show-delay="200"
       :tooltip-hide-delay="10000"
       @grid-ready="resizeColumns"

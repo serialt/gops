@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	cache "github.com/patrickmn/go-cache"
 	"gops/internal/data/api"
 	"gops/internal/data/model"
 	"gops/internal/pkg/utils"
@@ -254,7 +255,153 @@ spec:
     - Egress
 `
 
+const configMapYAMLTemplate = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example
+  namespace: %s
+data:
+  key1: value1
+  key2: value2
+`
+
+const secretYAMLTemplate = `apiVersion: v1
+kind: Secret
+metadata:
+  name: example
+  namespace: %s
+type: Opaque
+data:
+  username: YWRtaW4=
+  password: cGFzc3dvcmQ=
+
+`
+
+const resourceQuotaYAMLTemplate = `apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: example
+  namespace: %s
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    requests.storage: 100Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    pods: "50"
+    persistentvolumeclaims: "10"
+    services: "20"
+    services.loadbalancers: "2"
+    services.nodeports: "5"
+    configmaps: "50"
+    secrets: "50"
+    count/deployments.apps: "20"
+    count/statefulsets.apps: "10"
+`
+
+const limitRangeYAMLTemplate = `apiVersion: v1
+kind: LimitRange
+metadata:
+  name: example
+  namespace: %s
+spec:
+  limits:
+    - type: Container
+      max:
+        cpu: "2"
+        memory: 2Gi
+      min:
+        cpu: 50m
+        memory: 64Mi
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      maxLimitRequestRatio:
+        cpu: "10"
+        memory: "4"
+    - type: Pod
+      max:
+        cpu: "4"
+        memory: 4Gi
+      min:
+        cpu: 50m
+        memory: 64Mi
+    - type: PersistentVolumeClaim
+      max:
+        storage: 50Gi
+      min:
+        storage: 1Gi
+`
+
+const horizontalPodAutoscalerYAMLTemplate = `apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: example
+  namespace: %s
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: example
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 4
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      selectPolicy: Max
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 60
+`
+
+const podDisruptionBudgetYAMLTemplate = `apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: example
+  namespace: %s
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: example
+  unhealthyPodEvictionPolicy: IfHealthyBudget
+`
+
 func (b *KubernetesBiz) dynamicClient(clusterID int64) (dynamic.Interface, error) {
+	b.cacheMutex.RLock()
+	if cached := b.dynamicCache[clusterID]; cached != nil {
+		b.cacheMutex.RUnlock()
+		return cached, nil
+	}
+	b.cacheMutex.RUnlock()
 	var cluster model.KubernetesCluster
 	if err := b.db.First(&cluster, clusterID).Error; err != nil {
 		return nil, k8sErr(err)
@@ -263,7 +410,18 @@ func (b *KubernetesBiz) dynamicClient(clusterID int64) (dynamic.Interface, error
 	if err != nil {
 		return nil, fmt.Errorf("parse kubeconfig: %w", err)
 	}
-	return dynamic.NewForConfig(config)
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	b.cacheMutex.Lock()
+	if cached := b.dynamicCache[clusterID]; cached != nil {
+		b.cacheMutex.Unlock()
+		return cached, nil
+	}
+	b.dynamicCache[clusterID] = client
+	b.cacheMutex.Unlock()
+	return client, nil
 }
 
 func resourceSpec(name string) (kubernetesResourceSpec, error) {
@@ -314,6 +472,18 @@ func (b *KubernetesBiz) ResourceTemplate(r *api.KubernetesObjectRequest) (*api.K
 		content = fmt.Sprintf(endpointsYAMLTemplate, namespace)
 	case "networkpolicies":
 		content = fmt.Sprintf(networkPolicyYAMLTemplate, namespace)
+	case "configmaps":
+		content = fmt.Sprintf(configMapYAMLTemplate, namespace)
+	case "secrets":
+		content = fmt.Sprintf(secretYAMLTemplate, namespace)
+	case "resourcequotas":
+		content = fmt.Sprintf(resourceQuotaYAMLTemplate, namespace)
+	case "limitranges":
+		content = fmt.Sprintf(limitRangeYAMLTemplate, namespace)
+	case "horizontalpodautoscalers":
+		content = fmt.Sprintf(horizontalPodAutoscalerYAMLTemplate, namespace)
+	case "poddisruptionbudgets":
+		content = fmt.Sprintf(podDisruptionBudgetYAMLTemplate, namespace)
 	default:
 		content = prefix
 	}
@@ -324,6 +494,15 @@ func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.Kube
 	spec, err := resourceSpec(r.Resource)
 	if err != nil {
 		return nil, err
+	}
+	cacheable := isCachedKubernetesResource(r.Resource)
+	cacheKey := fmt.Sprintf("resource:list:%d:%s:%s", r.ClusterID, r.Resource, r.Namespace)
+	if cacheable && !r.Refresh {
+		if cached, found := b.workloadCache.Get(cacheKey); found {
+			if values, ok := cached.([]*api.KubernetesObjectResponse); ok {
+				return filterKubernetesObjects(values, r.Keyword), nil
+			}
+		}
 	}
 	client, err := b.dynamicClient(r.ClusterID)
 	if err != nil {
@@ -345,15 +524,66 @@ func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.Kube
 	}
 	out := make([]*api.KubernetesObjectResponse, 0, len(rows.Items))
 	for _, item := range rows.Items {
-		if r.Keyword != "" && !strings.Contains(strings.ToLower(item.GetName()), strings.ToLower(r.Keyword)) {
-			continue
-		}
-		row := &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(item), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}
+		row := &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(item, spec.kind), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}
 		fillWorkloadObject(row, item)
 		fillNetworkObject(row, item)
 		out = append(out, row)
 	}
-	return out, nil
+	if cacheable {
+		b.workloadCache.Set(cacheKey, out, cache.DefaultExpiration)
+	}
+	return filterKubernetesObjects(out, r.Keyword), nil
+}
+
+func isWorkloadResource(resource string) bool {
+	switch resource {
+	case "deployments", "statefulsets", "daemonsets", "jobs", "cronjobs", "pods":
+		return true
+	default:
+		return false
+	}
+}
+
+func isConfigResource(resource string) bool {
+	switch resource {
+	case "configmaps", "secrets", "resourcequotas", "limitranges", "horizontalpodautoscalers", "poddisruptionbudgets":
+		return true
+	default:
+		return false
+	}
+}
+
+func isStorageResource(resource string) bool {
+	switch resource {
+	case "persistentvolumeclaims", "persistentvolumes", "storageclasses":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCachedKubernetesResource(resource string) bool {
+	return isWorkloadResource(resource) || isConfigResource(resource) || isStorageResource(resource)
+}
+
+func (b *KubernetesBiz) invalidateWorkloadCache(resource string) {
+	if isCachedKubernetesResource(resource) {
+		b.workloadCache.Flush()
+	}
+}
+
+func filterKubernetesObjects(rows []*api.KubernetesObjectResponse, keyword string) []*api.KubernetesObjectResponse {
+	if keyword == "" {
+		return rows
+	}
+	keyword = strings.ToLower(keyword)
+	filtered := make([]*api.KubernetesObjectResponse, 0, len(rows))
+	for _, row := range rows {
+		if strings.Contains(strings.ToLower(row.Name), keyword) {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered
 }
 
 func fillNetworkObject(row *api.KubernetesObjectResponse, item unstructured.Unstructured) {
@@ -537,11 +767,27 @@ func podReady(item unstructured.Unstructured) string {
 	return fmt.Sprintf("%d/%d", ready, len(statuses))
 }
 
-func objectStatus(item unstructured.Unstructured) string {
-	for _, path := range [][]string{{"status", "phase"}, {"status", "conditions", "0", "type"}, {"spec", "type"}} {
+func objectStatus(item unstructured.Unstructured, kind string) string {
+	for _, path := range [][]string{{"status", "phase"}, {"spec", "type"}} {
 		if value, found, _ := unstructured.NestedString(item.Object, path...); found {
 			return value
 		}
+	}
+	conditions, _, _ := unstructured.NestedSlice(item.Object, "status", "conditions")
+	for _, raw := range conditions {
+		condition, ok := raw.(map[string]interface{})
+		if !ok || fmt.Sprint(condition["status"]) != "True" {
+			continue
+		}
+		if value, ok := condition["type"].(string); ok && value != "" {
+			return value
+		}
+	}
+	switch kind {
+	case "ConfigMap", "Secret", "ResourceQuota", "LimitRange":
+		return "Active"
+	case "HorizontalPodAutoscaler", "PodDisruptionBudget":
+		return "Ready"
 	}
 	return "-"
 }
@@ -645,7 +891,8 @@ func (b *KubernetesBiz) ApplyObject(r *api.KubernetesObjectRequest) (*api.Kubern
 	if err != nil {
 		return nil, err
 	}
-	return &api.KubernetesObjectResponse{Name: saved.GetName(), Namespace: saved.GetNamespace(), Kind: spec.kind, Status: objectStatus(*saved), Age: utils.CalculateAge(saved.GetCreationTimestamp().Time), Labels: saved.GetLabels(), CreatedAt: saved.GetCreationTimestamp().Format("2006-01-02 15:04:05")}, nil
+	b.invalidateWorkloadCache(r.Resource)
+	return &api.KubernetesObjectResponse{Name: saved.GetName(), Namespace: saved.GetNamespace(), Kind: spec.kind, Status: objectStatus(*saved, spec.kind), Age: utils.CalculateAge(saved.GetCreationTimestamp().Time), Labels: saved.GetLabels(), CreatedAt: saved.GetCreationTimestamp().Format("2006-01-02 15:04:05")}, nil
 }
 
 func (b *KubernetesBiz) DeleteObject(r *api.KubernetesObjectRequest) error {
@@ -661,10 +908,16 @@ func (b *KubernetesBiz) DeleteObject(r *api.KubernetesObjectRequest) error {
 		return err
 	}
 	resource := client.Resource(spec.gvr)
+	var deleteErr error
 	if spec.namespaced {
-		return resource.Namespace(r.Namespace).Delete(context.Background(), r.Name, metav1.DeleteOptions{})
+		deleteErr = resource.Namespace(r.Namespace).Delete(context.Background(), r.Name, metav1.DeleteOptions{})
+	} else {
+		deleteErr = resource.Delete(context.Background(), r.Name, metav1.DeleteOptions{})
 	}
-	return resource.Delete(context.Background(), r.Name, metav1.DeleteOptions{})
+	if deleteErr == nil {
+		b.invalidateWorkloadCache(r.Resource)
+	}
+	return deleteErr
 }
 
 func (b *KubernetesBiz) UpdateObjectLabels(r *api.KubernetesLabelUpdateRequest) (*api.KubernetesObjectResponse, error) {
@@ -695,5 +948,6 @@ func (b *KubernetesBiz) UpdateObjectLabels(r *api.KubernetesLabelUpdateRequest) 
 	if err != nil {
 		return nil, err
 	}
-	return &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(*item), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}, nil
+	b.invalidateWorkloadCache(r.Resource)
+	return &api.KubernetesObjectResponse{Name: item.GetName(), Namespace: item.GetNamespace(), Kind: spec.kind, Status: objectStatus(*item, spec.kind), Age: utils.CalculateAge(item.GetCreationTimestamp().Time), Labels: item.GetLabels(), CreatedAt: item.GetCreationTimestamp().Format("2006-01-02 15:04:05")}, nil
 }

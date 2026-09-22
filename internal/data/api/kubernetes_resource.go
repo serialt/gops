@@ -6,6 +6,7 @@ type KubernetesResourceListRequest struct {
 	Namespace string `json:"namespace"`
 	Status    string `json:"status"`
 	Role      string `json:"role"`
+	Refresh   bool   `json:"refresh"`
 }
 type KubernetesClusterStatsRequest struct {
 	ClusterID int64 `json:"cluster_id" binding:"required"`

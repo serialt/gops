@@ -10,8 +10,10 @@ import (
 	"sync"
 	"time"
 
+	cache "github.com/patrickmn/go-cache"
 	"gorm.io/gorm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
@@ -19,14 +21,19 @@ import (
 
 type KubernetesBiz struct {
 	db             *gorm.DB
-	clientsetCache map[string]*kubernetes.Clientset
+	clientsetCache map[int64]*kubernetes.Clientset
+	dynamicCache   map[int64]dynamic.Interface
 	metricsCache   map[uint]*metricsv.Clientset
+	workloadCache  *cache.Cache
 	cacheMutex     sync.RWMutex
 }
 
 func NewKubernetesBiz(db *gorm.DB) *KubernetesBiz {
 	return &KubernetesBiz{
-		db: db,
+		db:             db,
+		clientsetCache: make(map[int64]*kubernetes.Clientset),
+		dynamicCache:   make(map[int64]dynamic.Interface),
+		workloadCache:  cache.New(3*time.Minute, 6*time.Minute),
 	}
 }
 
@@ -170,6 +177,7 @@ func (b *KubernetesBiz) Save(r *api.KubernetesClusterRequest) (*api.KubernetesCl
 	if e := b.db.Save(&x).Error; e != nil {
 		return nil, e
 	}
+	b.clearKubernetesCaches(x.ID)
 	return k8sCluster(x), nil
 }
 func (b *KubernetesBiz) Delete(r *api.KubernetesClusterIDRequest) error {
@@ -180,7 +188,16 @@ func (b *KubernetesBiz) Delete(r *api.KubernetesClusterIDRequest) error {
 	if x.RowsAffected == 0 {
 		return ErrNotFound
 	}
+	b.clearKubernetesCaches(r.ID)
 	return nil
+}
+
+func (b *KubernetesBiz) clearKubernetesCaches(clusterID int64) {
+	b.cacheMutex.Lock()
+	delete(b.clientsetCache, clusterID)
+	delete(b.dynamicCache, clusterID)
+	b.cacheMutex.Unlock()
+	b.workloadCache.Flush()
 }
 func (b *KubernetesBiz) Config(r *api.KubernetesClusterIDRequest) (*api.KubernetesClusterConfigResponse, error) {
 	var cluster model.KubernetesCluster
