@@ -10,6 +10,7 @@ import (
 	"gops/internal/biz"
 	"gops/internal/config"
 	"gops/internal/data"
+	"gops/internal/data/repo"
 	"gops/internal/server"
 
 	"github.com/google/wire"
@@ -18,6 +19,7 @@ import (
 //go:generate wire
 func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(), error) {
 	wire.Build(
+		repo.ProviderSet,
 		data.ProviderSet,
 		biz.ProviderSet,
 		server.ProviderSet,

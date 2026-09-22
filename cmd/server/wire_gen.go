@@ -10,6 +10,7 @@ import (
 	"gops/internal/biz"
 	"gops/internal/config"
 	"gops/internal/data"
+	"gops/internal/data/repo/rbac"
 	"gops/internal/handler"
 	"gops/internal/pkg/auth"
 	"gops/internal/pkg/casbinx"
@@ -36,7 +37,8 @@ func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(
 	authHandler := handler.NewAuthHandler(authBiz)
 	dashboardBiz := biz.NewDashboardBiz(db)
 	dashboardHandler := handler.NewDashboardHandler(dashboardBiz)
-	userBiz := biz.NewUserBiz(db, service)
+	rbacRepo := rbac.NewRbacRepo(db)
+	userBiz := biz.NewUserBiz(db, service, rbacRepo)
 	userHandler := handler.NewUserHandler(userBiz)
 	roleBiz := biz.NewRoleBiz(db, service)
 	roleHandler := handler.NewRoleHandler(roleBiz)

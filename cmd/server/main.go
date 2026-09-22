@@ -28,6 +28,7 @@ var (
 	GenModel    bool
 	GenTable    bool
 	ResetPass   string
+	DBPath      string
 	GenTableDir = "sql"
 	Args        []string
 )
@@ -39,6 +40,7 @@ func init() {
 	flag.StringVar(&ConfigFile, "c", "config.yaml", "Config file")
 	flag.StringVar(&ResetPass, "u", "", "reset user pass")
 	flag.BoolVar(&GenTable, "t", false, "goose cmd")
+	flag.StringVar(&DBPath, "db", "", "sqlite db path")
 	flag.Parse()
 	Args = flag.Args()
 }

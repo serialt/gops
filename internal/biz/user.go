@@ -6,6 +6,7 @@ import (
 
 	"gops/internal/data/api"
 	"gops/internal/data/model"
+	"gops/internal/data/repo/rbac"
 	"gops/internal/pkg/auth"
 	"gops/internal/pkg/casbinx"
 
@@ -15,10 +16,11 @@ import (
 type UserBiz struct {
 	db     *gorm.DB
 	casbin *casbinx.Service
+	repo   *rbac.RbacRepo
 }
 
-func NewUserBiz(db *gorm.DB, casbinService *casbinx.Service) *UserBiz {
-	return &UserBiz{db: db, casbin: casbinService}
+func NewUserBiz(db *gorm.DB, casbinService *casbinx.Service, repo *rbac.RbacRepo) *UserBiz {
+	return &UserBiz{db: db, casbin: casbinService, repo: repo}
 }
 
 func (b *UserBiz) List(req *api.UserListRequest) ([]*api.UserResponse, error) {
