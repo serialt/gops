@@ -202,6 +202,7 @@ func NewGinEngine(
 		cancelSchedulers()
 		panic(err)
 	}
+	registerFrontend(r)
 	cleanup = cancelSchedulers
 	return
 }

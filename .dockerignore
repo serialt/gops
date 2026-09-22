@@ -1,0 +1,9 @@
+.git
+.gitignore
+.vscode
+config.yaml
+dist
+*.db
+web/dist
+web/node_modules
+.pnpm-store

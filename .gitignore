@@ -5,8 +5,10 @@
 dist/
 web/node_modules/
 web/dist/
+.pnpm-store/
 *.db
 
 __debug*
 
 db
+gops
