@@ -3,7 +3,8 @@ import { reactive, ref } from 'vue'
 import { Lock, UserFilled } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import illustrationUrl from '@/assets/login/illustration.svg'
-import backgroundUrl from '@/assets/login/bg.png'
+import backgroundUrl from '@/assets/login/bg.svg'
+import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -24,14 +25,15 @@ async function submit() {
 </script>
 
 <template>
-  <main class="login-page" :style="{ backgroundImage: `url(${backgroundUrl})` }">
+  <main class="login-page">
+    <img class="login-background" :src="backgroundUrl" alt="" aria-hidden="true" />
     <section class="login-visual" aria-hidden="true">
       <img class="login-illustration" :src="illustrationUrl" alt="" />
     </section>
     <section class="login-panel">
       <div class="login-form-wrap">
         <div class="login-heading">
-          <span class="login-logo">Gops</span>
+          <img class="login-logo" :src="gopsLogoUrl" alt="Gops" />
           <div>
             <h1>欢迎登录</h1>
             <p>登录管理控制台，开始你的工作。</p>
@@ -63,34 +65,35 @@ async function submit() {
 
 <style scoped>
 .login-page {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(520px, 1.15fr) minmax(420px, .85fr);
   min-height: 100%;
   overflow: hidden;
   background-color: #fff;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: cover;
+}
+
+.login-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }
 
 .login-visual {
   position: relative;
+  z-index: 1;
   min-width: 0;
   overflow: hidden;
 }
 
-.brand-mark,
 .login-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 42px;
   height: 42px;
   border-radius: 11px;
-  background: linear-gradient(135deg, #6078f4, #7a57e8);
-  color: #fff;
-  font-size: 17px;
-  font-weight: 800;
+  object-fit: contain;
   box-shadow: 0 10px 24px rgba(48, 73, 180, .26);
 }
 
@@ -105,6 +108,8 @@ async function submit() {
 }
 
 .login-panel {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,7 +185,10 @@ async function submit() {
 @media (max-width: 900px) {
   .login-page {
     grid-template-columns: 1fr;
-    background-image: none !important;
+  }
+
+  .login-background {
+    display: none;
   }
 
   .login-visual {

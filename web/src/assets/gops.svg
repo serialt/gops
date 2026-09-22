@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- 图标圆角剪裁 -->
+    <clipPath id="icon-clip">
+      <rect x="0" y="0" width="512" height="512" rx="115" ry="115" />
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#icon-clip)">
+    <!-- 4x4 色块网格（基于系统主色 #536fe8 的深浅层次） -->
+    <!-- Row 1 -->
+    <rect x="0" y="0" width="128" height="128" fill="#536FE8" />
+    <rect x="128" y="0" width="128" height="128" fill="#405BCC" />
+    <rect x="256" y="0" width="128" height="128" fill="#667FEC" />
+    <rect x="384" y="0" width="128" height="128" fill="#4964DA" />
+
+    <!-- Row 2 -->
+    <rect x="0" y="128" width="128" height="128" fill="#4964DA" />
+    <rect x="128" y="128" width="128" height="128" fill="#384FB9" />
+    <rect x="256" y="128" width="128" height="128" fill="#7088F0" />
+    <rect x="384" y="128" width="128" height="128" fill="#405BCC" />
+
+    <!-- Row 3 -->
+    <rect x="0" y="256" width="128" height="128" fill="#5D77EA" />
+    <rect x="128" y="256" width="128" height="128" fill="#405BCC" />
+    <rect x="256" y="256" width="128" height="128" fill="#7088F0" />
+    <rect x="384" y="256" width="128" height="128" fill="#4964DA" />
+
+    <!-- Row 4 -->
+    <rect x="0" y="384" width="128" height="128" fill="#4964DA" />
+    <rect x="128" y="384" width="128" height="128" fill="#3148AD" />
+    <rect x="256" y="384" width="128" height="128" fill="#536FE8" />
+    <rect x="384" y="384" width="128" height="128" fill="#384FB9" />
+
+    <!-- 双向白色箭头 -->
+    <g transform="translate(136, 224)">
+      <polygon points="0,40 85,40 85,15 135,60 85,105 85,80 0,80" fill="#FFFFFF" />
+    </g>
+    <g transform="translate(240, 155)">
+      <polygon points="135,40 50,40 50,15 0,60 50,105 50,80 135,80" fill="#FFFFFF" />
+    </g>
+  </g>
+</svg>

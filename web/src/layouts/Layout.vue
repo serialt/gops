@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDown, ArrowLeft, ArrowRight, Search, Close, Brush, FolderOpened, Monitor } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
+import gopsLogoUrl from '@/assets/gops.svg'
 
 const route = useRoute()
 const router = useRouter()
@@ -202,7 +203,7 @@ function toggleCollapse() {
   <el-container class="layout">
     <el-aside :width="`${sidebarWidth}px`" class="sidebar">
       <div v-if="sidebarWidth > 60" class="brand-wrap">
-        <div class="brand-mark">V3</div>
+        <img class="brand-mark" :src="gopsLogoUrl" alt="" />
         <div class="brand-name">{{ systemConfig.systemName }}</div>
       </div>
 
@@ -450,14 +451,8 @@ function toggleCollapse() {
 .brand-mark {
   width: 32px;
   height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border-radius: 6px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, #5b7cfa, #7c5cff);
+  object-fit: contain;
   box-shadow: 0 8px 18px rgba(91, 124, 250, 0.28);
   flex-shrink: 0;
 }
