@@ -5,6 +5,8 @@ export interface MonitorDomain { id:number; domain:string; port:number; request_
 export interface MonitorDomainRequest { id?:number; domain:string; port:number; request_client:MonitorRequestClient; check_interval:number; check_jitter:number; enable_ssl:boolean; verify_certificate:boolean; enable_alert:boolean; response_threshold:number; ssl_expiry_days:number }
 export interface MonitorCheckHistory { id:number; domain_id:number; status:string; response_time:number; ssl_valid:boolean; ssl_expiry:string; status_code:number; error_message:string; checked_at:string }
 export interface MonitorStats { total:number; normal:number; abnormal:number; paused:number }
+export interface MonitorDomainExcelExport { file_name:string; content:string }
+export interface MonitorDomainExcelImportResult { created:number; updated:number }
 export type MonitorAlertChannelType = 'email' | 'dingtalk' | 'feishu' | 'wechat' | 'webhook'
 export interface MonitorAlertChannelConfig { smtp_host:string; smtp_port:number; smtp_user:string; smtp_password:string; from_email:string; from_name:string; webhook_url:string; wechat_webhook:string; dingtalk_webhook:string; dingtalk_secret:string; feishu_webhook:string }
 export interface MonitorAlertChannel { id:number; name:string; channel_type:MonitorAlertChannelType; enabled:boolean; config:MonitorAlertChannelConfig; created_at:string; updated_at:string }
@@ -19,6 +21,8 @@ export const deleteMonitorDomain=(id:number)=>request.post<null>('/monitor/domai
 export const checkMonitorDomain=(id:number)=>request.post<MonitorDomain>('/monitor/domains/check',{id})
 export const listMonitorCheckHistory=(domain_id:number)=>request.post<MonitorCheckHistory[]>('/monitor/domains/history',{domain_id})
 export const monitorStats=()=>request.post<MonitorStats>('/monitor/domains/stats',{})
+export const exportMonitorDomains=(keyword='')=>request.post<MonitorDomainExcelExport>('/monitor/domains/export',{keyword,status:''})
+export const importMonitorDomains=(file_name:string,content:string)=>request.post<MonitorDomainExcelImportResult>('/monitor/domains/import',{file_name,content})
 export const listMonitorChannels=(keyword='')=>request.post<MonitorAlertChannel[]>('/monitor/channels/list',{keyword})
 export const saveMonitorChannel=(data:MonitorAlertChannelRequest)=>request.post<MonitorAlertChannel>('/monitor/channels/save',data)
 export const deleteMonitorChannel=(id:number)=>request.post<null>('/monitor/channels/delete',{id})

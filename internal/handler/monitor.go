@@ -24,6 +24,8 @@ func (h *MonitorHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/monitor/domains/check", h.CheckDomain)
 	g.POST("/monitor/domains/history", h.ListCheckHistory)
 	g.POST("/monitor/domains/stats", h.DomainStats)
+	g.POST("/monitor/domains/export", h.ExportDomains)
+	g.POST("/monitor/domains/import", h.ImportDomains)
 
 	g.POST("/monitor/channels/list", h.ListChannels)
 	g.POST("/monitor/channels/save", h.SaveChannel)
@@ -118,6 +120,24 @@ func (h *MonitorHandler) DomainStats(c *gin.Context) {
 	req := new(struct{})
 	if monitorBind(c, req) {
 		data, err := h.biz.DomainStats()
+		monitorResult(c, data, err)
+	}
+}
+
+// ExportDomains POST /api/v1/monitor/domains/export 导出域名监控 Excel。
+func (h *MonitorHandler) ExportDomains(c *gin.Context) {
+	req := new(api.MonitorDomainListRequest)
+	if monitorBind(c, req) {
+		data, err := h.biz.ExportDomains(req)
+		monitorResult(c, data, err)
+	}
+}
+
+// ImportDomains POST /api/v1/monitor/domains/import 导入域名监控 Excel。
+func (h *MonitorHandler) ImportDomains(c *gin.Context) {
+	req := new(api.MonitorDomainExcelImportRequest)
+	if monitorBind(c, req) {
+		data, err := h.biz.ImportDomains(req)
 		monitorResult(c, data, err)
 	}
 }

@@ -64,6 +64,18 @@ type MonitorStatsResponse struct {
 	Abnormal int64 `json:"abnormal"`
 	Paused   int64 `json:"paused"`
 }
+type MonitorDomainExcelExportResponse struct {
+	FileName string `json:"file_name"`
+	Content  string `json:"content"`
+}
+type MonitorDomainExcelImportRequest struct {
+	FileName string `json:"file_name" binding:"required"`
+	Content  string `json:"content" binding:"required"`
+}
+type MonitorDomainExcelImportResponse struct {
+	Created int `json:"created"`
+	Updated int `json:"updated"`
+}
 
 type MonitorAlertChannelListRequest struct {
 	Keyword string `json:"keyword"`

@@ -3,8 +3,9 @@ import { onMounted, ref, watch } from 'vue'
 import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, listMonitorCheckHistory, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
+import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
 const rows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
+const importInput = ref<HTMLInputElement>(); const exporting = ref(false); const importing = ref(false)
 const requestClientOptions: Array<{ label: string; value: MonitorRequestClient }> = [{ label: 'Google Chrome', value: 'chrome' }, { label: 'Mozilla Firefox', value: 'firefox' }, { label: 'Microsoft Edge', value: 'edge' }, { label: 'Apple Safari', value: 'safari' }, { label: 'curl', value: 'curl' }]
 const form = ref<MonitorDomainRequest>({ domain: '', port: 443, request_client: 'chrome', check_interval: 300, check_jitter: 30, enable_ssl: true, verify_certificate: true, enable_alert: true, response_threshold: 3000, ssl_expiry_days: 30 })
 async function load() { const [domainResult, statsResult] = await Promise.all([listMonitorDomains(keyword.value), monitorStats()]); rows.value = domainResult.data.data; stats.value = statsResult.data.data }
@@ -24,6 +25,33 @@ async function save() {
 async function remove(row: MonitorDomain) { await ElMessageBox.confirm(`删除监控 ${row.domain}？`, '确认删除'); await deleteMonitorDomain(row.id); await load() }
 async function check(row: MonitorDomain) { await checkMonitorDomain(row.id); ElMessage.success('检测完成'); await load() }
 async function detail(row: MonitorDomain) { const { data } = await listMonitorCheckHistory(row.id); historyRows.value = data.data; detailMonitor.value = row; detailDialog.value = true }
+async function exportExcel() {
+  exporting.value = true
+  try {
+    const { data } = await exportMonitorDomains(keyword.value)
+    const binary = atob(data.data.content)
+    const bytes = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    const link = document.createElement('a'); link.href = url; link.download = data.data.file_name; link.click(); URL.revokeObjectURL(url)
+    ElMessage.success(`已导出 ${rows.value.length} 条监控配置`)
+  } finally { exporting.value = false }
+}
+function chooseImport() { importInput.value?.click() }
+async function importExcel(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  importing.value = true
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    let binary = ''; const chunkSize = 0x8000
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+    const { data } = await importMonitorDomains(file.name, btoa(binary))
+    await load()
+    ElMessage.success(`导入完成：新增 ${data.data.created} 条，更新 ${data.data.updated} 条`)
+  } finally { importing.value = false; input.value = '' }
+}
 watch(keyword, load)
 function formatDate(value?: string) { return value && !value.startsWith('0001-') ? value.replace('T', ' ').slice(0, 19) : '—' }
 function statusText(status?: string) { return status === 'normal' ? '正常' : status === 'abnormal' ? '异常' : status === 'paused' ? '暂停' : '未知' }
@@ -65,8 +93,10 @@ onMounted(load)
             <div class="stat-card is-abnormal"><span>异常</span><strong>{{ stats.abnormal }}</strong></div>
             <div class="stat-card is-paused"><span>暂停</span><strong>{{ stats.paused }}</strong></div>
         </div>
-        <div class="toolbar"><el-input v-model="keyword" placeholder="搜索域名" clearable /><el-button type="primary"
-                @click="open()">新增监控</el-button></div>
+        <div class="toolbar"><el-input v-model="keyword" placeholder="搜索域名" clearable /><div class="toolbar-actions"><input
+                ref="importInput" type="file" accept=".xlsx" hidden @change="importExcel" /><el-button v-permission="'POST /api/v1/monitor/domains/import'" :loading="importing"
+                @click="chooseImport">Excel 导入</el-button><el-button v-permission="'POST /api/v1/monitor/domains/export'" :loading="exporting" @click="exportExcel">Excel 导出</el-button><el-button type="primary"
+                @click="open()">新增监控</el-button></div></div>
         <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination /><el-dialog v-model="dialog"
             :title="editing ? '编辑监控' : '新增监控'" width="480px"><el-form label-width="100px"><el-form-item label="域名"><el-input
                         v-model="form.domain" /></el-form-item><el-form-item label="端口"><el-input-number
@@ -132,6 +162,8 @@ onMounted(load)
         display: flex;
         justify-content: space-between
     }
+
+    .toolbar-actions { display: flex; gap: 8px; }
 
     .monitor-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 140px)); gap: 10px; }
     .stat-card { display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); color: var(--text-soft); font-size: 11px; }

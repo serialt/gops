@@ -90,6 +90,8 @@ func Catalog() []Permission {
 		{Group: "Kubernetes", Name: "查看巡检历史", Path: "/api/v1/kubernetes/inspections/history", Method: "POST"},
 		{Group: "Kubernetes", Name: "删除巡检记录", Path: "/api/v1/kubernetes/inspections/delete", Method: "POST"},
 		{Group: "监控管理", Name: "查看域名监控", Path: "/api/v1/monitor/domains/list", Method: "POST"},
+		{Group: "监控管理", Name: "导出域名监控", Path: "/api/v1/monitor/domains/export", Method: "POST"},
+		{Group: "监控管理", Name: "导入域名监控", Path: "/api/v1/monitor/domains/import", Method: "POST"},
 		{Group: "监控管理", Name: "查看域名请求日志", Path: "/api/v1/monitor/domains/history", Method: "POST"},
 		{Group: "监控管理", Name: "查看告警通道", Path: "/api/v1/monitor/channels/list", Method: "POST"},
 		{Group: "监控管理", Name: "保存告警通道", Path: "/api/v1/monitor/channels/save", Method: "POST"},
