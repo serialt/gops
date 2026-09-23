@@ -41,7 +41,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	result, err := h.biz.Login(req, c.ClientIP())
 	if err != nil {
-		if errors.Is(err, biz.ErrInvalidCredentials) || errors.Is(err, biz.ErrInvalidCaptcha) || errors.Is(err, biz.ErrInvalidEmailCode) {
+		if errors.Is(err, biz.ErrInvalidEmailCode) {
+			response.Error(c, 401, "邮件验证码错误或已过期")
+			return
+		}
+		if errors.Is(err, biz.ErrInvalidCredentials) || errors.Is(err, biz.ErrInvalidCaptcha) {
 			response.Error(c, 401, err.Error())
 			return
 		}

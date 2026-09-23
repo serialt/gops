@@ -17,6 +17,7 @@ export interface SystemConfigResponse {
   max_login_failures: number
   account_lock_minutes: number
   verification_email_enabled: boolean
+  verification_email_expire_minutes: number
   verification_email_sender_name: string
   verification_smtp_host: string
   verification_smtp_port: number

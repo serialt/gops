@@ -31,6 +31,8 @@ type EmailCodeRequest struct {
 }
 
 type EmailCodeResponse struct {
-	Required bool `json:"required"`
-	Sent     bool `json:"sent"`
+	Required          bool `json:"required"`
+	Sent              bool `json:"sent"`
+	RetryAfterSeconds int  `json:"retry_after_seconds"`
+	ExpiresInSeconds  int  `json:"expires_in_seconds"`
 }

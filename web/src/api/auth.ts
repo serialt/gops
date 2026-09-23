@@ -10,7 +10,12 @@ export interface LoginSecurityConfig {
   login_verification_method: '' | 'email' | 'webhook'
 }
 export interface CaptchaResponse { captcha_id: string; image: string }
-export interface EmailCodeResponse { required: boolean; sent: boolean }
+export interface EmailCodeResponse {
+  required: boolean
+  sent: boolean
+  retry_after_seconds: number
+  expires_in_seconds: number
+}
 
 export const login = (data: LoginRequest) => request.post<LoginResponse>('/auth/login', data)
 export const getMe = () => request.post<CurrentUserResponse>('/auth/me', {})

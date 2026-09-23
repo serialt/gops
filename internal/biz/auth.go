@@ -29,8 +29,10 @@ var (
 )
 
 type verificationValue struct {
-	code      string
-	expiresAt time.Time
+	code               string
+	expiresAt          time.Time
+	challengeExpiresAt time.Time
+	attempts           int
 }
 
 type AuthBiz struct {
@@ -57,11 +59,12 @@ func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, e
 	if err != nil {
 		return nil, err
 	}
-	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+	verificationRequired := b.loginVerificationRequired(config, user)
+	if config.CaptchaEnabled && !verificationRequired && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
 		b.recordLogin(user.ID, user.Username, ip, "failed", "图形验证码错误或已过期")
 		return nil, ErrInvalidCaptcha
 	}
-	if b.loginVerificationRequired(config, user) && !b.verifyEmailCode(user.Username, req.EmailCode) {
+	if verificationRequired && !b.verifyEmailCode(user.Username, req.EmailCode) {
 		b.recordLogin(user.ID, user.Username, ip, "failed", "登录验证码错误或已过期")
 		return nil, ErrInvalidEmailCode
 	}
@@ -115,23 +118,31 @@ func (b *AuthBiz) SendEmailCode(req *api.EmailCodeRequest) (*api.EmailCodeRespon
 	if err != nil {
 		return nil, err
 	}
-	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, false) {
+	verificationRequired := b.loginVerificationRequired(config, user)
+	if config.CaptchaEnabled && !b.hasActiveEmailCode(user.Username) && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, verificationRequired) {
 		return nil, ErrInvalidCaptcha
 	}
-	if !b.loginVerificationRequired(config, user) {
+	if !verificationRequired {
 		return &api.EmailCodeResponse{Required: false, Sent: false}, nil
 	}
 	code, err := randomDigits(6)
 	if err != nil {
 		return nil, err
 	}
-	if err := b.config.SendLoginVerification(config, user.Username, user.Email, code); err != nil {
-		return nil, err
+	expiresIn := 5 * time.Minute
+	if config.LoginVerificationMethod == "email" {
+		expiresIn = time.Duration(config.VerificationEmailExpireMinutes) * time.Minute
 	}
-	b.mu.Lock()
-	b.emailCodes[user.Username] = verificationValue{code: code, expiresAt: time.Now().Add(5 * time.Minute)}
-	b.mu.Unlock()
-	return &api.EmailCodeResponse{Required: true, Sent: true}, nil
+	if retryAfter, expiresAfter := b.reserveEmailCode(user.Username, code, expiresIn); retryAfter > 0 {
+		return &api.EmailCodeResponse{Required: true, Sent: false, RetryAfterSeconds: retryAfter, ExpiresInSeconds: expiresAfter}, nil
+	}
+	go func(username, email, verificationCode string) {
+		if err := b.config.SendLoginVerification(config, username, email, verificationCode); err != nil {
+			b.discardEmailCode(username, verificationCode)
+			slog.Error("发送登录二次验证码失败", "error", err, "username", username, "method", config.LoginVerificationMethod)
+		}
+	}(user.Username, user.Email, code)
+	return &api.EmailCodeResponse{Required: true, Sent: true, RetryAfterSeconds: int(expiresIn.Seconds()), ExpiresInSeconds: int(expiresIn.Seconds())}, nil
 }
 
 func (b *AuthBiz) loginVerificationRequired(config *api.SystemConfigResponse, user *model.User) bool {
@@ -170,8 +181,59 @@ func (b *AuthBiz) verifyEmailCode(username, code string) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	value, ok := b.emailCodes[username]
+	if !ok {
+		return false
+	}
+	if time.Now().After(value.expiresAt) {
+		if time.Now().After(value.challengeExpiresAt) {
+			delete(b.emailCodes, username)
+		}
+		return false
+	}
+	if value.code != strings.TrimSpace(code) {
+		value.attempts++
+		if value.attempts >= 5 {
+			delete(b.emailCodes, username)
+		} else {
+			b.emailCodes[username] = value
+		}
+		return false
+	}
 	delete(b.emailCodes, username)
-	return ok && time.Now().Before(value.expiresAt) && value.code == strings.TrimSpace(code)
+	return true
+}
+
+func (b *AuthBiz) hasActiveEmailCode(username string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	value, ok := b.emailCodes[username]
+	if ok && time.Now().Before(value.challengeExpiresAt) {
+		return true
+	}
+	delete(b.emailCodes, username)
+	return false
+}
+
+func (b *AuthBiz) reserveEmailCode(username, code string, expiresIn time.Duration) (int, int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	value, ok := b.emailCodes[username]
+	if !ok || now.After(value.expiresAt) {
+		delete(b.emailCodes, username)
+	} else if remaining := value.expiresAt.Sub(now); remaining > 0 {
+		return int(remaining.Seconds()) + 1, int(remaining.Seconds()) + 1
+	}
+	b.emailCodes[username] = verificationValue{code: code, expiresAt: now.Add(expiresIn), challengeExpiresAt: now.Add(expiresIn + 30*time.Minute)}
+	return 0, int(expiresIn.Seconds())
+}
+
+func (b *AuthBiz) discardEmailCode(username, code string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if value, ok := b.emailCodes[username]; ok && value.code == code {
+		delete(b.emailCodes, username)
+	}
 }
 
 func randomToken() (string, error) {

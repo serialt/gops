@@ -18,7 +18,8 @@ const form = reactive({
   session_timeout_minutes: 30, captcha_enabled: false, captcha_expire_minutes: 1,
   login_verification_enabled: false, login_verification_method: '' as '' | 'email' | 'webhook',
   max_login_failures: 5, account_lock_minutes: 30,
-  verification_email_enabled: false, verification_email_sender_name: '', verification_smtp_host: '', verification_smtp_port: 465,
+  verification_email_enabled: false, verification_email_expire_minutes: 5,
+  verification_email_sender_name: '', verification_smtp_host: '', verification_smtp_port: 465,
   verification_smtp_username: '', verification_smtp_password: '', verification_smtp_tls: true,
   verification_webhook_enabled: false, verification_webhook_url: '', verification_webhook_secret: '',
 })
@@ -143,7 +144,7 @@ watch(
               <div class="security-grid">
                 <el-form-item label="启用验证">
                   <el-switch v-model="form.login_verification_enabled" active-text="开启" inactive-text="关闭" />
-                  <span class="form-hint">通过已配置的方式发送验证码</span>
+                  <span class="form-hint">登录时通过已配置的方式发送验证码</span>
                 </el-form-item>
                 <el-form-item label="验证方式" :required="form.login_verification_enabled">
                   <el-select v-model="form.login_verification_method" :disabled="!form.login_verification_enabled"
@@ -184,6 +185,11 @@ watch(
               <el-form :model="form" label-width="96px" class="system-form">
                 <el-form-item label="启用邮件验证码"><el-switch v-model="form.verification_email_enabled" active-text="开启"
                     inactive-text="关闭" /></el-form-item>
+                <el-form-item label="验证码有效期" required>
+                  <el-input-number v-model="form.verification_email_expire_minutes" :min="1" :max="60"
+                    controls-position="right" />
+                  <span class="form-hint">分钟，默认 5 分钟</span>
+                </el-form-item>
                 <el-form-item label="发件人名称"><el-input v-model="form.verification_email_sender_name"
                     placeholder="系统管理员" /></el-form-item>
                 <el-form-item label="SMTP 服务器">

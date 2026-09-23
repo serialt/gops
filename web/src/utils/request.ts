@@ -50,6 +50,7 @@ request.interceptors.response.use(
     if (status === 401) {
       localStorage.removeItem('token')
       if (location.pathname !== '/login') redirectToError(401)
+      else ElMessage.error(message)
     } else if (status === 403) {
       redirectToError(403)
     } else if (status === 429) {

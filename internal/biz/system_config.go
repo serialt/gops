@@ -30,7 +30,7 @@ var systemConfigKeys = []string{
 	"password_require_letter", "password_require_upper", "password_require_lower", "password_require_special",
 	"session_timeout_minutes", "captcha_enabled", "max_login_failures", "account_lock_minutes",
 	"captcha_expire_minutes", "login_verification_enabled", "login_verification_method",
-	"verification_email_enabled", "verification_email_sender_name", "verification_smtp_host", "verification_smtp_port",
+	"verification_email_enabled", "verification_email_expire_minutes", "verification_email_sender_name", "verification_smtp_host", "verification_smtp_port",
 	"verification_smtp_username", "verification_smtp_password", "verification_smtp_tls", "verification_webhook_enabled",
 	"verification_webhook_url", "verification_webhook_secret",
 }
@@ -58,7 +58,7 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 		"session_timeout_minutes": "30", "captcha_enabled": "false", "captcha_expire_minutes": "1",
 		"login_verification_enabled": "false", "login_verification_method": "",
 		"max_login_failures": "5", "account_lock_minutes": "30",
-		"verification_email_enabled": "false", "verification_email_sender_name": "", "verification_smtp_host": "",
+		"verification_email_enabled": "false", "verification_email_expire_minutes": "5", "verification_email_sender_name": "", "verification_smtp_host": "",
 		"verification_smtp_port": "465", "verification_smtp_username": "", "verification_smtp_password": "", "verification_smtp_tls": "true",
 		"verification_webhook_enabled": "false", "verification_webhook_url": "", "verification_webhook_secret": "",
 	}
@@ -74,29 +74,30 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 	}
 	return &api.SystemConfigResponse{
 		SystemName: values["system_name"], SystemDescription: values["system_description"],
-		PasswordMinLength:           parseConfigInt(values["password_min_length"], 8),
-		PasswordRequireDigit:        parseConfigBool(values["password_require_digit"]),
-		PasswordRequireLetter:       parseConfigBool(values["password_require_letter"]),
-		PasswordRequireUpper:        parseConfigBool(values["password_require_upper"]),
-		PasswordRequireLower:        parseConfigBool(values["password_require_lower"]),
-		PasswordRequireSpecial:      parseConfigBool(values["password_require_special"]),
-		SessionTimeoutMinutes:       parseConfigInt(values["session_timeout_minutes"], 30),
-		CaptchaEnabled:              parseConfigBool(values["captcha_enabled"]),
-		CaptchaExpireMinutes:        parseConfigInt(values["captcha_expire_minutes"], 1),
-		LoginVerificationEnabled:    parseConfigBool(values["login_verification_enabled"]),
-		LoginVerificationMethod:     values["login_verification_method"],
-		MaxLoginFailures:            parseConfigInt(values["max_login_failures"], 5),
-		AccountLockMinutes:          parseConfigInt(values["account_lock_minutes"], 30),
-		VerificationEmailEnabled:    parseConfigBool(values["verification_email_enabled"]),
-		VerificationEmailSenderName: values["verification_email_sender_name"],
-		VerificationSMTPHost:        values["verification_smtp_host"],
-		VerificationSMTPPort:        parseConfigInt(values["verification_smtp_port"], 465),
-		VerificationSMTPUsername:    values["verification_smtp_username"],
-		VerificationSMTPPassword:    values["verification_smtp_password"],
-		VerificationSMTPTLS:         parseConfigBool(values["verification_smtp_tls"]),
-		VerificationWebhookEnabled:  parseConfigBool(values["verification_webhook_enabled"]),
-		VerificationWebhookURL:      values["verification_webhook_url"],
-		VerificationWebhookSecret:   values["verification_webhook_secret"],
+		PasswordMinLength:              parseConfigInt(values["password_min_length"], 8),
+		PasswordRequireDigit:           parseConfigBool(values["password_require_digit"]),
+		PasswordRequireLetter:          parseConfigBool(values["password_require_letter"]),
+		PasswordRequireUpper:           parseConfigBool(values["password_require_upper"]),
+		PasswordRequireLower:           parseConfigBool(values["password_require_lower"]),
+		PasswordRequireSpecial:         parseConfigBool(values["password_require_special"]),
+		SessionTimeoutMinutes:          parseConfigInt(values["session_timeout_minutes"], 30),
+		CaptchaEnabled:                 parseConfigBool(values["captcha_enabled"]),
+		CaptchaExpireMinutes:           parseConfigInt(values["captcha_expire_minutes"], 1),
+		LoginVerificationEnabled:       parseConfigBool(values["login_verification_enabled"]),
+		LoginVerificationMethod:        values["login_verification_method"],
+		MaxLoginFailures:               parseConfigInt(values["max_login_failures"], 5),
+		AccountLockMinutes:             parseConfigInt(values["account_lock_minutes"], 30),
+		VerificationEmailEnabled:       parseConfigBool(values["verification_email_enabled"]),
+		VerificationEmailExpireMinutes: parseConfigInt(values["verification_email_expire_minutes"], 5),
+		VerificationEmailSenderName:    values["verification_email_sender_name"],
+		VerificationSMTPHost:           values["verification_smtp_host"],
+		VerificationSMTPPort:           parseConfigInt(values["verification_smtp_port"], 465),
+		VerificationSMTPUsername:       values["verification_smtp_username"],
+		VerificationSMTPPassword:       values["verification_smtp_password"],
+		VerificationSMTPTLS:            parseConfigBool(values["verification_smtp_tls"]),
+		VerificationWebhookEnabled:     parseConfigBool(values["verification_webhook_enabled"]),
+		VerificationWebhookURL:         values["verification_webhook_url"],
+		VerificationWebhookSecret:      values["verification_webhook_secret"],
 	}, nil
 }
 
@@ -137,6 +138,7 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 		{ConfigKey: "max_login_failures", ConfigValue: strconv.Itoa(req.MaxLoginFailures)},
 		{ConfigKey: "account_lock_minutes", ConfigValue: strconv.Itoa(req.AccountLockMinutes)},
 		{ConfigKey: "verification_email_enabled", ConfigValue: strconv.FormatBool(req.VerificationEmailEnabled)},
+		{ConfigKey: "verification_email_expire_minutes", ConfigValue: strconv.Itoa(req.VerificationEmailExpireMinutes)},
 		{ConfigKey: "verification_email_sender_name", ConfigValue: req.VerificationEmailSenderName},
 		{ConfigKey: "verification_smtp_host", ConfigValue: req.VerificationSMTPHost},
 		{ConfigKey: "verification_smtp_port", ConfigValue: strconv.Itoa(req.VerificationSMTPPort)},
@@ -160,12 +162,14 @@ func (b *SystemConfigBiz) TestEmail(req *api.SystemConfigEmailTestRequest) error
 	return b.sendEmail(req.Recipient, "SMTP 配置测试", "SMTP 配置测试邮件发送成功。")
 }
 
-func (b *SystemConfigBiz) SendLoginVerificationEmail(recipient, code string) error {
-	return b.sendEmail(recipient, "登录验证码", "您的登录验证码是："+code+"\n验证码 5 分钟内有效，请勿泄露给他人。")
-}
-
 func (b *SystemConfigBiz) SendLoginVerification(config *api.SystemConfigResponse, username, email, code string) error {
+	if !config.LoginVerificationEnabled {
+		return nil
+	}
 	if config.LoginVerificationMethod == "webhook" {
+		if !config.VerificationWebhookEnabled || config.VerificationWebhookURL == "" {
+			return ErrInvalidVerificationConfig
+		}
 		payload, err := json.Marshal(map[string]any{
 			"event": "login_verification", "username": username, "email": email,
 			"code": code, "expires_in": 300,
@@ -193,7 +197,10 @@ func (b *SystemConfigBiz) SendLoginVerification(config *api.SystemConfigResponse
 		}
 		return nil
 	}
-	return b.SendLoginVerificationEmail(email, code)
+	if config.LoginVerificationMethod != "email" || !config.VerificationEmailEnabled || email == "" {
+		return ErrInvalidVerificationConfig
+	}
+	return b.sendEmail(email, "登录验证码", fmt.Sprintf("您的登录验证码是：%s\n验证码 %d 分钟内有效，请勿泄露给他人。", code, config.VerificationEmailExpireMinutes))
 }
 
 func (b *SystemConfigBiz) sendEmail(recipient, subject, content string) error {
