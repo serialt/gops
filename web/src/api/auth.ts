@@ -4,6 +4,13 @@ import request from '@/utils/request'
 export interface LoginRequest { username: string; password: string; captcha_id?: string; captcha_code?: string; email_code?: string }
 export interface LoginResponse { token: string }
 export interface CurrentUserResponse { user: User; permissions: string[] }
+export interface ProfileUpdateRequest {
+  username: string
+  nickname: string
+  email: string
+  current_password: string
+  new_password: string
+}
 export interface LoginSecurityConfig {
   captcha_enabled: boolean
   login_verification_enabled: boolean
@@ -19,6 +26,7 @@ export interface EmailCodeResponse {
 
 export const login = (data: LoginRequest) => request.post<LoginResponse>('/auth/login', data)
 export const getMe = () => request.post<CurrentUserResponse>('/auth/me', {})
+export const updateProfile = (data: ProfileUpdateRequest) => request.post<User>('/auth/profile/update', data)
 export const getLoginSecurityConfig = () => request.post<LoginSecurityConfig>('/auth/security-config', {})
 export const getCaptcha = () => request.post<CaptchaResponse>('/auth/captcha', {})
 export const sendLoginEmailCode = (data: Omit<LoginRequest, 'email_code'>) => request.post<EmailCodeResponse>('/auth/email-code/send', data)

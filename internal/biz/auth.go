@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"gops/internal/data/api"
 	"gops/internal/data/model"
@@ -273,4 +274,76 @@ func (b *AuthBiz) Me(userID uint) (*api.CurrentUserResponse, error) {
 		return nil, ErrNotFound
 	}
 	return &api.CurrentUserResponse{User: toUserResponse(user), Permissions: b.casbin.AllowedPermissionKeys(userID)}, nil
+}
+
+func (b *AuthBiz) UpdateProfile(userID uint, req *api.ProfileUpdateRequest) (*api.UserResponse, error) {
+	var user model.User
+	if err := b.db.Preload("Roles").Preload("Organizations").First(&user, userID).Error; err != nil {
+		return nil, ErrNotFound
+	}
+	username := strings.TrimSpace(req.Username)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	nickname := strings.TrimSpace(req.Nickname)
+	if username == "" || nickname == "" {
+		return nil, errors.New("用户名和昵称不能为空")
+	}
+	var duplicateCount int64
+	if err := b.db.Model(&model.User{}).Where("id <> ? AND username = ?", user.ID, username).Count(&duplicateCount).Error; err != nil {
+		return nil, err
+	}
+	if duplicateCount > 0 {
+		return nil, errors.New("用户名已存在")
+	}
+	if email != "" {
+		if err := b.db.Model(&model.User{}).Where("id <> ? AND email = ?", user.ID, email).Count(&duplicateCount).Error; err != nil {
+			return nil, err
+		}
+		if duplicateCount > 0 {
+			return nil, errors.New("邮箱已被使用")
+		}
+	}
+	if req.NewPassword != "" {
+		if !auth.CheckPassword(user.PasswordHash, req.CurrentPassword) {
+			return nil, errors.New("当前密码不正确")
+		}
+		config, err := b.config.Get()
+		if err != nil {
+			return nil, err
+		}
+		if err := validateProfilePassword(req.NewPassword, config); err != nil {
+			return nil, err
+		}
+		hash, err := auth.HashPassword(req.NewPassword)
+		if err != nil {
+			return nil, err
+		}
+		user.PasswordHash = hash
+	}
+	user.Username = username
+	user.Nickname = nickname
+	user.Email = email
+	if err := b.db.Save(&user).Error; err != nil {
+		return nil, err
+	}
+	return toUserResponse(user), nil
+}
+
+func validateProfilePassword(password string, config *api.SystemConfigResponse) error {
+	if len([]rune(password)) < config.PasswordMinLength {
+		return fmt.Errorf("新密码长度不能少于 %d 个字符", config.PasswordMinLength)
+	}
+	var hasDigit, hasLetter, hasUpper, hasLower, hasSpecial bool
+	for _, character := range password {
+		hasDigit = hasDigit || unicode.IsDigit(character)
+		hasLetter = hasLetter || unicode.IsLetter(character)
+		hasUpper = hasUpper || unicode.IsUpper(character)
+		hasLower = hasLower || unicode.IsLower(character)
+		hasSpecial = hasSpecial || (!unicode.IsLetter(character) && !unicode.IsDigit(character))
+	}
+	if config.PasswordRequireDigit && !hasDigit || config.PasswordRequireLetter && !hasLetter ||
+		config.PasswordRequireUpper && !hasUpper || config.PasswordRequireLower && !hasLower ||
+		config.PasswordRequireSpecial && !hasSpecial {
+		return errors.New("新密码不符合系统密码安全策略")
+	}
+	return nil
 }

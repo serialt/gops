@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDown, ArrowLeft, ArrowRight, Search, Close, Brush, FolderOpened, Monitor } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
 import gopsLogoUrl from '@/assets/gops.svg'
+import { updateProfile } from '@/api/auth'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const systemConfig = useSystemConfigStore()
 const active = computed(() => route.path)
+const userRoleLabel = computed(() => auth.user?.roles?.map((role) => role.name).join('、') || '用户')
+const profileVisible = ref(false)
+const profileSaving = ref(false)
+const profileForm = reactive({ username: '', nickname: '', email: '', current_password: '', new_password: '', confirm_password: '' })
 
 const sidebarWidth = ref(180)
 const isCollapsed = ref(false)
@@ -148,6 +153,34 @@ function handleTabDropAtEnd() {
 function logout() {
   auth.logout()
   router.push('/login')
+}
+
+function openProfile() {
+  profileForm.username = auth.user?.username || ''
+  profileForm.nickname = auth.user?.nickname || ''
+  profileForm.email = auth.user?.email || ''
+  profileForm.current_password = ''
+  profileForm.new_password = ''
+  profileForm.confirm_password = ''
+  profileVisible.value = true
+}
+
+async function saveProfile() {
+  if (!profileForm.username.trim() || !profileForm.nickname.trim()) return ElMessage.warning('用户名和昵称不能为空')
+  if (profileForm.new_password && !profileForm.current_password) return ElMessage.warning('修改密码时请输入当前密码')
+  if (profileForm.new_password !== profileForm.confirm_password) return ElMessage.warning('两次输入的新密码不一致')
+  profileSaving.value = true
+  try {
+    await updateProfile({
+      username: profileForm.username.trim(), nickname: profileForm.nickname.trim(), email: profileForm.email.trim(),
+      current_password: profileForm.current_password, new_password: profileForm.new_password,
+    })
+    await auth.fetchMe()
+    profileVisible.value = false
+    ElMessage.success('个性化配置已保存')
+  } finally {
+    profileSaving.value = false
+  }
 }
 
 function handlePointerDown(e: PointerEvent) {
@@ -394,7 +427,7 @@ function toggleCollapse() {
               </div>
               <div class="user-meta">
                 <span class="user-name">{{ auth.user?.nickname || auth.user?.username }}</span>
-                <small>管理员</small>
+                <small>{{ userRoleLabel }}</small>
               </div>
               <el-icon class="arrow">
                 <ArrowDown />
@@ -402,6 +435,7 @@ function toggleCollapse() {
             </div>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item :icon="Setting" @click="openProfile">个性化配置</el-dropdown-item>
                 <el-dropdown-item :icon="SwitchButton" @click="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -412,6 +446,33 @@ function toggleCollapse() {
       <el-main class="main"><router-view /></el-main>
     </el-container>
   </el-container>
+  <el-dialog v-model="profileVisible" title="个性化配置" width="460px" class="profile-dialog" destroy-on-close>
+    <el-form :model="profileForm" label-width="82px" class="profile-form">
+      <el-form-item label="用户名" required>
+        <el-input v-model="profileForm.username" maxlength="64" autocomplete="username" />
+      </el-form-item>
+      <el-form-item label="昵称" required>
+        <el-input v-model="profileForm.nickname" maxlength="64" />
+      </el-form-item>
+      <el-form-item label="邮箱">
+        <el-input v-model="profileForm.email" maxlength="255" placeholder="允许为空" autocomplete="email" />
+      </el-form-item>
+      <div class="profile-password-title">修改密码（不修改请留空）</div>
+      <el-form-item label="当前密码">
+        <el-input v-model="profileForm.current_password" type="password" show-password autocomplete="current-password" />
+      </el-form-item>
+      <el-form-item label="新密码">
+        <el-input v-model="profileForm.new_password" type="password" show-password autocomplete="new-password" />
+      </el-form-item>
+      <el-form-item label="确认密码">
+        <el-input v-model="profileForm.confirm_password" type="password" show-password autocomplete="new-password" />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="profileVisible = false">取消</el-button>
+      <el-button type="primary" :loading="profileSaving" @click="saveProfile">保存</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -941,6 +1002,22 @@ function toggleCollapse() {
 .main :deep(.page-container) {
   flex: 1 0 auto;
   min-height: 0;
+}
+
+.profile-form {
+  padding: 4px 10px 0 0;
+}
+
+.profile-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.profile-password-title {
+  margin: 22px 0 16px 82px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--text-soft);
+  font-size: 11px;
 }
 
 @media (max-width: 768px) {

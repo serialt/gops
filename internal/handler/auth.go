@@ -21,6 +21,27 @@ func NewAuthHandler(authBiz *biz.AuthBiz) *AuthHandler {
 
 func (h *AuthHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/auth/me", h.Me)
+	g.POST("/auth/profile/update", h.UpdateProfile)
+}
+
+// UpdateProfile POST /api/v1/auth/profile/update 更新当前用户的个性化资料。
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	req := new(api.ProfileUpdateRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "用户名、昵称或邮箱格式不正确")
+		return
+	}
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	result, err := h.biz.UpdateProfile(userID, req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {

@@ -12,6 +12,14 @@ type LoginResponse struct {
 	Token string `json:"token"`
 }
 
+type ProfileUpdateRequest struct {
+	Username        string `json:"username" binding:"required"`
+	Nickname        string `json:"nickname" binding:"required"`
+	Email           string `json:"email" binding:"omitempty,email"`
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 type LoginSecurityConfigResponse struct {
 	CaptchaEnabled           bool   `json:"captcha_enabled"`
 	LoginVerificationEnabled bool   `json:"login_verification_enabled"`
