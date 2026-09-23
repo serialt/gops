@@ -128,4 +128,4 @@ gmodel:
 	go run $(CMD_PATH) -g
 
 clean:
-	rm -rf $(DIST_DIR)
+	@rm -rf $(DIST_DIR)
