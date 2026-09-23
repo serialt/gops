@@ -15,12 +15,12 @@ const TableNameRole = "role"
 // Role mapped from table <role>
 type Role struct {
 	ID          int64          `gorm:"column:id;primaryKey" json:"id"`
-	Code        string         `gorm:"column:code;type:VARCHAR(64)" json:"code"`
-	Name        string         `gorm:"column:name;type:VARCHAR(64)" json:"name"`
-	Description string         `gorm:"column:description;type:VARCHAR(255)" json:"description"`
-	CreatedAt   time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
+	Code        string         `gorm:"column:code;not null" json:"code"`
+	Name        string         `gorm:"column:name;not null" json:"name"`
+	Description string         `gorm:"column:description" json:"description"`
+	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName Role's table name

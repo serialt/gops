@@ -10,6 +10,7 @@ export interface Role {
 export interface User {
   id: number
   username: string
+  email: string
   nickname: string
   status: boolean
   roles: Role[]

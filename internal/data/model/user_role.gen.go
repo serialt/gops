@@ -8,8 +8,8 @@ const TableNameUserRole = "user_role"
 
 // UserRole mapped from table <user_role>
 type UserRole struct {
-	UserID int64 `gorm:"column:user_id;not null" json:"user_id"`
-	RoleID int64 `gorm:"column:role_id;type:INTEGER" json:"role_id"`
+	UserID int64 `gorm:"column:user_id;primaryKey" json:"user_id"`
+	RoleID int64 `gorm:"column:role_id;not null" json:"role_id"`
 }
 
 // TableName UserRole's table name

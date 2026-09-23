@@ -15,15 +15,15 @@ const TableNameOrganization = "organization"
 // Organization mapped from table <organization>
 type Organization struct {
 	ID        int64          `gorm:"column:id;primaryKey" json:"id"`
-	ParentID  int64          `gorm:"column:parent_id;type:INTEGER" json:"parent_id"`
-	Name      string         `gorm:"column:name;type:VARCHAR(64)" json:"name"`
-	Code      string         `gorm:"column:code;type:VARCHAR(64)" json:"code"`
-	Manager   string         `gorm:"column:manager;type:VARCHAR(64)" json:"manager"`
-	Status    bool           `gorm:"column:status;type:BOOLEAN" json:"status"`
-	CreatedAt time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
-	SortOrder int64          `gorm:"column:sort_order;type:INTEGER" json:"sort_order"`
+	ParentID  int64          `gorm:"column:parent_id" json:"parent_id"`
+	Name      string         `gorm:"column:name;not null" json:"name"`
+	Code      string         `gorm:"column:code;not null" json:"code"`
+	Manager   string         `gorm:"column:manager;not null;default:''" json:"manager"`
+	Status    bool           `gorm:"column:status;not null;default:TRUE" json:"status"`
+	CreatedAt time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	SortOrder int64          `gorm:"column:sort_order;not null" json:"sort_order"`
 }
 
 // TableName Organization's table name

@@ -15,20 +15,20 @@ const TableNameDbInstance = "db_instance"
 // DbInstance mapped from table <db_instance>
 type DbInstance struct {
 	ID           int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name         string         `gorm:"column:name;type:VARCHAR(255)" json:"name"`
-	DbType       string         `gorm:"column:db_type;type:VARCHAR(50)" json:"db_type"`
-	Host         string         `gorm:"column:host;type:VARCHAR(255)" json:"host"`
-	Port         int64          `gorm:"column:port;type:INTEGER" json:"port"`
-	Username     string         `gorm:"column:username;type:VARCHAR(255)" json:"username"`
-	Password     string         `gorm:"column:password;type:TEXT" json:"password"`
-	Version      string         `gorm:"column:version;type:VARCHAR(50)" json:"version"`
-	CredentialID int64          `gorm:"column:credential_id;type:BIGINT" json:"credential_id"`
-	Tags         string         `gorm:"column:tags;type:VARCHAR(255)" json:"tags"`
-	Description  string         `gorm:"column:description;type:VARCHAR(500)" json:"description"`
-	Status       bool           `gorm:"column:status;type:BOOLEAN" json:"status"`
-	CreatedAt    time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
-	UpdatedAt    time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
+	Name         string         `gorm:"column:name;not null" json:"name"`
+	DbType       string         `gorm:"column:db_type;not null" json:"db_type"`
+	Host         string         `gorm:"column:host;not null" json:"host"`
+	Port         int64          `gorm:"column:port;not null" json:"port"`
+	Username     string         `gorm:"column:username;not null;default:''" json:"username"`
+	Password     string         `gorm:"column:password;not null;default:''" json:"password"`
+	Version      string         `gorm:"column:version;not null;default:''" json:"version"`
+	CredentialID int64          `gorm:"column:credential_id" json:"credential_id"`
+	Tags         string         `gorm:"column:tags;not null;default:''" json:"tags"`
+	Description  string         `gorm:"column:description;not null;default:''" json:"description"`
+	Status       bool           `gorm:"column:status;not null;default:TRUE" json:"status"`
+	CreatedAt    time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt    time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName DbInstance's table name

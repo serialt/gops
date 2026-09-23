@@ -15,24 +15,24 @@ const TableNameHost = "host"
 // Host mapped from table <host>
 type Host struct {
 	ID             int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name           string         `gorm:"column:name;type:VARCHAR(100)" json:"name"`
-	GroupID        int64          `gorm:"column:group_id;type:BIGINT" json:"group_id"`
-	HostType       string         `gorm:"column:host_type;type:VARCHAR(20)" json:"host_type"`
-	IP             string         `gorm:"column:ip;type:VARCHAR(255)" json:"ip"`
-	Port           int64          `gorm:"column:port;type:INTEGER" json:"port"`
-	SSHUser        string         `gorm:"column:ssh_user;type:VARCHAR(100)" json:"ssh_user"`
-	CredentialID   int64          `gorm:"column:credential_id;type:BIGINT" json:"credential_id"`
-	CloudAccountID int64          `gorm:"column:cloud_account_id;type:BIGINT" json:"cloud_account_id"`
-	Tags           string         `gorm:"column:tags;type:VARCHAR(500)" json:"tags"`
-	Description    string         `gorm:"column:description;type:VARCHAR(500)" json:"description"`
-	Status         int64          `gorm:"column:status;type:SMALLINT" json:"status"`
-	LastSeenAt     time.Time      `gorm:"column:last_seen_at;type:DATETIME" json:"last_seen_at"`
-	Os             string         `gorm:"column:os;type:VARCHAR(100)" json:"os"`
-	Kernel         string         `gorm:"column:kernel;type:VARCHAR(100)" json:"kernel"`
-	Arch           string         `gorm:"column:arch;type:VARCHAR(50)" json:"arch"`
-	CreatedAt      time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
+	Name           string         `gorm:"column:name;not null" json:"name"`
+	GroupID        int64          `gorm:"column:group_id" json:"group_id"`
+	HostType       string         `gorm:"column:host_type;not null;default:'self'" json:"host_type"`
+	IP             string         `gorm:"column:ip;not null" json:"ip"`
+	Port           int64          `gorm:"column:port;not null;default:22" json:"port"`
+	SSHUser        string         `gorm:"column:ssh_user;not null;default:''" json:"ssh_user"`
+	CredentialID   int64          `gorm:"column:credential_id" json:"credential_id"`
+	CloudAccountID int64          `gorm:"column:cloud_account_id" json:"cloud_account_id"`
+	Tags           string         `gorm:"column:tags;not null;default:''" json:"tags"`
+	Description    string         `gorm:"column:description;not null;default:''" json:"description"`
+	Status         int64          `gorm:"column:status;not null;default:-1" json:"status"`
+	LastSeenAt     time.Time      `gorm:"column:last_seen_at" json:"last_seen_at"`
+	Os             string         `gorm:"column:os;not null;default:''" json:"os"`
+	Kernel         string         `gorm:"column:kernel;not null;default:''" json:"kernel"`
+	Arch           string         `gorm:"column:arch;not null;default:''" json:"arch"`
+	CreatedAt      time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt      time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName Host's table name

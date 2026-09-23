@@ -11,6 +11,9 @@ type SystemConfigRequest struct {
 	PasswordRequireSpecial      bool   `json:"password_require_special"`
 	SessionTimeoutMinutes       int    `json:"session_timeout_minutes" binding:"min=1,max=10080"`
 	CaptchaEnabled              bool   `json:"captcha_enabled"`
+	CaptchaExpireMinutes        int    `json:"captcha_expire_minutes" binding:"min=1,max=60"`
+	LoginVerificationEnabled    bool   `json:"login_verification_enabled"`
+	LoginVerificationMethod     string `json:"login_verification_method" binding:"omitempty,oneof=email webhook"`
 	MaxLoginFailures            int    `json:"max_login_failures" binding:"min=1,max=100"`
 	AccountLockMinutes          int    `json:"account_lock_minutes" binding:"min=1,max=10080"`
 	VerificationEmailEnabled    bool   `json:"verification_email_enabled"`
@@ -36,6 +39,9 @@ type SystemConfigResponse struct {
 	PasswordRequireSpecial      bool   `json:"password_require_special"`
 	SessionTimeoutMinutes       int    `json:"session_timeout_minutes"`
 	CaptchaEnabled              bool   `json:"captcha_enabled"`
+	CaptchaExpireMinutes        int    `json:"captcha_expire_minutes"`
+	LoginVerificationEnabled    bool   `json:"login_verification_enabled"`
+	LoginVerificationMethod     string `json:"login_verification_method"`
 	MaxLoginFailures            int    `json:"max_login_failures"`
 	AccountLockMinutes          int    `json:"account_lock_minutes"`
 	VerificationEmailEnabled    bool   `json:"verification_email_enabled"`

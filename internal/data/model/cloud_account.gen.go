@@ -15,16 +15,16 @@ const TableNameCloudAccount = "cloud_account"
 // CloudAccount mapped from table <cloud_account>
 type CloudAccount struct {
 	ID          int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name        string         `gorm:"column:name;type:VARCHAR(100)" json:"name"`
-	Provider    string         `gorm:"column:provider;type:VARCHAR(50)" json:"provider"`
-	AccessKey   string         `gorm:"column:access_key;type:TEXT" json:"access_key"`
-	SecretKey   string         `gorm:"column:secret_key;type:TEXT" json:"secret_key"`
-	Region      string         `gorm:"column:region;type:VARCHAR(100)" json:"region"`
-	Description string         `gorm:"column:description;type:VARCHAR(500)" json:"description"`
-	Status      bool           `gorm:"column:status;type:BOOLEAN" json:"status"`
-	CreatedAt   time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
+	Name        string         `gorm:"column:name;not null" json:"name"`
+	Provider    string         `gorm:"column:provider;not null" json:"provider"`
+	AccessKey   string         `gorm:"column:access_key;not null;default:''" json:"access_key"`
+	SecretKey   string         `gorm:"column:secret_key;not null;default:''" json:"secret_key"`
+	Region      string         `gorm:"column:region;not null;default:''" json:"region"`
+	Description string         `gorm:"column:description;not null;default:''" json:"description"`
+	Status      bool           `gorm:"column:status;not null;default:TRUE" json:"status"`
+	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName CloudAccount's table name

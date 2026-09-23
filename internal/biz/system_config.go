@@ -1,13 +1,20 @@
 package biz
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"mime"
 	"net"
+	"net/http"
 	"net/smtp"
 	"strconv"
+	"time"
 
 	"gops/internal/config"
 	"gops/internal/data/api"
@@ -22,10 +29,13 @@ var systemConfigKeys = []string{
 	"system_name", "system_description", "password_min_length", "password_require_digit",
 	"password_require_letter", "password_require_upper", "password_require_lower", "password_require_special",
 	"session_timeout_minutes", "captcha_enabled", "max_login_failures", "account_lock_minutes",
+	"captcha_expire_minutes", "login_verification_enabled", "login_verification_method",
 	"verification_email_enabled", "verification_email_sender_name", "verification_smtp_host", "verification_smtp_port",
 	"verification_smtp_username", "verification_smtp_password", "verification_smtp_tls", "verification_webhook_enabled",
 	"verification_webhook_url", "verification_webhook_secret",
 }
+
+var ErrInvalidVerificationConfig = errors.New("selected login verification method is not enabled")
 
 type SystemConfigBiz struct {
 	db     *gorm.DB
@@ -45,7 +55,9 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 		"system_name": "Gops", "system_description": "", "password_min_length": "8",
 		"password_require_digit": "false", "password_require_letter": "false", "password_require_upper": "false",
 		"password_require_lower": "false", "password_require_special": "false",
-		"session_timeout_minutes": "30", "captcha_enabled": "false", "max_login_failures": "5", "account_lock_minutes": "30",
+		"session_timeout_minutes": "30", "captcha_enabled": "false", "captcha_expire_minutes": "1",
+		"login_verification_enabled": "false", "login_verification_method": "",
+		"max_login_failures": "5", "account_lock_minutes": "30",
 		"verification_email_enabled": "false", "verification_email_sender_name": "", "verification_smtp_host": "",
 		"verification_smtp_port": "465", "verification_smtp_username": "", "verification_smtp_password": "", "verification_smtp_tls": "true",
 		"verification_webhook_enabled": "false", "verification_webhook_url": "", "verification_webhook_secret": "",
@@ -70,6 +82,9 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 		PasswordRequireSpecial:      parseConfigBool(values["password_require_special"]),
 		SessionTimeoutMinutes:       parseConfigInt(values["session_timeout_minutes"], 30),
 		CaptchaEnabled:              parseConfigBool(values["captcha_enabled"]),
+		CaptchaExpireMinutes:        parseConfigInt(values["captcha_expire_minutes"], 1),
+		LoginVerificationEnabled:    parseConfigBool(values["login_verification_enabled"]),
+		LoginVerificationMethod:     values["login_verification_method"],
 		MaxLoginFailures:            parseConfigInt(values["max_login_failures"], 5),
 		AccountLockMinutes:          parseConfigInt(values["account_lock_minutes"], 30),
 		VerificationEmailEnabled:    parseConfigBool(values["verification_email_enabled"]),
@@ -86,6 +101,17 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 }
 
 func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfigResponse, error) {
+	if req.LoginVerificationEnabled {
+		if req.LoginVerificationMethod == "" {
+			return nil, ErrInvalidVerificationConfig
+		}
+		if req.LoginVerificationMethod == "email" && !req.VerificationEmailEnabled {
+			return nil, ErrInvalidVerificationConfig
+		}
+		if req.LoginVerificationMethod == "webhook" && (!req.VerificationWebhookEnabled || req.VerificationWebhookURL == "") {
+			return nil, ErrInvalidVerificationConfig
+		}
+	}
 	smtpPassword, err := cryptox.Encrypt(b.aesKey, req.VerificationSMTPPassword)
 	if err != nil {
 		return nil, err
@@ -105,6 +131,9 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 		{ConfigKey: "password_require_special", ConfigValue: strconv.FormatBool(req.PasswordRequireSpecial)},
 		{ConfigKey: "session_timeout_minutes", ConfigValue: strconv.Itoa(req.SessionTimeoutMinutes)},
 		{ConfigKey: "captcha_enabled", ConfigValue: strconv.FormatBool(req.CaptchaEnabled)},
+		{ConfigKey: "captcha_expire_minutes", ConfigValue: strconv.Itoa(req.CaptchaExpireMinutes)},
+		{ConfigKey: "login_verification_enabled", ConfigValue: strconv.FormatBool(req.LoginVerificationEnabled)},
+		{ConfigKey: "login_verification_method", ConfigValue: req.LoginVerificationMethod},
 		{ConfigKey: "max_login_failures", ConfigValue: strconv.Itoa(req.MaxLoginFailures)},
 		{ConfigKey: "account_lock_minutes", ConfigValue: strconv.Itoa(req.AccountLockMinutes)},
 		{ConfigKey: "verification_email_enabled", ConfigValue: strconv.FormatBool(req.VerificationEmailEnabled)},
@@ -128,6 +157,46 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 }
 
 func (b *SystemConfigBiz) TestEmail(req *api.SystemConfigEmailTestRequest) error {
+	return b.sendEmail(req.Recipient, "SMTP 配置测试", "SMTP 配置测试邮件发送成功。")
+}
+
+func (b *SystemConfigBiz) SendLoginVerificationEmail(recipient, code string) error {
+	return b.sendEmail(recipient, "登录验证码", "您的登录验证码是："+code+"\n验证码 5 分钟内有效，请勿泄露给他人。")
+}
+
+func (b *SystemConfigBiz) SendLoginVerification(config *api.SystemConfigResponse, username, email, code string) error {
+	if config.LoginVerificationMethod == "webhook" {
+		payload, err := json.Marshal(map[string]any{
+			"event": "login_verification", "username": username, "email": email,
+			"code": code, "expires_in": 300,
+		})
+		if err != nil {
+			return err
+		}
+		req, err := http.NewRequest(http.MethodPost, config.VerificationWebhookURL, bytes.NewReader(payload))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if config.VerificationWebhookSecret != "" {
+			mac := hmac.New(sha256.New, []byte(config.VerificationWebhookSecret))
+			_, _ = mac.Write(payload)
+			req.Header.Set("X-Gops-Signature", hex.EncodeToString(mac.Sum(nil)))
+		}
+		response, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+		if err != nil {
+			return err
+		}
+		defer response.Body.Close()
+		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+			return fmt.Errorf("webhook returned status %d", response.StatusCode)
+		}
+		return nil
+	}
+	return b.SendLoginVerificationEmail(email, code)
+}
+
+func (b *SystemConfigBiz) sendEmail(recipient, subject, content string) error {
 	config, err := b.Get()
 	if err != nil {
 		return err
@@ -150,7 +219,7 @@ func (b *SystemConfigBiz) TestEmail(req *api.SystemConfigEmailTestRequest) error
 	if err := client.Mail(config.VerificationSMTPUsername); err != nil {
 		return err
 	}
-	if err := client.Rcpt(req.Recipient); err != nil {
+	if err := client.Rcpt(recipient); err != nil {
 		return err
 	}
 	body, err := client.Data()
@@ -161,7 +230,7 @@ func (b *SystemConfigBiz) TestEmail(req *api.SystemConfigEmailTestRequest) error
 	if config.VerificationEmailSenderName != "" {
 		sender = mime.QEncoding.Encode("UTF-8", config.VerificationEmailSenderName) + " <" + sender + ">"
 	}
-	_, writeErr := fmt.Fprint(body, "To: "+req.Recipient+"\r\nFrom: "+sender+"\r\nSubject: SMTP 配置测试\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nSMTP 配置测试邮件发送成功。\r\n")
+	_, writeErr := fmt.Fprint(body, "To: "+recipient+"\r\nFrom: "+sender+"\r\nSubject: "+mime.QEncoding.Encode("UTF-8", subject)+"\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n"+content+"\r\n")
 	closeErr := body.Close()
 	if writeErr != nil {
 		return writeErr

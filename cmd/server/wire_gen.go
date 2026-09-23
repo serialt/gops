@@ -33,7 +33,8 @@ func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(
 		return nil, nil, err
 	}
 	jwtManager := auth.NewJWTManager(cfg)
-	authBiz := biz.NewAuthBiz(db, jwtManager, service)
+	systemConfigBiz := biz.NewSystemConfigBiz(db, cfg)
+	authBiz := biz.NewAuthBiz(db, jwtManager, service, systemConfigBiz)
 	authHandler := handler.NewAuthHandler(authBiz)
 	dashboardBiz := biz.NewDashboardBiz(db)
 	dashboardHandler := handler.NewDashboardHandler(dashboardBiz)
@@ -46,7 +47,6 @@ func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(
 	organizationHandler := handler.NewOrganizationHandler(organizationBiz)
 	assetBiz := biz.NewAssetBiz(db, cfg, log)
 	assetHandler := handler.NewAssetHandler(assetBiz)
-	systemConfigBiz := biz.NewSystemConfigBiz(db, cfg)
 	systemConfigHandler := handler.NewSystemConfigHandler(systemConfigBiz)
 	monitorBiz := biz.NewMonitorBiz(db, cfg)
 	monitorHandler := handler.NewMonitorHandler(monitorBiz)

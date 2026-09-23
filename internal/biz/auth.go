@@ -1,8 +1,17 @@
 package biz
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"html"
 	"log/slog"
+	"math/big"
+	"strings"
+	"sync"
+	"time"
 
 	"gops/internal/data/api"
 	"gops/internal/data/model"
@@ -15,31 +24,46 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrGenerateToken      = errors.New("generate token failed")
+	ErrInvalidCaptcha     = errors.New("invalid or expired captcha")
+	ErrInvalidEmailCode   = errors.New("invalid or expired email code")
 )
 
-type AuthBiz struct {
-	db     *gorm.DB
-	jwt    *auth.JWTManager
-	casbin *casbinx.Service
+type verificationValue struct {
+	code      string
+	expiresAt time.Time
 }
 
-func NewAuthBiz(db *gorm.DB, jwt *auth.JWTManager, casbinService *casbinx.Service) *AuthBiz {
-	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService}
+type AuthBiz struct {
+	db         *gorm.DB
+	jwt        *auth.JWTManager
+	casbin     *casbinx.Service
+	config     *SystemConfigBiz
+	mu         sync.Mutex
+	captchas   map[string]verificationValue
+	emailCodes map[string]verificationValue
+}
+
+func NewAuthBiz(db *gorm.DB, jwt *auth.JWTManager, casbinService *casbinx.Service, config *SystemConfigBiz) *AuthBiz {
+	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue)}
 }
 
 func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, error) {
-	var user model.User
-	if err := b.db.Where("username = ?", req.Username).First(&user).Error; err != nil {
+	user, err := b.authenticate(req.Username, req.Password)
+	if err != nil {
 		b.recordLogin(0, req.Username, ip, "failed", "用户名或密码错误")
 		return nil, ErrInvalidCredentials
 	}
-	if !user.Status || !auth.CheckPassword(user.PasswordHash, req.Password) {
-		message := "用户名或密码错误"
-		if !user.Status {
-			message = "用户已被禁用"
-		}
-		b.recordLogin(user.ID, user.Username, ip, "failed", message)
-		return nil, ErrInvalidCredentials
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+		b.recordLogin(user.ID, user.Username, ip, "failed", "图形验证码错误或已过期")
+		return nil, ErrInvalidCaptcha
+	}
+	if b.loginVerificationRequired(config, user) && !b.verifyEmailCode(user.Username, req.EmailCode) {
+		b.recordLogin(user.ID, user.Username, ip, "failed", "登录验证码错误或已过期")
+		return nil, ErrInvalidEmailCode
 	}
 
 	token, err := b.jwt.Generate(uint(user.ID))
@@ -49,6 +73,125 @@ func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, e
 	}
 	b.recordLogin(user.ID, user.Username, ip, "success", "登录成功")
 	return &api.LoginResponse{Token: token}, nil
+}
+
+func (b *AuthBiz) SecurityConfig() (*api.LoginSecurityConfigResponse, error) {
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	return &api.LoginSecurityConfigResponse{
+		CaptchaEnabled: config.CaptchaEnabled, LoginVerificationEnabled: config.LoginVerificationEnabled,
+		LoginVerificationMethod: config.LoginVerificationMethod,
+	}, nil
+}
+
+func (b *AuthBiz) CreateCaptcha() (*api.CaptchaResponse, error) {
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	id, err := randomToken()
+	if err != nil {
+		return nil, err
+	}
+	code, err := randomDigits(4)
+	if err != nil {
+		return nil, err
+	}
+	b.mu.Lock()
+	b.captchas[id] = verificationValue{code: code, expiresAt: time.Now().Add(time.Duration(config.CaptchaExpireMinutes) * time.Minute)}
+	b.mu.Unlock()
+	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40"><rect width="120" height="40" rx="7" fill="#f3f5ff"/><path d="M8 30L32 8M48 35L75 5M83 34L112 10" stroke="#c7d2f7" stroke-width="2"/><text x="60" y="27" text-anchor="middle" font-family="monospace" font-size="22" font-weight="700" letter-spacing="6" fill="#536fe8">%s</text></svg>`, html.EscapeString(code))
+	return &api.CaptchaResponse{CaptchaID: id, Image: "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte(svg))}, nil
+}
+
+func (b *AuthBiz) SendEmailCode(req *api.EmailCodeRequest) (*api.EmailCodeResponse, error) {
+	user, err := b.authenticate(req.Username, req.Password)
+	if err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, false) {
+		return nil, ErrInvalidCaptcha
+	}
+	if !b.loginVerificationRequired(config, user) {
+		return &api.EmailCodeResponse{Required: false, Sent: false}, nil
+	}
+	code, err := randomDigits(6)
+	if err != nil {
+		return nil, err
+	}
+	if err := b.config.SendLoginVerification(config, user.Username, user.Email, code); err != nil {
+		return nil, err
+	}
+	b.mu.Lock()
+	b.emailCodes[user.Username] = verificationValue{code: code, expiresAt: time.Now().Add(5 * time.Minute)}
+	b.mu.Unlock()
+	return &api.EmailCodeResponse{Required: true, Sent: true}, nil
+}
+
+func (b *AuthBiz) loginVerificationRequired(config *api.SystemConfigResponse, user *model.User) bool {
+	if !config.LoginVerificationEnabled {
+		return false
+	}
+	if config.LoginVerificationMethod == "email" {
+		return config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != ""
+	}
+	return config.LoginVerificationMethod == "webhook" && config.VerificationWebhookEnabled
+}
+
+func (b *AuthBiz) authenticate(username, password string) (*model.User, error) {
+	var user model.User
+	if err := b.db.Where("username = ?", username).First(&user).Error; err != nil || !user.Status || !auth.CheckPassword(user.PasswordHash, password) {
+		return nil, ErrInvalidCredentials
+	}
+	return &user, nil
+}
+
+func (b *AuthBiz) verifyCaptcha(id, code string, consume bool) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	value, ok := b.captchas[id]
+	if !ok || time.Now().After(value.expiresAt) || !strings.EqualFold(value.code, strings.TrimSpace(code)) {
+		delete(b.captchas, id)
+		return false
+	}
+	if consume {
+		delete(b.captchas, id)
+	}
+	return true
+}
+
+func (b *AuthBiz) verifyEmailCode(username, code string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	value, ok := b.emailCodes[username]
+	delete(b.emailCodes, username)
+	return ok && time.Now().Before(value.expiresAt) && value.code == strings.TrimSpace(code)
+}
+
+func randomToken() (string, error) {
+	buffer := make([]byte, 16)
+	if _, err := rand.Read(buffer); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buffer), nil
+}
+
+func randomDigits(length int) (string, error) {
+	result := make([]byte, length)
+	for i := range result {
+		n, err := rand.Int(rand.Reader, big.NewInt(10))
+		if err != nil {
+			return "", err
+		}
+		result[i] = byte('0' + n.Int64())
+	}
+	return string(result), nil
 }
 
 func (b *AuthBiz) RecordInvalidLogin(username, ip, message string) {

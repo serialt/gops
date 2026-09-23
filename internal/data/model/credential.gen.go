@@ -15,16 +15,16 @@ const TableNameCredential = "credential"
 // Credential mapped from table <credential>
 type Credential struct {
 	ID             int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name           string         `gorm:"column:name;type:VARCHAR(100)" json:"name"`
-	CredentialType string         `gorm:"column:credential_type;type:VARCHAR(20)" json:"credential_type"`
-	Username       string         `gorm:"column:username;type:VARCHAR(100)" json:"username"`
-	Password       string         `gorm:"column:password;type:TEXT" json:"password"`
-	PrivateKey     string         `gorm:"column:private_key;type:TEXT" json:"private_key"`
-	Passphrase     string         `gorm:"column:passphrase;type:TEXT" json:"passphrase"`
-	Description    string         `gorm:"column:description;type:VARCHAR(500)" json:"description"`
-	CreatedAt      time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
+	Name           string         `gorm:"column:name;not null" json:"name"`
+	CredentialType string         `gorm:"column:credential_type;not null" json:"credential_type"`
+	Username       string         `gorm:"column:username;not null;default:''" json:"username"`
+	Password       string         `gorm:"column:password;not null;default:''" json:"password"`
+	PrivateKey     string         `gorm:"column:private_key;not null;default:''" json:"private_key"`
+	Passphrase     string         `gorm:"column:passphrase;not null;default:''" json:"passphrase"`
+	Description    string         `gorm:"column:description;not null;default:''" json:"description"`
+	CreatedAt      time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt      time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName Credential's table name

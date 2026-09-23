@@ -11,6 +11,9 @@ export interface SystemConfigResponse {
   password_require_special: boolean
   session_timeout_minutes: number
   captcha_enabled: boolean
+  captcha_expire_minutes: number
+  login_verification_enabled: boolean
+  login_verification_method: '' | 'email' | 'webhook'
   max_login_failures: number
   account_lock_minutes: number
   verification_email_enabled: boolean

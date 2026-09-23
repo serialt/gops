@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 import { getSystemConfig, testSystemConfigEmail, updateSystemConfig } from '@/api/system-config'
@@ -15,22 +15,14 @@ const form = reactive({
   system_name: '', system_description: '', password_min_length: 8,
   password_require_digit: false, password_require_letter: false, password_require_upper: false,
   password_require_lower: false, password_require_special: false,
-  session_timeout_minutes: 30, captcha_enabled: false, max_login_failures: 5, account_lock_minutes: 30,
+  session_timeout_minutes: 30, captcha_enabled: false, captcha_expire_minutes: 1,
+  login_verification_enabled: false, login_verification_method: '' as '' | 'email' | 'webhook',
+  max_login_failures: 5, account_lock_minutes: 30,
   verification_email_enabled: false, verification_email_sender_name: '', verification_smtp_host: '', verification_smtp_port: 465,
   verification_smtp_username: '', verification_smtp_password: '', verification_smtp_tls: true,
   verification_webhook_enabled: false, verification_webhook_url: '', verification_webhook_secret: '',
 })
 const systemConfig = useSystemConfigStore()
-const verificationChannels = computed<string[]>({
-  get: () => [
-    ...(form.verification_email_enabled ? ['email'] : []),
-    ...(form.verification_webhook_enabled ? ['webhook'] : []),
-  ],
-  set: (channels) => {
-    form.verification_email_enabled = channels.includes('email')
-    form.verification_webhook_enabled = channels.includes('webhook')
-  },
-})
 
 async function load() {
   const { data } = await getSystemConfig()
@@ -39,6 +31,10 @@ async function load() {
 }
 
 async function save() {
+  if (form.login_verification_enabled && !form.login_verification_method) {
+    ElMessage.warning('开启登录二次验证后，请选择验证方式')
+    return
+  }
   saving.value = true
   try {
     const { data } = await updateSystemConfig(form)
@@ -70,6 +66,23 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  () => form.login_verification_enabled,
+  (enabled) => {
+    if (enabled && !form.verification_email_enabled && !form.verification_webhook_enabled) {
+      ElMessage.warning('请先在“验证码配置”中启用至少一种验证方式')
+    }
+  },
+)
+
+watch(
+  () => [form.verification_email_enabled, form.verification_webhook_enabled] as const,
+  ([emailEnabled, webhookEnabled]) => {
+    if (form.login_verification_method === 'email' && !emailEnabled) form.login_verification_method = ''
+    if (form.login_verification_method === 'webhook' && !webhookEnabled) form.login_verification_method = ''
+  },
+)
 </script>
 
 <template>
@@ -94,39 +107,73 @@ watch(
         </el-tab-pane>
         <el-tab-pane label="安全配置" name="security">
           <el-form :model="form" label-width="96px" class="system-form security-form">
-            <el-form-item label="Session 超时" required>
-              <el-input-number v-model="form.session_timeout_minutes" :min="1" :max="10080" controls-position="right" />
-              <span class="form-hint">分钟，最长 7 天</span>
-            </el-form-item>
-            <el-form-item label="验证码验证">
-              <el-switch v-model="form.captcha_enabled" active-text="开启" inactive-text="关闭" />
-            </el-form-item>
-            <el-form-item v-if="form.captcha_enabled" label="验证码方式">
-              <el-checkbox-group v-model="verificationChannels">
-                <el-checkbox label="email">邮件验证码</el-checkbox>
-                <el-checkbox label="webhook">Webhook 验证码</el-checkbox>
-              </el-checkbox-group>
-              <span class="form-hint">请至少选择一种已启用的验证码方式</span>
-            </el-form-item>
-            <el-form-item label="登录失败上限" required>
-              <el-input-number v-model="form.max_login_failures" :min="1" :max="100" controls-position="right" />
-              <span class="form-hint">达到上限后锁定账户</span>
-            </el-form-item>
-            <el-form-item label="账户锁定时长" required>
-              <el-input-number v-model="form.account_lock_minutes" :min="1" :max="10080" controls-position="right" />
-              <span class="form-hint">分钟</span>
-            </el-form-item>
-            <el-form-item label="密码最小长度" required>
-              <el-input-number v-model="form.password_min_length" :min="1" :max="128" controls-position="right" />
-              <span class="form-hint">设置用户密码的最少字符数</span>
-            </el-form-item>
-            <el-form-item label="密码安全级别">
-              <el-checkbox v-model="form.password_require_digit">数字</el-checkbox>
-              <el-checkbox v-model="form.password_require_letter">字母</el-checkbox>
-              <el-checkbox v-model="form.password_require_upper">大写字母</el-checkbox>
-              <el-checkbox v-model="form.password_require_lower">小写字母</el-checkbox>
-              <el-checkbox v-model="form.password_require_special">特殊字符</el-checkbox>
-            </el-form-item>
+            <section class="security-group">
+              <h3>登录安全</h3>
+              <div class="security-grid">
+                <el-form-item label="Session 超时" required>
+                  <el-input-number v-model="form.session_timeout_minutes" :min="1" :max="10080" controls-position="right" />
+                  <span class="form-hint">分钟，最长 7 天</span>
+                </el-form-item>
+                <el-form-item label="登录失败上限" required>
+                  <el-input-number v-model="form.max_login_failures" :min="1" :max="100" controls-position="right" />
+                  <span class="form-hint">达到上限后锁定账户</span>
+                </el-form-item>
+                <el-form-item label="账户锁定时长" required>
+                  <el-input-number v-model="form.account_lock_minutes" :min="1" :max="10080" controls-position="right" />
+                  <span class="form-hint">分钟</span>
+                </el-form-item>
+              </div>
+            </section>
+            <section class="security-group">
+              <h3>图形验证码</h3>
+              <div class="security-grid">
+                <el-form-item label="启用验证码">
+                  <el-switch v-model="form.captcha_enabled" active-text="开启" inactive-text="关闭" />
+                  <span class="form-hint">登录时校验图片验证码</span>
+                </el-form-item>
+                <el-form-item label="有效期" required>
+                  <el-input-number v-model="form.captcha_expire_minutes" :min="1" :max="60"
+                    :disabled="!form.captcha_enabled" controls-position="right" />
+                  <span class="form-hint">分钟，默认 1 分钟</span>
+                </el-form-item>
+              </div>
+            </section>
+            <section class="security-group">
+              <h3>登录二次验证</h3>
+              <div class="security-grid">
+                <el-form-item label="启用验证">
+                  <el-switch v-model="form.login_verification_enabled" active-text="开启" inactive-text="关闭" />
+                  <span class="form-hint">通过已配置的方式发送验证码</span>
+                </el-form-item>
+                <el-form-item label="验证方式" :required="form.login_verification_enabled">
+                  <el-select v-model="form.login_verification_method" :disabled="!form.login_verification_enabled"
+                    placeholder="请选择验证码方式">
+                    <el-option v-if="form.verification_email_enabled" label="邮件" value="email" />
+                    <el-option v-if="form.verification_webhook_enabled" label="Webhook" value="webhook" />
+                  </el-select>
+                  <span v-if="!form.verification_email_enabled && !form.verification_webhook_enabled" class="form-hint">
+                    请先在“验证码配置”中启用至少一种方式
+                  </span>
+                  <span v-else class="form-hint">仅显示已在“验证码配置”中启用的方式</span>
+                </el-form-item>
+              </div>
+            </section>
+            <section class="security-group">
+              <h3>密码策略</h3>
+              <div class="security-grid">
+                <el-form-item label="最小长度" required>
+                  <el-input-number v-model="form.password_min_length" :min="1" :max="128" controls-position="right" />
+                  <span class="form-hint">密码最少字符数</span>
+                </el-form-item>
+                <el-form-item label="安全级别">
+                  <el-checkbox v-model="form.password_require_digit">数字</el-checkbox>
+                  <el-checkbox v-model="form.password_require_letter">字母</el-checkbox>
+                  <el-checkbox v-model="form.password_require_upper">大写</el-checkbox>
+                  <el-checkbox v-model="form.password_require_lower">小写</el-checkbox>
+                  <el-checkbox v-model="form.password_require_special">特殊字符</el-checkbox>
+                </el-form-item>
+              </div>
+            </section>
             <el-form-item><el-button v-permission="'POST /api/v1/system-config/update'" type="primary" :loading="saving"
                 @click="save">保存配置</el-button></el-form-item>
           </el-form>
@@ -235,6 +282,44 @@ watch(
   font-size: 11px;
 }
 
+.security-form {
+  max-width: 1080px;
+}
+
+.security-group {
+  margin-bottom: 18px;
+  padding: 16px 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+
+.security-group h3 {
+  margin: 0 0 14px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.security-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+}
+
+.security-grid :deep(.el-form-item) {
+  min-width: 0;
+}
+
+.security-grid :deep(.el-form-item__content) {
+  min-width: 0;
+}
+
+.security-grid :deep(.el-select),
+.security-grid :deep(.el-input-number) {
+  width: 150px;
+}
+
 .form-hint {
   margin-left: 12px;
   color: var(--text-soft);
@@ -341,6 +426,12 @@ watch(
   border-top: 1px dashed var(--line);
 }
 
+@media (max-width: 980px) {
+  .security-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 760px) {
   .section-card {
     padding: 16px;
@@ -365,8 +456,14 @@ watch(
 
   .smtp-row,
   .mail-account-row,
-  .email-test-row {
+  .email-test-row,
+  .security-grid {
     grid-template-columns: 1fr;
+  }
+
+  .security-group {
+    padding-right: 10px;
+    padding-left: 10px;
   }
 
   .smtp-row :deep(.el-input-number) {

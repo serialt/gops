@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 
 	"gops/internal/biz"
@@ -41,6 +42,10 @@ func (h *SystemConfigHandler) Update(c *gin.Context) {
 	}
 	result, err := h.biz.Update(req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidVerificationConfig) {
+			response.Error(c, 400, "selected login verification method is not configured or enabled")
+			return
+		}
 		response.Error(c, 500, "update system config failed")
 		return
 	}

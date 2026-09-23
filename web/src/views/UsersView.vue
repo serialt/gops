@@ -27,7 +27,7 @@ const selectedUsers = ref<User[]>([])
 const dialogVisible = ref(false)
 const editingID = ref<number | null>(null)
 const title = computed(() => editingID.value ? '编辑用户' : '新增用户')
-const form = reactive({ username: '', password: '', nickname: '', status: true, role_ids: [] as number[], organization_ids: [] as number[] })
+const form = reactive({ username: '', email: '', password: '', nickname: '', status: true, role_ids: [] as number[], organization_ids: [] as number[] })
 function userActionButton(text: string, className: string, onClick: () => void) {
   const button = document.createElement('button')
   button.className = `grid-action ${className}`
@@ -38,6 +38,7 @@ function userActionButton(text: string, className: string, onClick: () => void) 
 const userColumnDefs = computed<ColDef[]>(() => [
   { headerName: '序号', valueGetter: params => String((currentPage.value - 1) * pageSize.value + (params.node?.rowIndex ?? 0) + 1), width: 70 },
   { field: 'username', headerName: '用户名' },
+  { field: 'email', headerName: '邮箱', minWidth: 160, valueFormatter: params => params.value || '-' },
   { field: 'nickname', headerName: '昵称' },
   { headerName: '所属组织', valueGetter: params => params.data.organizations.map((item: Organization) => item.name).join('、') },
   { headerName: '角色', valueGetter: params => params.data.roles.map((item: Role) => item.name).join('、'), minWidth: 140 },
@@ -94,13 +95,13 @@ async function loadUsers() {
 
 function openCreate() {
   editingID.value = null
-  Object.assign(form, { username: '', password: '', nickname: '', status: true, role_ids: [], organization_ids: activeOrganizationId.value ? [activeOrganizationId.value] : [] })
+  Object.assign(form, { username: '', email: '', password: '', nickname: '', status: true, role_ids: [], organization_ids: activeOrganizationId.value ? [activeOrganizationId.value] : [] })
   dialogVisible.value = true
 }
 
 function openEdit(row: User) {
   editingID.value = row.id
-  Object.assign(form, { username: row.username, password: '', nickname: row.nickname, status: row.status, role_ids: row.roles.map(r => r.id), organization_ids: row.organizations.map(o => o.id) })
+  Object.assign(form, { username: row.username, email: row.email, password: '', nickname: row.nickname, status: row.status, role_ids: row.roles.map(r => r.id), organization_ids: row.organizations.map(o => o.id) })
   dialogVisible.value = true
 }
 
@@ -283,6 +284,7 @@ function toggleOrganizationPane() {
       <el-dialog v-model="dialogVisible" :title="title" width="520px">
         <el-form :model="form" label-width="90px">
           <el-form-item label="用户名" required><el-input v-model="form.username" /></el-form-item>
+          <el-form-item label="邮箱"><el-input v-model="form.email" type="email" placeholder="未填写时跳过登录邮件验证" /></el-form-item>
           <el-form-item :label="editingID ? '新密码' : '密码'" :required="!editingID"><el-input v-model="form.password"
               type="password" show-password :placeholder="editingID ? '留空表示不修改' : ''" /></el-form-item>
           <el-form-item label="昵称" required><el-input v-model="form.nickname" /></el-form-item>

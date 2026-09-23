@@ -10,6 +10,7 @@ type UserListRequest struct {
 type UserRequest struct {
 	ID              int64   `json:"id"`
 	Username        string  `json:"username" binding:"required"`
+	Email           string  `json:"email" binding:"omitempty,email"`
 	Password        string  `json:"password"`
 	Nickname        string  `json:"nickname" binding:"required"`
 	Status          *bool   `json:"status" binding:"required"`
@@ -24,6 +25,7 @@ type UserIDRequest struct {
 type UserResponse struct {
 	ID            int64                   `json:"id"`
 	Username      string                  `json:"username"`
+	Email         string                  `json:"email"`
 	Nickname      string                  `json:"nickname"`
 	Status        bool                    `json:"status"`
 	Roles         []*RoleResponse         `json:"roles"`

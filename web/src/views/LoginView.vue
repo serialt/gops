@@ -1,29 +1,81 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import { Lock, UserFilled } from '@element-plus/icons-vue'
+import { onMounted, reactive, ref } from 'vue'
+import { Lock, Message, Refresh, UserFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import illustrationUrl from '@/assets/login/illustration.svg'
 import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
+import { getCaptcha, getLoginSecurityConfig, sendLoginEmailCode } from '@/api/auth'
 
 const auth = useAuthStore()
 const systemConfig = useSystemConfigStore()
 const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
-const form = reactive({ username: 'admin', password: 'password' })
+const sendingEmailCode = ref(false)
+const security = reactive({
+  captcha_enabled: false,
+  login_verification_enabled: false,
+  login_verification_method: '' as '' | 'email' | 'webhook',
+})
+const captcha = reactive({ id: '', image: '' })
+const emailCodeRequired = ref(false)
+const form = reactive({ username: 'admin', password: 'password', captcha_code: '', email_code: '' })
+
+async function refreshCaptcha() {
+  if (!security.captcha_enabled) return
+  const { data } = await getCaptcha()
+  captcha.id = data.data.captcha_id
+  captcha.image = data.data.image
+  form.captcha_code = ''
+}
+
+async function requestEmailCode() {
+  if (security.captcha_enabled && !form.captcha_code.trim()) {
+    ElMessage.warning('请输入图形验证码')
+    return false
+  }
+  sendingEmailCode.value = true
+  try {
+    const { data } = await sendLoginEmailCode({ username: form.username, password: form.password, captcha_id: captcha.id, captcha_code: form.captcha_code })
+    emailCodeRequired.value = data.data.required
+    if (data.data.sent) ElMessage.success(security.login_verification_method === 'webhook' ? '验证码已通过 Webhook 发送' : '验证码已发送至用户邮箱')
+    return data.data.required
+  } catch (error) {
+    await refreshCaptcha()
+    throw error
+  } finally {
+    sendingEmailCode.value = false
+  }
+}
 
 async function submit() {
+  if (security.captcha_enabled && !form.captcha_code.trim()) return ElMessage.warning('请输入图形验证码')
   loading.value = true
   try {
-    await auth.login(form.username, form.password)
+    if (security.login_verification_enabled && !emailCodeRequired.value) {
+      const required = await requestEmailCode()
+      if (required) return
+    }
+    if (emailCodeRequired.value && !form.email_code.trim()) return ElMessage.warning('请输入登录验证码')
+    await auth.login({ username: form.username, password: form.password, captcha_id: captcha.id, captcha_code: form.captcha_code, email_code: form.email_code })
     await router.replace((route.query.redirect as string) || '/')
+  } catch (error) {
+    await refreshCaptcha()
+    throw error
   } finally {
     loading.value = false
   }
 }
+
+onMounted(async () => {
+  const { data } = await getLoginSecurityConfig()
+  Object.assign(security, data.data)
+  await refreshCaptcha()
+})
 </script>
 
 <template>
@@ -48,6 +100,22 @@ async function submit() {
                   <UserFilled />
                 </el-icon></template>
             </el-input>
+          </el-form-item>
+          <el-form-item v-if="security.captcha_enabled">
+            <div class="verification-row captcha-row">
+              <el-input v-model="form.captcha_code" size="large" maxlength="4" placeholder="请输入图形验证码">
+                <template #prefix><el-icon><Refresh /></el-icon></template>
+              </el-input>
+              <button class="captcha-image" type="button" title="点击刷新验证码" @click="refreshCaptcha"><img :src="captcha.image" alt="图形验证码" /></button>
+            </div>
+          </el-form-item>
+          <el-form-item v-if="emailCodeRequired">
+            <div class="verification-row">
+              <el-input v-model="form.email_code" size="large" maxlength="6" placeholder="请输入登录验证码">
+                <template #prefix><el-icon><Message /></el-icon></template>
+              </el-input>
+              <el-button :loading="sendingEmailCode" @click="requestEmailCode">重新发送</el-button>
+            </div>
           </el-form-item>
           <el-form-item>
             <el-input v-model="form.password" type="password" show-password size="large" placeholder="请输入密码"
@@ -167,6 +235,36 @@ async function submit() {
 
 .login-form :deep(.el-input__prefix) {
   color: #a6afbf;
+}
+
+.verification-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 8px;
+  width: 100%;
+}
+
+.verification-row :deep(.el-button) {
+  height: 42px;
+  margin: 0;
+  border-radius: 8px;
+}
+
+.captcha-image {
+  height: 42px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e3e8f1;
+  border-radius: 8px;
+  background: #f3f5ff;
+  cursor: pointer;
+}
+
+.captcha-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .submit {

@@ -15,15 +15,15 @@ const TableNameAssetGroup = "asset_group"
 // AssetGroup mapped from table <asset_group>
 type AssetGroup struct {
 	ID          int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name        string         `gorm:"column:name;type:VARCHAR(100)" json:"name"`
-	Code        string         `gorm:"column:code;type:VARCHAR(50)" json:"code"`
-	ParentID    int64          `gorm:"column:parent_id;type:BIGINT" json:"parent_id"`
-	Description string         `gorm:"column:description;type:VARCHAR(500)" json:"description"`
-	SortOrder   int64          `gorm:"column:sort_order;type:INTEGER" json:"sort_order"`
-	Status      bool           `gorm:"column:status;type:BOOLEAN" json:"status"`
-	CreatedAt   time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
+	Name        string         `gorm:"column:name;not null" json:"name"`
+	Code        string         `gorm:"column:code;not null" json:"code"`
+	ParentID    int64          `gorm:"column:parent_id;not null" json:"parent_id"`
+	Description string         `gorm:"column:description;not null;default:''" json:"description"`
+	SortOrder   int64          `gorm:"column:sort_order;not null" json:"sort_order"`
+	Status      bool           `gorm:"column:status;not null;default:TRUE" json:"status"`
+	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName AssetGroup's table name

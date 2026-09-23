@@ -3,6 +3,7 @@ package biz
 import (
 	"errors"
 	"strconv"
+	"strings"
 
 	"gops/internal/data/api"
 	"gops/internal/data/model"
@@ -27,7 +28,7 @@ func (b *UserBiz) List(req *api.UserListRequest) ([]*api.UserResponse, error) {
 	var users []model.User
 	query := b.db.Preload("Roles").Preload("Organizations").Order("id DESC")
 	if req.Keyword != "" {
-		query = query.Where("username LIKE ? OR nickname LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		query = query.Where("username LIKE ? OR nickname LIKE ? OR email LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if req.OrganizationID > 0 {
 		query = query.Joins("JOIN organization_user ON organization_user.user_id = \"user\".id").Where("organization_user.organization_id = ?", req.OrganizationID).Group("\"user\".id")
@@ -47,7 +48,7 @@ func (b *UserBiz) Create(req *api.UserRequest) (*api.UserResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	user := model.User{Username: req.Username, PasswordHash: hash, Nickname: req.Nickname, Status: *req.Status}
+	user := model.User{Username: req.Username, Email: strings.ToLower(strings.TrimSpace(req.Email)), PasswordHash: hash, Nickname: req.Nickname, Status: *req.Status}
 	if err := b.saveUser(&user, req.RoleIDs, req.OrganizationIDs, true); err != nil {
 		return nil, err
 	}
@@ -66,6 +67,7 @@ func (b *UserBiz) Update(req *api.UserRequest) (*api.UserResponse, error) {
 		return nil, err
 	}
 	user.Username = req.Username
+	user.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	user.Nickname = req.Nickname
 	user.Status = *req.Status
 	if req.Password != "" {
@@ -184,5 +186,5 @@ func toUserResponse(user model.User) *api.UserResponse {
 			organizations = append(organizations, toOrganizationResponse(*organization))
 		}
 	}
-	return &api.UserResponse{ID: user.ID, Username: user.Username, Nickname: user.Nickname, Status: user.Status, Roles: roles, Organizations: organizations, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt}
+	return &api.UserResponse{ID: user.ID, Username: user.Username, Email: user.Email, Nickname: user.Nickname, Status: user.Status, Roles: roles, Organizations: organizations, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt}
 }

@@ -15,18 +15,18 @@ const TableNameTerminalSession = "terminal_session"
 // TerminalSession mapped from table <terminal_session>
 type TerminalSession struct {
 	ID              int64          `gorm:"column:id;primaryKey" json:"id"`
-	UserID          int64          `gorm:"column:user_id;type:BIGINT" json:"user_id"`
-	HostID          int64          `gorm:"column:host_id;type:BIGINT" json:"host_id"`
-	DbInstanceID    int64          `gorm:"column:db_instance_id;type:BIGINT" json:"db_instance_id"`
-	SessionType     string         `gorm:"column:session_type;type:VARCHAR(20)" json:"session_type"`
-	StartedAt       time.Time      `gorm:"column:started_at;type:DATETIME" json:"started_at"`
-	EndedAt         time.Time      `gorm:"column:ended_at;type:DATETIME" json:"ended_at"`
-	DurationSeconds int64          `gorm:"column:duration_seconds;type:BIGINT" json:"duration_seconds"`
-	CommandCount    int64          `gorm:"column:command_count;type:BIGINT" json:"command_count"`
-	Recording       string         `gorm:"column:recording;type:TEXT" json:"recording"`
-	CreatedAt       time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
-	UpdatedAt       time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
+	UserID          int64          `gorm:"column:user_id;not null" json:"user_id"`
+	HostID          int64          `gorm:"column:host_id" json:"host_id"`
+	DbInstanceID    int64          `gorm:"column:db_instance_id" json:"db_instance_id"`
+	SessionType     string         `gorm:"column:session_type;not null" json:"session_type"`
+	StartedAt       time.Time      `gorm:"column:started_at;not null;default:CURRENT_TIMESTAMP" json:"started_at"`
+	EndedAt         time.Time      `gorm:"column:ended_at" json:"ended_at"`
+	DurationSeconds int64          `gorm:"column:duration_seconds;not null" json:"duration_seconds"`
+	CommandCount    int64          `gorm:"column:command_count;not null" json:"command_count"`
+	Recording       string         `gorm:"column:recording;not null;default:''" json:"recording"`
+	CreatedAt       time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt       time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName TerminalSession's table name
