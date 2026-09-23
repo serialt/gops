@@ -49,6 +49,65 @@ func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
 	g.POST("/auth/security-config", h.SecurityConfig)
 	g.POST("/auth/captcha", h.Captcha)
 	g.POST("/auth/email-code/send", h.SendEmailCode)
+	g.POST("/auth/password-reset/code/send", h.SendPasswordResetCode)
+	g.POST("/auth/password-reset/code/verify", h.VerifyPasswordResetCode)
+	g.POST("/auth/password-reset/confirm", h.ResetPassword)
+}
+
+// VerifyPasswordResetCode POST /api/v1/auth/password-reset/code/verify 验证密码重置二次验证码。
+func (h *AuthHandler) VerifyPasswordResetCode(c *gin.Context) {
+	req := new(api.PasswordResetVerifyRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入验证码")
+		return
+	}
+	result, err := h.biz.VerifyPasswordResetCode(req)
+	if err != nil {
+		response.Error(c, 400, "验证码错误或已过期")
+		return
+	}
+	response.OK(c, result)
+}
+
+// SendPasswordResetCode POST /api/v1/auth/password-reset/code/send 发送密码重置二次验证码。
+func (h *AuthHandler) SendPasswordResetCode(c *gin.Context) {
+	req := new(api.PasswordResetCodeRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入用户名")
+		return
+	}
+	result, err := h.biz.SendPasswordResetCode(req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidCredentials) {
+			response.Error(c, 400, "用户不存在或已停用")
+			return
+		}
+		if errors.Is(err, biz.ErrInvalidCaptcha) {
+			response.Error(c, 400, "图形验证码错误或已过期")
+			return
+		}
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// ResetPassword POST /api/v1/auth/password-reset/confirm 使用重置凭证修改密码。
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	req := new(api.PasswordResetRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "重置密码参数不正确")
+		return
+	}
+	if err := h.biz.ResetPassword(req); err != nil {
+		if errors.Is(err, biz.ErrInvalidEmailCode) {
+			response.Error(c, 400, "验证码错误或已过期")
+			return
+		}
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
 }
 
 // Login POST /api/v1/auth/login 用户登录。

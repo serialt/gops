@@ -37,17 +37,19 @@ type verificationValue struct {
 }
 
 type AuthBiz struct {
-	db         *gorm.DB
-	jwt        *auth.JWTManager
-	casbin     *casbinx.Service
-	config     *SystemConfigBiz
-	mu         sync.Mutex
-	captchas   map[string]verificationValue
-	emailCodes map[string]verificationValue
+	db          *gorm.DB
+	jwt         *auth.JWTManager
+	casbin      *casbinx.Service
+	config      *SystemConfigBiz
+	mu          sync.Mutex
+	captchas    map[string]verificationValue
+	emailCodes  map[string]verificationValue
+	resetCodes  map[string]verificationValue
+	resetTokens map[string]verificationValue
 }
 
 func NewAuthBiz(db *gorm.DB, jwt *auth.JWTManager, casbinService *casbinx.Service, config *SystemConfigBiz) *AuthBiz {
-	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue)}
+	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue)}
 }
 
 func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, error) {
@@ -140,10 +142,100 @@ func (b *AuthBiz) SendEmailCode(req *api.EmailCodeRequest) (*api.EmailCodeRespon
 	go func(username, email, verificationCode string) {
 		if err := b.config.SendLoginVerification(config, username, email, verificationCode); err != nil {
 			b.discardEmailCode(username, verificationCode)
-			slog.Error("发送登录二次验证码失败", "error", err, "username", username, "method", config.LoginVerificationMethod)
+			slog.Error("发送登录验证码失败", "error", err, "username", username, "method", config.LoginVerificationMethod)
 		}
 	}(user.Username, user.Email, code)
 	return &api.EmailCodeResponse{Required: true, Sent: true, RetryAfterSeconds: int(expiresIn.Seconds()), ExpiresInSeconds: int(expiresIn.Seconds())}, nil
+}
+
+func (b *AuthBiz) SendPasswordResetCode(req *api.PasswordResetCodeRequest) (*api.EmailCodeResponse, error) {
+	var user model.User
+	if err := b.db.Where("username = ? AND status = ?", strings.TrimSpace(req.Username), true).First(&user).Error; err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	resetMethod := passwordResetVerificationMethod(config, &user)
+	if resetMethod == "" {
+		return nil, errors.New("验证码配置中没有适用于当前用户的发送方式")
+	}
+	resetConfig := *config
+	resetConfig.LoginVerificationEnabled = true
+	resetConfig.LoginVerificationMethod = resetMethod
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+		return nil, ErrInvalidCaptcha
+	}
+	expiresIn := 5 * time.Minute
+	if resetMethod == "email" {
+		expiresIn = time.Duration(config.VerificationEmailExpireMinutes) * time.Minute
+	}
+	code, err := randomDigits(6)
+	if err != nil {
+		return nil, err
+	}
+	if retryAfter, expiresAfter := b.reserveResetCode(user.Username, code, expiresIn); retryAfter > 0 {
+		return &api.EmailCodeResponse{Required: true, Sent: false, RetryAfterSeconds: retryAfter, ExpiresInSeconds: expiresAfter}, nil
+	}
+	go func(username, email, verificationCode string) {
+		if err := b.config.SendPasswordResetVerification(&resetConfig, username, email, verificationCode); err != nil {
+			b.discardResetCode(username, verificationCode)
+			slog.Error("发送密码重置验证码失败", "error", err, "username", username, "method", resetMethod)
+		}
+	}(user.Username, user.Email, code)
+	return &api.EmailCodeResponse{Required: true, Sent: true, RetryAfterSeconds: int(expiresIn.Seconds()), ExpiresInSeconds: int(expiresIn.Seconds())}, nil
+}
+
+func passwordResetVerificationMethod(config *api.SystemConfigResponse, user *model.User) string {
+	if config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != "" {
+		return "email"
+	}
+	if config.VerificationWebhookEnabled {
+		return "webhook"
+	}
+	return ""
+}
+
+func (b *AuthBiz) VerifyPasswordResetCode(req *api.PasswordResetVerifyRequest) (*api.PasswordResetVerifyResponse, error) {
+	username := strings.TrimSpace(req.Username)
+	if !b.verifyResetCode(username, req.Code) {
+		return nil, ErrInvalidEmailCode
+	}
+	token, err := randomToken()
+	if err != nil {
+		return nil, err
+	}
+	b.mu.Lock()
+	b.resetTokens[token] = verificationValue{code: username, expiresAt: time.Now().Add(10 * time.Minute)}
+	b.mu.Unlock()
+	return &api.PasswordResetVerifyResponse{ResetToken: token}, nil
+}
+
+func (b *AuthBiz) ResetPassword(req *api.PasswordResetRequest) error {
+	config, err := b.config.Get()
+	if err != nil {
+		return err
+	}
+	if err := validateProfilePassword(req.NewPassword, config); err != nil {
+		return err
+	}
+	username, ok := b.consumeResetToken(req.ResetToken)
+	if !ok {
+		return errors.New("密码重置凭证无效或已过期")
+	}
+	hash, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		return err
+	}
+	result := b.db.Model(&model.User{}).Where("username = ? AND status = ?", username, true).Update("password_hash", hash)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrInvalidCredentials
+	}
+	return nil
 }
 
 func (b *AuthBiz) loginVerificationRequired(config *api.SystemConfigResponse, user *model.User) bool {
@@ -235,6 +327,56 @@ func (b *AuthBiz) discardEmailCode(username, code string) {
 	if value, ok := b.emailCodes[username]; ok && value.code == code {
 		delete(b.emailCodes, username)
 	}
+}
+
+func (b *AuthBiz) reserveResetCode(username, code string, expiresIn time.Duration) (int, int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	value, ok := b.resetCodes[username]
+	if ok && now.Before(value.expiresAt) {
+		remaining := value.expiresAt.Sub(now)
+		return int(remaining.Seconds()) + 1, int(remaining.Seconds()) + 1
+	}
+	b.resetCodes[username] = verificationValue{code: code, expiresAt: now.Add(expiresIn)}
+	return 0, int(expiresIn.Seconds())
+}
+
+func (b *AuthBiz) discardResetCode(username, code string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if value, ok := b.resetCodes[username]; ok && value.code == code {
+		delete(b.resetCodes, username)
+	}
+}
+
+func (b *AuthBiz) verifyResetCode(username, code string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	value, ok := b.resetCodes[username]
+	if !ok || time.Now().After(value.expiresAt) {
+		delete(b.resetCodes, username)
+		return false
+	}
+	if value.code != strings.TrimSpace(code) {
+		value.attempts++
+		if value.attempts >= 5 {
+			delete(b.resetCodes, username)
+		} else {
+			b.resetCodes[username] = value
+		}
+		return false
+	}
+	delete(b.resetCodes, username)
+	return true
+}
+
+func (b *AuthBiz) consumeResetToken(token string) (string, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	value, ok := b.resetTokens[token]
+	delete(b.resetTokens, token)
+	return value.code, ok && time.Now().Before(value.expiresAt)
 }
 
 func randomToken() (string, error) {

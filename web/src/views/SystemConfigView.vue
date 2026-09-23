@@ -18,7 +18,7 @@ const form = reactive({
   session_timeout_minutes: 30, captcha_enabled: false, captcha_expire_minutes: 1,
   login_verification_enabled: false, login_verification_method: '' as '' | 'email' | 'webhook',
   max_login_failures: 5, account_lock_minutes: 30,
-  verification_email_enabled: false, verification_email_expire_minutes: 5,
+  verification_email_enabled: true, verification_email_expire_minutes: 5,
   verification_email_sender_name: '', verification_smtp_host: '', verification_smtp_port: 465,
   verification_smtp_username: '', verification_smtp_password: '', verification_smtp_tls: true,
   verification_webhook_enabled: false, verification_webhook_url: '', verification_webhook_secret: '',
@@ -32,6 +32,10 @@ async function load() {
 }
 
 async function save() {
+  if (!form.verification_email_enabled && !form.verification_webhook_enabled) {
+    ElMessage.warning('邮件验证码和 Webhook 至少需要启用一种')
+    return
+  }
   if (form.login_verification_enabled && !form.login_verification_method) {
     ElMessage.warning('开启登录二次验证后，请选择验证方式')
     return

@@ -58,12 +58,15 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 		"session_timeout_minutes": "30", "captcha_enabled": "false", "captcha_expire_minutes": "1",
 		"login_verification_enabled": "false", "login_verification_method": "",
 		"max_login_failures": "5", "account_lock_minutes": "30",
-		"verification_email_enabled": "false", "verification_email_expire_minutes": "5", "verification_email_sender_name": "", "verification_smtp_host": "",
+		"verification_email_enabled": "true", "verification_email_expire_minutes": "5", "verification_email_sender_name": "", "verification_smtp_host": "",
 		"verification_smtp_port": "465", "verification_smtp_username": "", "verification_smtp_password": "", "verification_smtp_tls": "true",
 		"verification_webhook_enabled": "false", "verification_webhook_url": "", "verification_webhook_secret": "",
 	}
 	for _, row := range rows {
 		values[row.ConfigKey] = row.ConfigValue
+	}
+	if !parseConfigBool(values["verification_email_enabled"]) && !parseConfigBool(values["verification_webhook_enabled"]) {
+		values["verification_email_enabled"] = "true"
 	}
 	for _, key := range []string{"verification_smtp_password", "verification_webhook_secret"} {
 		decrypted, err := cryptox.Decrypt(b.aesKey, values[key])
@@ -102,6 +105,9 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 }
 
 func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfigResponse, error) {
+	if !req.VerificationEmailEnabled && !req.VerificationWebhookEnabled {
+		return nil, ErrInvalidVerificationConfig
+	}
 	if req.LoginVerificationEnabled {
 		if req.LoginVerificationMethod == "" {
 			return nil, ErrInvalidVerificationConfig
@@ -163,6 +169,14 @@ func (b *SystemConfigBiz) TestEmail(req *api.SystemConfigEmailTestRequest) error
 }
 
 func (b *SystemConfigBiz) SendLoginVerification(config *api.SystemConfigResponse, username, email, code string) error {
+	return b.sendVerification(config, username, email, code, "login_verification", "登录验证码")
+}
+
+func (b *SystemConfigBiz) SendPasswordResetVerification(config *api.SystemConfigResponse, username, email, code string) error {
+	return b.sendVerification(config, username, email, code, "password_reset", "密码重置验证码")
+}
+
+func (b *SystemConfigBiz) sendVerification(config *api.SystemConfigResponse, username, email, code, event, subject string) error {
 	if !config.LoginVerificationEnabled {
 		return nil
 	}
@@ -171,7 +185,7 @@ func (b *SystemConfigBiz) SendLoginVerification(config *api.SystemConfigResponse
 			return ErrInvalidVerificationConfig
 		}
 		payload, err := json.Marshal(map[string]any{
-			"event": "login_verification", "username": username, "email": email,
+			"event": event, "username": username, "email": email,
 			"code": code, "expires_in": 300,
 		})
 		if err != nil {
@@ -200,7 +214,7 @@ func (b *SystemConfigBiz) SendLoginVerification(config *api.SystemConfigResponse
 	if config.LoginVerificationMethod != "email" || !config.VerificationEmailEnabled || email == "" {
 		return ErrInvalidVerificationConfig
 	}
-	return b.sendEmail(email, "登录验证码", fmt.Sprintf("您的登录验证码是：%s\n验证码 %d 分钟内有效，请勿泄露给他人。", code, config.VerificationEmailExpireMinutes))
+	return b.sendEmail(email, subject, fmt.Sprintf("您的%s是：%s\n验证码 %d 分钟内有效，请勿泄露给他人。", subject, code, config.VerificationEmailExpireMinutes))
 }
 
 func (b *SystemConfigBiz) sendEmail(recipient, subject, content string) error {

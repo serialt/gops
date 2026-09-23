@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { Lock, Message, Refresh, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
@@ -8,7 +8,7 @@ import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
-import { getCaptcha, getLoginSecurityConfig, sendLoginEmailCode } from '@/api/auth'
+import { getCaptcha, getLoginSecurityConfig, resetPassword, sendLoginEmailCode, sendPasswordResetCode, verifyPasswordResetCode } from '@/api/auth'
 
 const auth = useAuthStore()
 const systemConfig = useSystemConfigStore()
@@ -20,7 +20,7 @@ const resendCountdown = ref(0)
 let resendTimer: ReturnType<typeof setInterval> | undefined
 const verificationCountdown = ref(0)
 let verificationTimer: ReturnType<typeof setInterval> | undefined
-const loginStep = ref<'credentials' | 'verification'>('credentials')
+const loginStep = ref<'credentials' | 'verification' | 'forgot' | 'reset_verify' | 'reset_password'>('credentials')
 const security = reactive({
   captcha_enabled: false,
   login_verification_enabled: false,
@@ -29,6 +29,16 @@ const security = reactive({
 const captcha = reactive({ id: '', image: '' })
 const emailCodeRequired = ref(false)
 const form = reactive({ username: 'admin', password: 'password', captcha_code: '', email_code: '' })
+const resetForm = reactive({ code: '', new_password: '', confirm_password: '' })
+const resetToken = ref('')
+const stepTitle = computed(() => ({ credentials: '欢迎登录', verification: '二次验证', forgot: '忘记密码', reset_verify: '身份验证', reset_password: '重置密码' })[loginStep.value])
+const stepDescription = computed(() => ({
+  credentials: '登录管理控制台，开始你的工作。',
+  verification: '请输入收到的验证码以继续登录。',
+  forgot: '验证身份后即可重新设置密码。',
+  reset_verify: '请输入收到的验证码。',
+  reset_password: '身份验证已通过，请设置新密码。',
+})[loginStep.value])
 
 function startResendCountdown(seconds: number) {
   resendCountdown.value = seconds
@@ -119,8 +129,74 @@ function backToCredentials() {
   loginStep.value = 'credentials'
   emailCodeRequired.value = false
   form.email_code = ''
+  resetToken.value = ''
   startResendCountdown(0)
   startVerificationCountdown(0)
+}
+
+async function openForgotPassword() {
+  backToCredentials()
+  form.password = ''
+  loginStep.value = 'forgot'
+  await refreshCaptcha()
+}
+
+async function requestPasswordResetCode() {
+  if (!form.username.trim()) return ElMessage.warning('请输入用户名')
+  if (security.captcha_enabled && !form.captcha_code.trim()) return ElMessage.warning('请输入图形验证码')
+  sendingEmailCode.value = true
+  try {
+    const { data } = await sendPasswordResetCode({ username: form.username.trim(), captcha_id: captcha.id, captcha_code: form.captcha_code })
+    startResendCountdown(data.data.retry_after_seconds)
+    startVerificationCountdown(data.data.expires_in_seconds)
+    loginStep.value = 'reset_verify'
+    if (data.data.sent) ElMessage.success('密码重置验证码已发送')
+    else ElMessage.info('验证码已发送，请勿重复获取')
+  } catch (error) {
+    await refreshCaptcha()
+    throw error
+  } finally {
+    sendingEmailCode.value = false
+  }
+}
+
+async function verifyPasswordReset() {
+  if (verificationCountdown.value <= 0) return ElMessage.warning('验证码已过期，请重新获取')
+  if (!resetForm.code.trim()) return ElMessage.warning('请输入验证码')
+  loading.value = true
+  try {
+    const { data } = await verifyPasswordResetCode({ username: form.username.trim(), code: resetForm.code.trim() })
+    resetToken.value = data.data.reset_token
+    startVerificationCountdown(0)
+    loginStep.value = 'reset_password'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function confirmPasswordReset() {
+  if (!resetForm.new_password) return ElMessage.warning('请输入新密码')
+  if (resetForm.new_password !== resetForm.confirm_password) return ElMessage.warning('两次输入的新密码不一致')
+  loading.value = true
+  try {
+    await resetPassword({ reset_token: resetToken.value, new_password: resetForm.new_password })
+    ElMessage.success('密码修改成功，请重新登录')
+    resetForm.code = ''
+    resetForm.new_password = ''
+    resetForm.confirm_password = ''
+    resetToken.value = ''
+    backToCredentials()
+    await refreshCaptcha()
+  } finally {
+    loading.value = false
+  }
+}
+
+function handlePrimaryAction() {
+  if (loginStep.value === 'forgot') return requestPasswordResetCode()
+  if (loginStep.value === 'reset_verify') return verifyPasswordReset()
+  if (loginStep.value === 'reset_password') return confirmPasswordReset()
+  return submit()
 }
 
 onMounted(async () => {
@@ -146,12 +222,12 @@ onBeforeUnmount(() => {
         <div class="login-heading">
           <img class="login-logo" :src="gopsLogoUrl" :alt="systemConfig.systemName" />
           <div>
-            <h1>{{ loginStep === 'verification' ? '二次验证' : '欢迎登录' }}</h1>
-            <p>{{ loginStep === 'verification' ? '请输入收到的验证码以继续登录。' : '登录管理控制台，开始你的工作。' }}</p>
+            <h1>{{ stepTitle }}</h1>
+            <p>{{ stepDescription }}</p>
           </div>
         </div>
-        <el-form :model="form" class="login-form" @keyup.enter="submit">
-          <el-form-item v-if="loginStep === 'credentials'">
+        <el-form :model="form" class="login-form" @keyup.enter="handlePrimaryAction">
+          <el-form-item v-if="loginStep === 'credentials' || loginStep === 'forgot'">
             <el-input v-model="form.username" size="large" placeholder="请输入用户名" autocomplete="username">
               <template #prefix><el-icon>
                   <UserFilled />
@@ -166,7 +242,7 @@ onBeforeUnmount(() => {
                 </el-icon></template>
             </el-input>
           </el-form-item>
-          <el-form-item v-if="loginStep === 'credentials' && security.captcha_enabled">
+          <el-form-item v-if="(loginStep === 'credentials' || loginStep === 'forgot') && security.captcha_enabled">
             <div class="verification-row captcha-row">
               <el-input v-model="form.captcha_code" size="large" maxlength="4" placeholder="请输入图形验证码">
                 <template #prefix><el-icon><Refresh /></el-icon></template>
@@ -184,19 +260,33 @@ onBeforeUnmount(() => {
               </el-button>
             </div>
           </el-form-item>
-          <p v-if="loginStep === 'verification'" class="verification-expiry" :class="{ expired: verificationCountdown <= 0 }">
+          <el-form-item v-if="loginStep === 'reset_verify'">
+            <el-input v-model="resetForm.code" size="large" maxlength="6" placeholder="请输入验证码">
+              <template #prefix><el-icon><Message /></el-icon></template>
+            </el-input>
+          </el-form-item>
+          <el-form-item v-if="loginStep === 'reset_password'">
+            <el-input v-model="resetForm.new_password" type="password" show-password size="large" placeholder="请输入新密码"
+              autocomplete="new-password"><template #prefix><el-icon><Lock /></el-icon></template></el-input>
+          </el-form-item>
+          <el-form-item v-if="loginStep === 'reset_password'">
+            <el-input v-model="resetForm.confirm_password" type="password" show-password size="large" placeholder="请再次输入新密码"
+              autocomplete="new-password"><template #prefix><el-icon><Lock /></el-icon></template></el-input>
+          </el-form-item>
+          <p v-if="loginStep === 'verification' || loginStep === 'reset_verify'" class="verification-expiry" :class="{ expired: verificationCountdown <= 0 }">
             {{ verificationCountdown > 0 ? `验证码有效期剩余 ${formatCountdown(verificationCountdown)}` : '验证码已过期，请重新获取' }}
           </p>
           
-          <el-button type="primary" size="large" :loading="loading" class="submit" @click="submit">
-            {{ loginStep === 'verification' ? '验证并登录' : '登录' }}
+          <button v-if="loginStep === 'credentials'" type="button" class="forgot-password" @click="openForgotPassword">忘记密码？</button>
+          <el-button type="primary" size="large" :loading="loading || sendingEmailCode" class="submit" @click="handlePrimaryAction">
+            {{ loginStep === 'verification' ? '验证并登录' : loginStep === 'forgot' ? '发送验证码' : loginStep === 'reset_verify' ? '验证身份' : loginStep === 'reset_password' ? '修改密码' : '登录' }}
           </el-button>
-          <el-button v-if="loginStep === 'verification'" class="back-button" text @click="backToCredentials">
+          <el-button v-if="loginStep !== 'credentials'" class="back-button" text @click="backToCredentials">
             返回账号登录
           </el-button>
         </el-form>
         <p class="login-tip">
-          {{ loginStep === 'verification' ? '验证码最多可尝试 5 次' : '使用您的账号和密码登录系统' }}
+          {{ loginStep === 'verification' || loginStep === 'reset_verify' ? '验证码最多可尝试 5 次' : '使用您的账号和密码登录系统' }}
         </p>
       </div>
     </section>
@@ -354,6 +444,17 @@ onBeforeUnmount(() => {
   margin-top: 4px;
   border-radius: 8px;
   font-weight: 600;
+}
+
+.forgot-password {
+  display: block;
+  margin: -4px 0 10px auto;
+  padding: 0;
+  border: 0;
+  color: var(--primary);
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
 }
 
 .back-button {

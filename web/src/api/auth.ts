@@ -23,6 +23,10 @@ export interface EmailCodeResponse {
   retry_after_seconds: number
   expires_in_seconds: number
 }
+export interface PasswordResetCodeRequest { username: string; captcha_id?: string; captcha_code?: string }
+export interface PasswordResetVerifyRequest { username: string; code: string }
+export interface PasswordResetVerifyResponse { reset_token: string }
+export interface PasswordResetRequest { reset_token: string; new_password: string }
 
 export const login = (data: LoginRequest) => request.post<LoginResponse>('/auth/login', data)
 export const getMe = () => request.post<CurrentUserResponse>('/auth/me', {})
@@ -30,3 +34,6 @@ export const updateProfile = (data: ProfileUpdateRequest) => request.post<User>(
 export const getLoginSecurityConfig = () => request.post<LoginSecurityConfig>('/auth/security-config', {})
 export const getCaptcha = () => request.post<CaptchaResponse>('/auth/captcha', {})
 export const sendLoginEmailCode = (data: Omit<LoginRequest, 'email_code'>) => request.post<EmailCodeResponse>('/auth/email-code/send', data)
+export const sendPasswordResetCode = (data: PasswordResetCodeRequest) => request.post<EmailCodeResponse>('/auth/password-reset/code/send', data)
+export const verifyPasswordResetCode = (data: PasswordResetVerifyRequest) => request.post<PasswordResetVerifyResponse>('/auth/password-reset/code/verify', data)
+export const resetPassword = (data: PasswordResetRequest) => request.post<null>('/auth/password-reset/confirm', data)
