@@ -107,7 +107,7 @@ func NewGinEngine(
 	terminal.GET("/assets/terminal/connect/:id", assetHandler.ConnectTerminal)
 
 	authorized := protected.Group("")
-	authorized.Use(middleware.Casbin(casbinService))
+	authorized.Use(middleware.Casbin(casbinService), middleware.OperationAudit(db))
 	dashboardHandler.RegisterRoutes(authorized)
 	userHandler.RegisterRoutes(authorized)
 	roleHandler.RegisterRoutes(authorized)
@@ -121,7 +121,7 @@ func NewGinEngine(
 	kubernetesHandler.RegisterRoutes(authorized)
 	auditHandler.RegisterRoutes(authorized)
 
-	registerFrontend(r)
+	registerFrontend(r, db)
 	cleanup = cancelSchedulers
 	return
 }

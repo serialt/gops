@@ -32,11 +32,12 @@ func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	req := new(api.LoginRequest)
 	if err := c.ShouldBindJSON(req); err != nil {
+		h.biz.RecordInvalidLogin(req.Username, c.ClientIP(), "用户名和密码不能为空")
 		response.Error(c, 400, "username and password are required")
 		return
 	}
 
-	result, err := h.biz.Login(req)
+	result, err := h.biz.Login(req, c.ClientIP())
 	if err != nil {
 		if errors.Is(err, biz.ErrInvalidCredentials) {
 			response.Error(c, 401, err.Error())

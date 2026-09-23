@@ -13,8 +13,22 @@ func NewAuditHandler(b *biz.AuditBiz) *AuditHandler { return &AuditHandler{b} }
 
 func (h *AuditHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/audit/operation-logs/list", h.ListOperationLogs)
+	g.POST("/audit/operation-logs/delete", h.DeleteOperationLogs)
 	g.POST("/audit/login-logs/list", h.ListLoginLogs)
+	g.POST("/audit/login-logs/delete", h.DeleteLoginLogs)
 	g.POST("/audit/data-logs/list", h.ListDataLogs)
+}
+
+// DeleteOperationLogs POST /api/v1/audit/operation-logs/delete 删除操作日志。
+func (h *AuditHandler) DeleteOperationLogs(c *gin.Context) {
+	r := new(api.AuditDeleteRequest)
+	if auditBind(c, r) {
+		if e := h.biz.DeleteOperations(r); e != nil {
+			response.Error(c, 500, e.Error())
+		} else {
+			response.OK(c, nil)
+		}
+	}
 }
 
 func auditBind(c *gin.Context, r any) bool {
@@ -23,6 +37,18 @@ func auditBind(c *gin.Context, r any) bool {
 		return false
 	}
 	return true
+}
+
+// DeleteLoginLogs POST /api/v1/audit/login-logs/delete 删除登录日志。
+func (h *AuditHandler) DeleteLoginLogs(c *gin.Context) {
+	r := new(api.AuditDeleteRequest)
+	if auditBind(c, r) {
+		if e := h.biz.DeleteLogins(r); e != nil {
+			response.Error(c, 500, e.Error())
+		} else {
+			response.OK(c, nil)
+		}
+	}
 }
 
 // ListOperationLogs POST /api/v1/audit/operation-logs/list 查询操作日志。

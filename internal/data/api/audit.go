@@ -3,10 +3,17 @@ package api
 import "time"
 
 type AuditListRequest struct {
-	Keyword string `json:"keyword"`
+	Keyword   string `json:"keyword"`
+	Username  string `json:"username"`
+	Module    string `json:"module"`
+	Action    string `json:"action"`
+	Status    string `json:"status"`
+	LoginType string `json:"login_type"`
+	StartTime string `json:"start_time"`
+	EndTime   string `json:"end_time"`
 }
 type AuditDeleteRequest struct {
-	IDs []int64 `json:"ids" binding:"required"`
+	IDs []int64 `json:"ids" binding:"required,min=1,dive,gt=0"`
 }
 type AuditOperationLogResponse struct {
 	ID          int64     `json:"id"`
