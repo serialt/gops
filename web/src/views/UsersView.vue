@@ -284,10 +284,10 @@ function toggleOrganizationPane() {
       <el-dialog v-model="dialogVisible" :title="title" width="520px">
         <el-form :model="form" label-width="90px">
           <el-form-item label="用户名" required><el-input v-model="form.username" /></el-form-item>
-          <el-form-item label="邮箱"><el-input v-model="form.email" type="email" placeholder="未填写时跳过登录邮件验证" /></el-form-item>
           <el-form-item :label="editingID ? '新密码' : '密码'" :required="!editingID"><el-input v-model="form.password"
               type="password" show-password :placeholder="editingID ? '留空表示不修改' : ''" /></el-form-item>
           <el-form-item label="昵称" required><el-input v-model="form.nickname" /></el-form-item>
+          <el-form-item label="邮箱"><el-input v-model="form.email" type="email" placeholder="未填写时跳过登录邮件验证" /></el-form-item>
           <el-form-item label="角色"><el-select v-model="form.role_ids" multiple style="width: 100%"><el-option
                 v-for="role in roles" :key="role.id" :label="role.name" :value="role.id" /></el-select></el-form-item>
           <el-form-item label="所属组织"><el-tree-select v-model="form.organization_ids" :data="organizationTree"

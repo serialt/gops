@@ -250,7 +250,14 @@ func (b *AuthBiz) loginVerificationRequired(config *api.SystemConfigResponse, us
 
 func (b *AuthBiz) authenticate(username, password string) (*model.User, error) {
 	var user model.User
-	if err := b.db.Where("username = ?", username).First(&user).Error; err != nil || !user.Status || !auth.CheckPassword(user.PasswordHash, password) {
+	identifier := strings.TrimSpace(username)
+	var err error
+	if strings.Contains(identifier, "@") {
+		err = b.db.Where("email <> '' AND LOWER(email) = ?", strings.ToLower(identifier)).First(&user).Error
+	} else {
+		err = b.db.Where("username = ?", identifier).First(&user).Error
+	}
+	if err != nil || !user.Status || !auth.CheckPassword(user.PasswordHash, password) {
 		return nil, ErrInvalidCredentials
 	}
 	return &user, nil

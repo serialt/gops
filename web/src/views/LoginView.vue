@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
         </div>
         <el-form :model="form" class="login-form" @keyup.enter="handlePrimaryAction">
           <el-form-item v-if="loginStep === 'credentials' || loginStep === 'forgot'">
-            <el-input v-model="form.username" size="large" placeholder="请输入用户名" autocomplete="username">
+            <el-input v-model="form.username" size="large" :placeholder="loginStep === 'forgot' ? '请输入用户名' : '请输入用户名或邮箱'" autocomplete="username">
               <template #prefix><el-icon>
                   <UserFilled />
                 </el-icon></template>
