@@ -2,7 +2,7 @@ import type { User } from '@/types'
 import request from '@/utils/request'
 
 export interface LoginRequest { username: string; password: string; captcha_id?: string; captcha_code?: string; email_code?: string }
-export interface LoginResponse { token: string }
+export interface LoginResponse { token:string;access_token:string;refresh_token:string;expires_in:number;refresh_expires_in:number }
 export interface CurrentUserResponse { user: User; permissions: string[] }
 export interface ProfileUpdateRequest {
   username: string
@@ -29,6 +29,7 @@ export interface PasswordResetVerifyResponse { reset_token: string }
 export interface PasswordResetRequest { reset_token: string; new_password: string }
 
 export const login = (data: LoginRequest) => request.post<LoginResponse>('/auth/login', data)
+export const refreshToken = (refresh_token:string) => request.post<LoginResponse>('/auth/refresh', { refresh_token })
 export const getMe = () => request.post<CurrentUserResponse>('/auth/me', {})
 export const updateProfile = (data: ProfileUpdateRequest) => request.post<User>('/auth/profile/update', data)
 export const getLoginSecurityConfig = () => request.post<LoginSecurityConfig>('/auth/security-config', {})

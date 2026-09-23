@@ -24,6 +24,27 @@ const request = axios.create({
 })
 
 let isRedirecting = false
+let refreshPromise: Promise<string> | null = null
+
+function clearTokens() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('refresh_token')
+}
+
+async function renewAccessToken() {
+  if (refreshPromise) return refreshPromise
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) throw new Error('missing refresh token')
+  refreshPromise = axios.post<{token:string;access_token:string;refresh_token:string}>('/api/v1/auth/refresh', { refresh_token: refreshToken })
+    .then(({ data }) => {
+      const accessToken = data.data.access_token || data.data.token
+      localStorage.setItem('token', accessToken)
+      localStorage.setItem('refresh_token', data.data.refresh_token)
+      return accessToken
+    })
+    .finally(() => { refreshPromise = null })
+  return refreshPromise
+}
 
 function redirectToError(status: 401 | 403 | 429) {
   const targetPath = `/${status}`
@@ -44,11 +65,24 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status
     const message = error.response?.data?.message || error.message || '请求失败'
     if (status === 401) {
-      localStorage.removeItem('token')
+      const original = error.config as AxiosRequestConfig & { _retry?: boolean }
+      const isAuthRequest = String(original?.url || '').includes('/auth/login') || String(original?.url || '').includes('/auth/refresh')
+      if (!original?._retry && !isAuthRequest && localStorage.getItem('refresh_token')) {
+        original._retry = true
+        try {
+          const token = await renewAccessToken()
+          original.headers = { ...original.headers, Authorization: `Bearer ${token}` }
+          return request(original)
+        } catch {
+          clearTokens()
+        }
+      } else {
+        clearTokens()
+      }
       if (location.pathname !== '/login') redirectToError(401)
       else ElMessage.error(message)
     } else if (status === 403) {

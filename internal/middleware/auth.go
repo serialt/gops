@@ -20,7 +20,7 @@ func Auth(jwtManager *auth.JWTManager) gin.HandlerFunc {
 			return
 		}
 
-		claims, err := jwtManager.Parse(parts[1])
+		claims, err := jwtManager.ParseAccess(parts[1])
 		if err != nil {
 			response.Error(c, 401, "invalid or expired token")
 			return
@@ -40,7 +40,7 @@ func WebSocketAuth(jwtManager *auth.JWTManager) gin.HandlerFunc {
 			response.Error(c, 401, "missing terminal token")
 			return
 		}
-		claims, err := jwtManager.Parse(token)
+		claims, err := jwtManager.ParseAccess(token)
 		if err != nil {
 			response.Error(c, 401, "invalid or expired token")
 			return

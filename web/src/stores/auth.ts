@@ -13,8 +13,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(request: LoginRequest) {
     const { data } = await loginApi(request)
-    token.value = data.data.token
+    token.value = data.data.access_token || data.data.token
     localStorage.setItem('token', token.value)
+    localStorage.setItem('refresh_token', data.data.refresh_token)
     await fetchMe()
   }
 
@@ -35,6 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
     permissions.value = []
     loaded.value = false
     localStorage.removeItem('token')
+    localStorage.removeItem('refresh_token')
   }
 
   return { token, user, permissions, loaded, isLoggedIn, login, fetchMe, hasPermission, logout }

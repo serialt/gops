@@ -17,6 +17,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/samber/lo v1.53.0
+	github.com/serialt/crab v0.0.6
 	github.com/serialt/sugar/v3 v3.0.9
 	golang.org/x/crypto v0.54.0
 	golang.org/x/sync v0.22.0
@@ -93,7 +94,6 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/serialt/crab v0.0.6 // indirect
 	github.com/sethvargo/go-retry v0.4.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect

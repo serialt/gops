@@ -46,12 +46,28 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
 	g.POST("/auth/login", h.Login)
+	g.POST("/auth/refresh", h.RefreshToken)
 	g.POST("/auth/security-config", h.SecurityConfig)
 	g.POST("/auth/captcha", h.Captcha)
 	g.POST("/auth/email-code/send", h.SendEmailCode)
 	g.POST("/auth/password-reset/code/send", h.SendPasswordResetCode)
 	g.POST("/auth/password-reset/code/verify", h.VerifyPasswordResetCode)
 	g.POST("/auth/password-reset/confirm", h.ResetPassword)
+}
+
+// RefreshToken POST /api/v1/auth/refresh 使用 Refresh Token 轮换双 Token。
+func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	req := new(api.RefreshTokenRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 401, "refresh token is required")
+		return
+	}
+	result, err := h.biz.RefreshToken(req)
+	if err != nil {
+		response.Error(c, 401, "invalid or expired refresh token")
+		return
+	}
+	response.OK(c, result)
 }
 
 // VerifyPasswordResetCode POST /api/v1/auth/password-reset/code/verify 验证密码重置二次验证码。

@@ -72,13 +72,33 @@ func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, e
 		return nil, ErrInvalidEmailCode
 	}
 
-	token, err := b.jwt.Generate(uint(user.ID))
+	tokens, err := b.jwt.GeneratePair(uint(user.ID))
 	if err != nil {
 		b.recordLogin(user.ID, user.Username, ip, "failed", "生成登录令牌失败")
 		return nil, ErrGenerateToken
 	}
 	b.recordLogin(user.ID, user.Username, ip, "success", "登录成功")
-	return &api.LoginResponse{Token: token}, nil
+	return tokenResponse(tokens), nil
+}
+
+func (b *AuthBiz) RefreshToken(req *api.RefreshTokenRequest) (*api.LoginResponse, error) {
+	claims, err := b.jwt.ParseRefresh(req.RefreshToken)
+	if err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	var user model.User
+	if err := b.db.Select("id", "status").First(&user, claims.UserID).Error; err != nil || !user.Status {
+		return nil, ErrInvalidCredentials
+	}
+	tokens, err := b.jwt.GeneratePair(claims.UserID)
+	if err != nil {
+		return nil, ErrGenerateToken
+	}
+	return tokenResponse(tokens), nil
+}
+
+func tokenResponse(tokens *auth.TokenPair) *api.LoginResponse {
+	return &api.LoginResponse{Token: tokens.AccessToken, AccessToken: tokens.AccessToken, RefreshToken: tokens.RefreshToken, ExpiresIn: tokens.ExpiresIn, RefreshExpiresIn: tokens.RefreshExpiresIn}
 }
 
 func (b *AuthBiz) SecurityConfig() (*api.LoginSecurityConfigResponse, error) {
