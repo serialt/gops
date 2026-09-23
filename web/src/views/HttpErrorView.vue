@@ -2,12 +2,14 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import gopsLogoUrl from '@/assets/gops.svg'
+import { useSystemConfigStore } from '@/stores/system-config'
 
 type ErrorCode = 401 | 403 | 404 | 429
 
 const props = defineProps<{ code: ErrorCode }>()
 const route = useRoute()
 const router = useRouter()
+const systemConfig = useSystemConfigStore()
 
 const content = computed(() => ({
   401: {
@@ -75,7 +77,7 @@ function goBack() {
       </div>
 
       <div class="content">
-        <div class="brand"><img :src="gopsLogoUrl" alt="Gops" /><strong>管理平台</strong></div>
+        <div class="brand"><img :src="gopsLogoUrl" :alt="systemConfig.systemName" /><strong>{{ systemConfig.systemName }}</strong></div>
         <p class="eyebrow">{{ content.eyebrow }}</p>
         <h1>{{ content.title }}</h1>
         <p class="description">{{ content.description }}</p>

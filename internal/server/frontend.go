@@ -2,20 +2,23 @@ package server
 
 import (
 	"bytes"
+	"html"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
 
+	"gops/internal/data/model"
 	"gops/internal/webui"
 	loginassets "gops/web/src/assets/login"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // registerFrontend serves the embedded frontend and falls back to index.html
 // for routes handled by Vue Router. Unknown API routes keep returning JSON 404.
-func registerFrontend(r *gin.Engine) {
+func registerFrontend(r *gin.Engine, databases ...*gorm.DB) {
 	dist, err := fs.Sub(webui.Assets, "dist")
 	if err != nil {
 		panic("open embedded frontend: " + err.Error())
@@ -50,7 +53,23 @@ func registerFrontend(r *gin.Engine) {
 				c.JSON(http.StatusInternalServerError, gin.H{"code": http.StatusInternalServerError, "message": "frontend fallback unavailable"})
 				return
 			}
+			index = bytes.ReplaceAll(index, []byte("__SYSTEM_NAME__"), []byte(html.EscapeString(fallbackSystemName(databases...))))
 		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", index)
 	})
+}
+
+func fallbackSystemName(databases ...*gorm.DB) string {
+	const fallback = "Gops"
+	if len(databases) == 0 || databases[0] == nil {
+		return fallback
+	}
+	var config model.SystemConfig
+	if err := databases[0].Where("config_key = ?", "system_name").First(&config).Error; err != nil {
+		return fallback
+	}
+	if name := strings.TrimSpace(config.ConfigValue); name != "" {
+		return name
+	}
+	return fallback
 }

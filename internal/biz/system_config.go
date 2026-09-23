@@ -42,7 +42,7 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 		return nil, err
 	}
 	values := map[string]string{
-		"system_name": "V3 Admin", "system_description": "", "password_min_length": "8",
+		"system_name": "Gops", "system_description": "", "password_min_length": "8",
 		"password_require_digit": "false", "password_require_letter": "false", "password_require_upper": "false",
 		"password_require_lower": "false", "password_require_special": "false",
 		"session_timeout_minutes": "30", "captcha_enabled": "false", "max_login_failures": "5", "account_lock_minutes": "30",

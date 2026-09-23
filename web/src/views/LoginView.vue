@@ -6,8 +6,10 @@ import illustrationUrl from '@/assets/login/illustration.svg'
 import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
+import { useSystemConfigStore } from '@/stores/system-config'
 
 const auth = useAuthStore()
+const systemConfig = useSystemConfigStore()
 const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
@@ -33,7 +35,7 @@ async function submit() {
     <section class="login-panel">
       <div class="login-form-wrap">
         <div class="login-heading">
-          <img class="login-logo" :src="gopsLogoUrl" alt="Gops" />
+          <img class="login-logo" :src="gopsLogoUrl" :alt="systemConfig.systemName" />
           <div>
             <h1>欢迎登录</h1>
             <p>登录管理控制台，开始你的工作。</p>

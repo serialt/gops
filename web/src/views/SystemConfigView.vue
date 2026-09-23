@@ -194,7 +194,7 @@ watch(
 
 .section-card {
   min-height: 100%;
-  padding: 12px;
+  padding: 20px 22px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg-card);
@@ -202,7 +202,9 @@ watch(
 }
 
 .page-toolbar {
-  margin-bottom: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
 }
 
 .page-title {
@@ -212,7 +214,7 @@ watch(
 }
 
 .page-subtitle {
-  margin: 2px 0 0;
+  margin: 5px 0 0;
   color: var(--text-soft);
   font-size: 11px;
   line-height: 1.45;
@@ -224,22 +226,23 @@ watch(
 }
 
 .system-form {
-  max-width: 680px;
+  max-width: 760px;
+  padding: 8px 18px 22px 10px;
 }
 
 .security-form :deep(.el-checkbox) {
-  margin-right: 14px;
+  margin-right: 18px;
   font-size: 11px;
 }
 
 .form-hint {
-  margin-left: 8px;
+  margin-left: 12px;
   color: var(--text-soft);
   font-size: 11px;
 }
 
 .verification-tabs :deep(.el-tabs__header) {
-  margin-bottom: 8px;
+  margin-bottom: 18px;
 }
 
 .verification-tabs :deep(.el-tabs__item) {
@@ -247,29 +250,35 @@ watch(
 }
 
 .system-tabs :deep(.el-tabs__header) {
-  margin-right: 14px;
+  margin-right: 24px;
 }
 
 .system-tabs :deep(.el-tabs__item) {
-  height: 34px;
-  padding: 0 12px;
+  height: 42px;
+  padding: 0 18px;
   font-size: 12px;
-  line-height: 34px;
+  line-height: 42px;
+}
+
+.system-tabs :deep(.el-tabs__content) {
+  min-width: 0;
+  padding: 4px 8px 20px;
 }
 
 .system-form :deep(.el-form-item) {
-  margin-bottom: 10px;
+  margin-bottom: 18px;
 }
 
 .system-form :deep(.el-form-item__label) {
-  height: 32px;
+  height: 36px;
+  padding-right: 14px;
   font-size: 11px;
-  line-height: 32px;
+  line-height: 36px;
 }
 
 .system-form :deep(.el-input__wrapper) {
-  min-height: 32px;
-  padding: 1px 9px;
+  min-height: 36px;
+  padding: 1px 11px;
 }
 
 .system-form :deep(.el-input__inner) {
@@ -277,29 +286,29 @@ watch(
 }
 
 .system-form :deep(.el-input-number) {
-  height: 32px;
+  height: 36px;
 }
 
 .system-form :deep(.el-input-number .el-input__wrapper) {
-  min-height: 32px;
+  min-height: 36px;
 }
 
 .system-form :deep(.el-switch) {
   --el-switch-on-color: var(--primary);
-  transform: scale(.88);
+  transform: scale(.94);
   transform-origin: left center;
 }
 
 .system-form :deep(.el-button) {
-  min-height: 32px;
-  padding: 6px 13px;
+  min-height: 34px;
+  padding: 7px 16px;
   font-size: 11px;
 }
 
 .smtp-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 118px;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -310,14 +319,14 @@ watch(
 .mail-account-row {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 8px;
+  gap: 12px;
   width: 100%;
 }
 
 .email-test-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -327,6 +336,41 @@ watch(
 }
 
 .test-email-item {
-  margin-top: 64px;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--line);
+}
+
+@media (max-width: 760px) {
+  .section-card {
+    padding: 16px;
+  }
+
+  .page-toolbar {
+    margin-bottom: 14px;
+  }
+
+  .system-tabs :deep(.el-tabs__header) {
+    margin-right: 14px;
+  }
+
+  .system-tabs :deep(.el-tabs__item) {
+    padding: 0 12px;
+  }
+
+  .system-tabs :deep(.el-tabs__content),
+  .system-form {
+    padding-right: 0;
+  }
+
+  .smtp-row,
+  .mail-account-row,
+  .email-test-row {
+    grid-template-columns: 1fr;
+  }
+
+  .smtp-row :deep(.el-input-number) {
+    width: 100%;
+  }
 }
 </style>
