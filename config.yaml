@@ -3,7 +3,7 @@ dsn: "gops.db"
 
 log:
   file: 
-  level: info
+  level: debug
 server:
     http_port: 9876
     jwt_secret: "replace-with-a-long-random-secret"

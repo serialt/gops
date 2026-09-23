@@ -50,7 +50,7 @@ dsn: "gops.db"
 
 log:
   file: ""
-  level: "debug"
+  level: "dev"
 
 server:
   http_port: 9876
@@ -71,7 +71,7 @@ redis:
 | 配置项 | 说明 |
 | --- | --- |
 | `dsn` | SQLite 文件路径或 SQLite URI |
-| `log.level` | 日志级别；使用 `debug` 时同时输出 GORM SQL 日志 |
+| `log.level` | 日志级别；`debug` 输出 GORM SQL，`dev` 配合 `-dev` 执行开发种子数据 |
 | `server.http_port` | 后端监听端口，前端开发代理默认使用 `9876` |
 | `server.jwt_secret` | JWT 签名密钥，生产环境必须替换 |
 | `server.aes_key` | 用于加密数据库中的凭证、密码等敏感数据 |
@@ -86,8 +86,10 @@ redis:
 ```bash
 go mod download
 go run ./cmd/server -t up
-go run ./cmd/server
+go run ./cmd/server -dev
 ```
+
+开发种子数据仅在同时指定 `-dev` 且 `log.level` 为 `dev` 时执行；普通启动不会执行 `seed`。
 
 后端默认地址为 `http://localhost:9876`，健康检查：
 

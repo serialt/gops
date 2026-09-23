@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gops/internal/config"
+	"gops/internal/data/define"
 	"gops/internal/handler"
 	"gops/internal/middleware"
 	"gops/internal/pkg/auth"
@@ -72,7 +73,7 @@ func NewGinEngine(
 	auditHandler *handler.AuditHandler,
 ) (r *gin.Engine, cleanup func()) {
 
-	if cfg.Log.Level != "debug" {
+	if cfg.Log.Level != "debug" && cfg.Log.Level != "dev" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -81,9 +82,11 @@ func NewGinEngine(
 	whitelistMap := lo.KeyBy(whitelist, func(item string) string { return item })
 	middleware.RegisterMiddleware(r, cfg, whitelistMap)
 
-	if err := seed(db, casbinService); err != nil {
-		cancelSchedulers()
-		panic(err)
+	if cfg.Env == define.EnvDev {
+		if err := seed(db, casbinService); err != nil {
+			cancelSchedulers()
+			panic(err)
+		}
 	}
 
 	go monitorHandler.StartScheduler(schedulerCtx)

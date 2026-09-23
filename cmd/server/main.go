@@ -11,6 +11,7 @@ import (
 	"gops/docs"
 	"gops/internal/config"
 	"gops/internal/data"
+	"gops/internal/data/define"
 	"gops/internal/server"
 
 	"github.com/serialt/sugar/v3"
@@ -29,6 +30,7 @@ var (
 	GenTable    bool
 	ResetPass   string
 	DBPath      string
+	DevMode     bool
 	GenTableDir = "sql"
 	Args        []string
 )
@@ -41,12 +43,16 @@ func init() {
 	flag.StringVar(&ResetPass, "u", "", "reset user pass")
 	flag.BoolVar(&GenTable, "t", false, "goose cmd")
 	flag.StringVar(&DBPath, "db", "", "sqlite db path")
+	flag.BoolVar(&DevMode, "dev", false, "enable dev env")
 	flag.Parse()
 	Args = flag.Args()
 }
 
 func main() {
 	cfg := config.NewConfig(ConfigFile)
+	if DevMode {
+		cfg.Env = define.EnvDev
+	}
 
 	if appVersion {
 		fmt.Printf("AppVersion: %v\nGo Version: %v\nBuild Time: %v\nGit Commit: %v\n\n",

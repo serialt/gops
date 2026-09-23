@@ -11,6 +11,7 @@ type Config struct {
 	Log    Log    `json:"log" yaml:"log"`
 	Server Server `json:"server" yaml:"server"`
 	Redis  Redis  `json:"redis" yaml:"redis"`
+	Env    string `json:"-" yaml:"-"`
 }
 
 type Redis struct {
