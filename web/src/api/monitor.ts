@@ -1,7 +1,8 @@
 import request from '@/utils/request'
 
-export interface MonitorDomain { id:number; domain:string; port:number; status:string; response_time:number; ssl_valid:boolean; ssl_expiry:string; ssl_root_ca:string; check_interval:number; enable_ssl:boolean; verify_certificate:boolean; enable_alert:boolean; response_threshold:number; ssl_expiry_days:number; last_check:string; last_error:string; created_at:string; updated_at:string }
-export interface MonitorDomainRequest { id?:number; domain:string; port:number; check_interval:number; enable_ssl:boolean; verify_certificate:boolean; enable_alert:boolean; response_threshold:number; ssl_expiry_days:number }
+export type MonitorRequestClient = 'chrome' | 'firefox' | 'edge' | 'safari' | 'curl'
+export interface MonitorDomain { id:number; domain:string; port:number; request_client:MonitorRequestClient; status:string; response_time:number; ssl_valid:boolean; ssl_expiry:string; ssl_root_ca:string; check_interval:number; check_jitter:number; enable_ssl:boolean; verify_certificate:boolean; enable_alert:boolean; response_threshold:number; ssl_expiry_days:number; last_check:string; last_error:string; created_at:string; updated_at:string }
+export interface MonitorDomainRequest { id?:number; domain:string; port:number; request_client:MonitorRequestClient; check_interval:number; check_jitter:number; enable_ssl:boolean; verify_certificate:boolean; enable_alert:boolean; response_threshold:number; ssl_expiry_days:number }
 export interface MonitorCheckHistory { id:number; domain_id:number; status:string; response_time:number; ssl_valid:boolean; ssl_expiry:string; status_code:number; error_message:string; checked_at:string }
 export interface MonitorStats { total:number; normal:number; abnormal:number; paused:number }
 export type MonitorAlertChannelType = 'email' | 'dingtalk' | 'feishu' | 'wechat' | 'webhook'

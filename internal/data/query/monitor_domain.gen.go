@@ -47,6 +47,8 @@ func newMonitorDomain(db *gorm.DB, opts ...gen.DOOption) monitorDomain {
 	_monitorDomain.DeletedAt = field.NewField(tableName, "deleted_at")
 	_monitorDomain.VerifyCertificate = field.NewBool(tableName, "verify_certificate")
 	_monitorDomain.SslRootCa = field.NewString(tableName, "ssl_root_ca")
+	_monitorDomain.RequestClient = field.NewString(tableName, "request_client")
+	_monitorDomain.CheckJitter = field.NewInt64(tableName, "check_jitter")
 
 	_monitorDomain.fillFieldMap()
 
@@ -77,6 +79,8 @@ type monitorDomain struct {
 	DeletedAt         field.Field
 	VerifyCertificate field.Bool
 	SslRootCa         field.String
+	RequestClient     field.String
+	CheckJitter       field.Int64
 
 	fieldMap map[string]field.Expr
 }
@@ -113,6 +117,8 @@ func (m *monitorDomain) updateTableName(table string) *monitorDomain {
 	m.DeletedAt = field.NewField(table, "deleted_at")
 	m.VerifyCertificate = field.NewBool(table, "verify_certificate")
 	m.SslRootCa = field.NewString(table, "ssl_root_ca")
+	m.RequestClient = field.NewString(table, "request_client")
+	m.CheckJitter = field.NewInt64(table, "check_jitter")
 
 	m.fillFieldMap()
 
@@ -141,7 +147,7 @@ func (m *monitorDomain) GetFieldByName(fieldName string) (field.OrderExpr, bool)
 }
 
 func (m *monitorDomain) fillFieldMap() {
-	m.fieldMap = make(map[string]field.Expr, 20)
+	m.fieldMap = make(map[string]field.Expr, 22)
 	m.fieldMap["id"] = m.ID
 	m.fieldMap["domain"] = m.Domain
 	m.fieldMap["port"] = m.Port
@@ -162,6 +168,8 @@ func (m *monitorDomain) fillFieldMap() {
 	m.fieldMap["deleted_at"] = m.DeletedAt
 	m.fieldMap["verify_certificate"] = m.VerifyCertificate
 	m.fieldMap["ssl_root_ca"] = m.SslRootCa
+	m.fieldMap["request_client"] = m.RequestClient
+	m.fieldMap["check_jitter"] = m.CheckJitter
 }
 
 func (m monitorDomain) clone(db *gorm.DB) monitorDomain {

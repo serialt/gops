@@ -107,7 +107,11 @@ function resizeColumns(event: any) {
   cancelAnimationFrame(resizeFrame)
   resizeFrame = requestAnimationFrame(() => {
     // 先按内容压缩普通列；再只把余量分配给最后一个数据列。
-    const columns = event.api.getColumns().filter((column: any) => !column.isPinned() && column.getColDef().suppressSizeToFit && !column.getColDef().width)
+    const columns = event.api.getColumns().filter((column: any) => {
+      const definition = column.getColDef()
+      const autoSizedAction = definition.headerName === '操作' && !definition.width
+      return definition.suppressSizeToFit && !definition.width && (!column.isPinned() || autoSizedAction)
+    })
     event.api.autoSizeColumns(columns)
     event.api.sizeColumnsToFit()
   })

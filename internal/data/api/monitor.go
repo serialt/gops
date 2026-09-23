@@ -10,7 +10,9 @@ type MonitorDomainRequest struct {
 	ID                int64  `json:"id"`
 	Domain            string `json:"domain" binding:"required"`
 	Port              int64  `json:"port"`
+	RequestClient     string `json:"request_client"`
 	CheckInterval     int64  `json:"check_interval"`
+	CheckJitter       int64  `json:"check_jitter"`
 	EnableSSL         bool   `json:"enable_ssl"`
 	VerifyCertificate bool   `json:"verify_certificate"`
 	EnableAlert       bool   `json:"enable_alert"`
@@ -38,12 +40,14 @@ type MonitorDomainResponse struct {
 	ID                int64     `json:"id"`
 	Domain            string    `json:"domain"`
 	Port              int64     `json:"port"`
+	RequestClient     string    `json:"request_client"`
 	Status            string    `json:"status"`
 	ResponseTime      int64     `json:"response_time"`
 	SSLValid          bool      `json:"ssl_valid"`
 	SSLExpiry         time.Time `json:"ssl_expiry"`
 	SSLRootCA         string    `json:"ssl_root_ca"`
 	CheckInterval     int64     `json:"check_interval"`
+	CheckJitter       int64     `json:"check_jitter"`
 	EnableSSL         bool      `json:"enable_ssl"`
 	VerifyCertificate bool      `json:"verify_certificate"`
 	EnableAlert       bool      `json:"enable_alert"`

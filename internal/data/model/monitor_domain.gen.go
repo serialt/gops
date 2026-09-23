@@ -34,6 +34,8 @@ type MonitorDomain struct {
 	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
 	VerifyCertificate bool           `gorm:"column:verify_certificate;not null;default:TRUE" json:"verify_certificate"`
 	SslRootCa         string         `gorm:"column:ssl_root_ca;not null;default:''" json:"ssl_root_ca"`
+	RequestClient     string         `gorm:"column:request_client;not null;default:'chrome'" json:"request_client"`
+	CheckJitter       int64          `gorm:"column:check_jitter;type:INTEGER" json:"check_jitter"`
 }
 
 // TableName MonitorDomain's table name

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -137,9 +138,17 @@ func (b *MonitorBiz) checkDomain(row *model.MonitorDomain) error {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- explicitly configured to skip certificate verification.
 		client = &http.Client{Timeout: b.client.Timeout, Transport: transport}
 	}
-	res, err := client.Get(fmt.Sprintf("%s://%s:%d", scheme, row.Domain, row.Port))
+	request, requestErr := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("%s://%s:%d", scheme, row.Domain, row.Port), nil)
+	var res *http.Response
+	var err error
+	if requestErr != nil {
+		err = requestErr
+	} else {
+		request.Header = monitorRequestHeaders(row.RequestClient)
+		res, err = client.Do(request)
+	}
 	now := time.Now()
-	row.LastCheck, row.ResponseTime, row.NextCheck = now, time.Since(start).Milliseconds(), now.Add(time.Duration(row.CheckInterval)*time.Second)
+	row.LastCheck, row.ResponseTime, row.NextCheck = now, time.Since(start).Milliseconds(), nextMonitorCheck(now, row.CheckInterval, row.CheckJitter)
 	row.LastError, row.Status = "", "normal"
 	statusCode := int64(0)
 	if err != nil {
@@ -241,7 +250,7 @@ func (b *MonitorBiz) domainModel(req *api.MonitorDomainRequest) model.MonitorDom
 	if d == 0 {
 		d = 30
 	}
-	return model.MonitorDomain{Domain: strings.TrimSpace(req.Domain), Port: p, Status: "unknown", CheckInterval: i, EnableSsl: req.EnableSSL, VerifyCertificate: req.VerifyCertificate, EnableAlert: req.EnableAlert, ResponseThreshold: req.ResponseThreshold, SslExpiryDays: d}
+	return model.MonitorDomain{Domain: strings.TrimSpace(req.Domain), Port: p, RequestClient: normalizeMonitorRequestClient(req.RequestClient), Status: "unknown", CheckInterval: i, CheckJitter: normalizeMonitorCheckJitter(req.CheckJitter), EnableSsl: req.EnableSSL, VerifyCertificate: req.VerifyCertificate, EnableAlert: req.EnableAlert, ResponseThreshold: req.ResponseThreshold, SslExpiryDays: d}
 }
 
 type normalizedMonitorDomain struct {
@@ -252,12 +261,83 @@ type normalizedMonitorDomain struct {
 
 func normalizeMonitorDomainRequest(req *api.MonitorDomainRequest) *api.MonitorDomainRequest {
 	normalized := *req
+	normalized.RequestClient = normalizeMonitorRequestClient(req.RequestClient)
+	normalized.CheckJitter = normalizeMonitorCheckJitter(req.CheckJitter)
 	address := normalizeMonitorDomainAddress(req.Domain, req.Port, req.EnableSSL)
 	normalized.Domain, normalized.Port, normalized.EnableSSL = address.domain, address.port, address.enableSSL
 	if !normalized.EnableSSL {
 		normalized.VerifyCertificate = false
 	}
 	return &normalized
+}
+
+func normalizeMonitorCheckJitter(jitter int64) int64 {
+	if jitter < 0 {
+		return 0
+	}
+	return jitter
+}
+
+func nextMonitorCheck(now time.Time, interval, jitter int64) time.Time {
+	delay := interval
+	if jitter > 0 {
+		delay += rand.Int64N(jitter + 1) // #nosec G404 -- scheduling jitter does not require cryptographic randomness.
+	}
+	return now.Add(time.Duration(delay) * time.Second)
+}
+
+func normalizeMonitorRequestClient(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch normalized {
+	case "firefox", "edge", "safari", "curl":
+		return normalized
+	default:
+		return "chrome"
+	}
+}
+
+// monitorRequestHeaders returns built-in request-header presets. Only the preset
+// key is persisted; concrete headers remain maintained by the backend.
+func monitorRequestHeaders(client string) http.Header {
+	headers := make(http.Header)
+	headers.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	switch normalizeMonitorRequestClient(client) {
+	case "firefox":
+		headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0")
+		headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+		headers.Set("Upgrade-Insecure-Requests", "1")
+		headers.Set("Sec-Fetch-Dest", "document")
+		headers.Set("Sec-Fetch-Mode", "navigate")
+		headers.Set("Sec-Fetch-Site", "none")
+		headers.Set("Sec-Fetch-User", "?1")
+	case "edge":
+		headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0")
+		setChromiumMonitorHeaders(headers, `"Chromium";v="134", "Not:A-Brand";v="24", "Microsoft Edge";v="134"`)
+	case "safari":
+		headers.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15")
+		headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+		headers.Set("Upgrade-Insecure-Requests", "1")
+	case "curl":
+		headers.Set("User-Agent", "curl/8.12.1")
+		headers.Set("Accept", "*/*")
+		headers.Del("Accept-Language")
+	default:
+		headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36")
+		setChromiumMonitorHeaders(headers, `"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"`)
+	}
+	return headers
+}
+
+func setChromiumMonitorHeaders(headers http.Header, secCHUA string) {
+	headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+	headers.Set("Upgrade-Insecure-Requests", "1")
+	headers.Set("Sec-CH-UA", secCHUA)
+	headers.Set("Sec-CH-UA-Mobile", "?0")
+	headers.Set("Sec-CH-UA-Platform", `"Windows"`)
+	headers.Set("Sec-Fetch-Dest", "document")
+	headers.Set("Sec-Fetch-Mode", "navigate")
+	headers.Set("Sec-Fetch-Site", "none")
+	headers.Set("Sec-Fetch-User", "?1")
 }
 
 func normalizeMonitorDomainAddress(raw string, port int64, enableSSL bool) normalizedMonitorDomain {
@@ -305,7 +385,7 @@ func certificateName(name pkix.Name) string {
 	return name.String()
 }
 func monitorDomainResponse(r model.MonitorDomain) *api.MonitorDomainResponse {
-	return &api.MonitorDomainResponse{ID: r.ID, Domain: r.Domain, Port: r.Port, Status: r.Status, ResponseTime: r.ResponseTime, SSLValid: r.SslValid, SSLExpiry: r.SslExpiry, SSLRootCA: r.SslRootCa, CheckInterval: r.CheckInterval, EnableSSL: r.EnableSsl, VerifyCertificate: r.VerifyCertificate, EnableAlert: r.EnableAlert, ResponseThreshold: r.ResponseThreshold, SSLExpiryDays: r.SslExpiryDays, LastCheck: r.LastCheck, LastError: r.LastError, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	return &api.MonitorDomainResponse{ID: r.ID, Domain: r.Domain, Port: r.Port, RequestClient: normalizeMonitorRequestClient(r.RequestClient), Status: r.Status, ResponseTime: r.ResponseTime, SSLValid: r.SslValid, SSLExpiry: r.SslExpiry, SSLRootCA: r.SslRootCa, CheckInterval: r.CheckInterval, CheckJitter: r.CheckJitter, EnableSSL: r.EnableSsl, VerifyCertificate: r.VerifyCertificate, EnableAlert: r.EnableAlert, ResponseThreshold: r.ResponseThreshold, SSLExpiryDays: r.SslExpiryDays, LastCheck: r.LastCheck, LastError: r.LastError, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 func monitorError(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
