@@ -8,7 +8,7 @@ import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
-import { beginDirectEmailLogin, beginDirectPasskeyLogin, beginPasskeyLogin, beginPasswordResetPasskey, finishDirectEmailLogin, finishDirectPasskeyLogin, finishPasskeyLogin, finishPasswordResetPasskey, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, verifyPasswordResetTOTP, type MFAMethod } from '@/api/auth'
+import { beginDirectEmailLogin, beginDirectPasskeyLogin, beginPasskeyLogin, beginPasswordResetPasskey, directTOTPLogin, finishDirectEmailLogin, finishDirectPasskeyLogin, finishPasskeyLogin, finishPasswordResetPasskey, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, verifyPasswordResetTOTP, type MFAMethod } from '@/api/auth'
 import { credentialJSON, requestOptions } from '@/utils/webauthn'
 
 const auth = useAuthStore()
@@ -26,6 +26,12 @@ const security = reactive({
   captcha_enabled: false,
   login_verification_enabled: false,
   login_verification_method: '' as '' | 'email' | 'webhook',
+  verification_email_enabled: false,
+  verification_passkey_enabled: false,
+  verification_totp_enabled: false,
+  direct_verification_email_enabled: false,
+  direct_verification_passkey_enabled: false,
+  direct_verification_totp_enabled: false,
 })
 const captcha = reactive({ id: '', image: '' })
 const emailCodeRequired = ref(false)
@@ -33,11 +39,26 @@ const mfaToken = ref('')
 const directEmailToken = ref('')
 const mfaMethods = ref<MFAMethod[]>([])
 const selectedMFAMethod = ref<MFAMethod>('code')
-const directLoginMethod = ref<'passkey' | 'email'>('passkey')
+type DirectLoginMethod = 'passkey' | 'email' | 'totp'
+const directLoginMethod = ref<DirectLoginMethod>('passkey')
 const form = reactive({ username: 'admin', password: 'password', captcha_code: '', email_code: '' })
 const resetForm = reactive({ code: '', new_password: '', confirm_password: '' })
 const resetMethod = ref<'email' | 'passkey' | 'totp'>('email')
 const resetToken = ref('')
+const directLoginOptions = computed(() => {
+  const options: Array<{ label: string; value: DirectLoginMethod }> = []
+  if (security.verification_passkey_enabled && security.direct_verification_passkey_enabled) options.push({ label: 'Passkey 登录', value: 'passkey' })
+  if (security.verification_email_enabled && security.direct_verification_email_enabled) options.push({ label: '邮箱验证码登录', value: 'email' })
+  if (security.verification_totp_enabled && security.direct_verification_totp_enabled) options.push({ label: 'TOTP 登录', value: 'totp' })
+  return options
+})
+const resetMethodOptions = computed(() => {
+  const options: Array<{ label: string; value: 'email' | 'passkey' | 'totp' }> = []
+  if (security.verification_email_enabled) options.push({ label: '邮箱验证码', value: 'email' })
+  if (security.verification_passkey_enabled) options.push({ label: 'Passkey', value: 'passkey' })
+  if (security.verification_totp_enabled) options.push({ label: 'TOTP', value: 'totp' })
+  return options
+})
 const stepTitle = computed(() => ({ credentials: '欢迎登录', verification: '二次验证', email_login: '验证码登录', forgot: '忘记密码', reset_verify: '身份验证', reset_password: '重置密码' })[loginStep.value])
 const stepDescription = computed(() => ({
   credentials: '登录管理控制台，开始你的工作。',
@@ -164,7 +185,27 @@ async function directEmailLogin() {
 }
 
 function startDirectMFALogin() {
-	return directLoginMethod.value === 'passkey' ? directPasskeyLogin() : directEmailLogin()
+	if (directLoginMethod.value === 'passkey') return directPasskeyLogin()
+	if (directLoginMethod.value === 'totp') return directTOTPLoginAction()
+	return directEmailLogin()
+}
+
+async function directTOTPLoginAction() {
+	if (!form.username.trim()) return ElMessage.warning('请输入用户名或邮箱')
+	if (security.captcha_enabled && !form.captcha_code.trim()) return ElMessage.warning('请输入图形验证码')
+	if (!form.email_code.trim()) return ElMessage.warning('请输入 TOTP 动态码')
+	loading.value = true
+	try {
+		const { data } = await directTOTPLogin({ username: form.username.trim(), captcha_id: captcha.id, captcha_code: form.captcha_code, code: form.email_code.trim() })
+		await auth.acceptLogin(data.data)
+		await router.replace((route.query.redirect as string) || '/')
+	} catch (error) {
+		form.email_code = ''
+		await refreshCaptcha()
+		throw error
+	} finally {
+		loading.value = false
+	}
 }
 
 async function loginWithPasskey() {
@@ -177,12 +218,11 @@ async function loginWithPasskey() {
 }
 
 async function directPasskeyLogin() {
-	if (!form.username.trim()) return ElMessage.warning('请输入用户名或邮箱')
 	if (security.captcha_enabled && !form.captcha_code.trim()) return ElMessage.warning('请输入图形验证码')
 	if (!window.PublicKeyCredential) return ElMessage.warning('当前浏览器不支持 Passkey')
 	loading.value = true
 	try {
-		const { data } = await beginDirectPasskeyLogin({ username: form.username.trim(), captcha_id: captcha.id, captcha_code: form.captcha_code })
+		const { data } = await beginDirectPasskeyLogin({ captcha_id: captcha.id, captcha_code: form.captcha_code })
 		const credential = await navigator.credentials.get(requestOptions(data.data.options)) as PublicKeyCredential | null
 		if (!credential) return
 		const result = await finishDirectPasskeyLogin({ login_token: data.data.login_token, credential: credentialJSON(credential) })
@@ -313,6 +353,8 @@ function handlePrimaryAction() {
 onMounted(async () => {
   const { data } = await getLoginSecurityConfig()
   Object.assign(security, data.data)
+  if (!directLoginOptions.value.some((item) => item.value === directLoginMethod.value) && directLoginOptions.value[0]) directLoginMethod.value = directLoginOptions.value[0].value
+  if (!resetMethodOptions.value.some((item) => item.value === resetMethod.value) && resetMethodOptions.value[0]) resetMethod.value = resetMethodOptions.value[0].value
   await refreshCaptcha()
 })
 
@@ -367,11 +409,7 @@ onBeforeUnmount(() => {
             </div>
           </el-form-item>
           <el-form-item v-if="loginStep === 'forgot'">
-            <el-segmented v-model="resetMethod" :options="[
-              { label: '邮箱验证码', value: 'email' },
-              { label: 'Passkey', value: 'passkey' },
-              { label: 'TOTP', value: 'totp' },
-            ]" class="reset-methods" />
+            <el-segmented v-model="resetMethod" :options="resetMethodOptions" class="reset-methods" />
           </el-form-item>
           <el-form-item v-if="loginStep === 'forgot' && resetMethod === 'totp'">
             <el-input v-model="resetForm.code" size="large" maxlength="6" placeholder="请输入 TOTP 动态码">
@@ -416,11 +454,11 @@ onBeforeUnmount(() => {
           <el-button type="primary" size="large" :loading="loading || sendingEmailCode" class="submit" @click="handlePrimaryAction">
             {{ loginStep === 'verification' || loginStep === 'email_login' ? '验证并登录' : loginStep === 'forgot' ? (resetMethod === 'email' ? '发送验证码' : '验证身份') : loginStep === 'reset_verify' ? '验证身份' : loginStep === 'reset_password' ? '修改密码' : '登录' }}
           </el-button>
-          <div v-if="loginStep === 'credentials'" class="direct-mfa-login">
+          <div v-if="loginStep === 'credentials' && directLoginOptions.length" class="direct-mfa-login" :class="{ 'has-code': directLoginMethod === 'totp' }">
             <el-select v-model="directLoginMethod" aria-label="MFA 登录方式">
-              <el-option label="Passkey 登录" value="passkey" />
-              <el-option label="邮箱验证码登录" value="email" />
+              <el-option v-for="option in directLoginOptions" :key="option.value" :label="option.label" :value="option.value" />
             </el-select>
+            <el-input v-if="directLoginMethod === 'totp'" v-model="form.email_code" maxlength="6" placeholder="TOTP 动态码" />
             <el-button plain :loading="loading || sendingEmailCode" @click="startDirectMFALogin">MFA 登录</el-button>
           </div>
           <el-button v-if="loginStep !== 'credentials'" class="back-button" text @click="backToCredentials">
@@ -606,6 +644,10 @@ onBeforeUnmount(() => {
 	grid-template-columns: minmax(0, 1fr) 104px;
 	gap: 8px;
 	margin-top: 9px;
+}
+
+.direct-mfa-login.has-code {
+  grid-template-columns: minmax(0, .9fr) minmax(0, .8fr) 92px;
 }
 
 .direct-mfa-login :deep(.el-select__wrapper),

@@ -22,6 +22,9 @@ const form = reactive({
   verification_email_sender_name: '', verification_smtp_host: '', verification_smtp_port: 465,
   verification_smtp_username: '', verification_smtp_password: '', verification_smtp_tls: true,
   verification_webhook_enabled: false, verification_webhook_url: '', verification_webhook_secret: '',
+  verification_passkey_enabled: true, verification_totp_enabled: true,
+  direct_verification_email_enabled: true,
+  direct_verification_passkey_enabled: true, direct_verification_totp_enabled: true,
 })
 const systemConfig = useSystemConfigStore()
 
@@ -32,11 +35,11 @@ async function load() {
 }
 
 async function save() {
-  if (!form.verification_email_enabled && !form.verification_webhook_enabled) {
-    ElMessage.warning('邮件验证码和 Webhook 至少需要启用一种')
+  if (!form.verification_email_enabled && !form.verification_webhook_enabled && !form.verification_passkey_enabled && !form.verification_totp_enabled) {
+    ElMessage.warning('验证配置至少需要启用一种方式')
     return
   }
-  if (form.login_verification_enabled && !form.login_verification_method) {
+  if (form.login_verification_enabled && (form.verification_email_enabled || form.verification_webhook_enabled) && !form.login_verification_method) {
     ElMessage.warning('开启登录二次验证后，请选择验证方式')
     return
   }
@@ -75,8 +78,8 @@ watch(
 watch(
   () => form.login_verification_enabled,
   (enabled) => {
-    if (enabled && !form.verification_email_enabled && !form.verification_webhook_enabled) {
-      ElMessage.warning('请先在“验证码配置”中启用至少一种验证方式')
+    if (enabled && !form.verification_email_enabled && !form.verification_webhook_enabled && !form.verification_passkey_enabled && !form.verification_totp_enabled) {
+      ElMessage.warning('请先在“验证配置”中启用至少一种验证方式')
     }
   },
 )
@@ -87,6 +90,21 @@ watch(
     if (form.login_verification_method === 'email' && !emailEnabled) form.login_verification_method = ''
     if (form.login_verification_method === 'webhook' && !webhookEnabled) form.login_verification_method = ''
   },
+)
+
+watch(
+  () => form.verification_email_enabled,
+  (enabled) => { if (!enabled) form.direct_verification_email_enabled = false },
+)
+
+watch(
+  () => form.verification_passkey_enabled,
+  (enabled) => { if (!enabled) form.direct_verification_passkey_enabled = false },
+)
+
+watch(
+  () => form.verification_totp_enabled,
+  (enabled) => { if (!enabled) form.direct_verification_totp_enabled = false },
 )
 </script>
 
@@ -150,16 +168,36 @@ watch(
                   <el-switch v-model="form.login_verification_enabled" active-text="开启" inactive-text="关闭" />
                   <span class="form-hint">登录时通过已配置的方式发送验证码</span>
                 </el-form-item>
-                <el-form-item label="验证方式" :required="form.login_verification_enabled">
+                <el-form-item label="验证码方式" :required="form.login_verification_enabled && (form.verification_email_enabled || form.verification_webhook_enabled)">
                   <el-select v-model="form.login_verification_method" :disabled="!form.login_verification_enabled"
                     placeholder="请选择验证码方式">
                     <el-option v-if="form.verification_email_enabled" label="邮件" value="email" />
                     <el-option v-if="form.verification_webhook_enabled" label="Webhook" value="webhook" />
                   </el-select>
                   <span v-if="!form.verification_email_enabled && !form.verification_webhook_enabled" class="form-hint">
-                    请先在“验证码配置”中启用至少一种方式
+                    Passkey/TOTP 将按用户已启用方式提供
                   </span>
-                  <span v-else class="form-hint">仅显示已在“验证码配置”中启用的方式</span>
+                  <span v-else class="form-hint">仅显示已在“验证配置”中启用的方式</span>
+                </el-form-item>
+              </div>
+            </section>
+            <section class="security-group">
+              <h3>直接登录配置</h3>
+              <div class="security-grid">
+                <el-form-item label="邮件">
+                  <el-switch v-model="form.direct_verification_email_enabled"
+                    :disabled="!form.verification_email_enabled" active-text="开启" inactive-text="关闭" />
+                  <span class="form-hint">控制登录页邮件验证码直接登录入口</span>
+                </el-form-item>
+                <el-form-item label="Passkey">
+                  <el-switch v-model="form.direct_verification_passkey_enabled"
+                    :disabled="!form.verification_passkey_enabled" active-text="开启" inactive-text="关闭" />
+                  <span class="form-hint">控制登录页 Passkey 直接登录入口</span>
+                </el-form-item>
+                <el-form-item label="TOTP">
+                  <el-switch v-model="form.direct_verification_totp_enabled"
+                    :disabled="!form.verification_totp_enabled" active-text="开启" inactive-text="关闭" />
+                  <span class="form-hint">控制登录页 TOTP 直接登录入口</span>
                 </el-form-item>
               </div>
             </section>
@@ -183,7 +221,7 @@ watch(
                 @click="save">保存配置</el-button></el-form-item>
           </el-form>
         </el-tab-pane>
-        <el-tab-pane label="验证码配置" name="verification">
+        <el-tab-pane label="验证配置" name="verification">
           <el-tabs v-model="verificationTab" class="verification-tabs">
             <el-tab-pane label="邮件" name="email">
               <el-form :model="form" label-width="96px" class="system-form">
@@ -232,6 +270,26 @@ watch(
                     placeholder="https://example.com/webhook" /></el-form-item>
                 <el-form-item label="签名密钥"><el-input v-model="form.verification_webhook_secret" type="password"
                     show-password autocomplete="new-password" /></el-form-item>
+                <el-form-item><el-button v-permission="'POST /api/v1/system-config/update'" type="primary"
+                    :loading="saving" @click="save">保存配置</el-button></el-form-item>
+              </el-form>
+            </el-tab-pane>
+            <el-tab-pane label="Passkey" name="passkey">
+              <el-form :model="form" label-width="96px" class="system-form">
+                <el-form-item label="启用 Passkey">
+                  <el-switch v-model="form.verification_passkey_enabled" active-text="开启" inactive-text="关闭" />
+                  <span class="form-hint">控制 Passkey 验证入口与后端验证能力</span>
+                </el-form-item>
+                <el-form-item><el-button v-permission="'POST /api/v1/system-config/update'" type="primary"
+                    :loading="saving" @click="save">保存配置</el-button></el-form-item>
+              </el-form>
+            </el-tab-pane>
+            <el-tab-pane label="TOTP" name="totp">
+              <el-form :model="form" label-width="96px" class="system-form">
+                <el-form-item label="启用 TOTP">
+                  <el-switch v-model="form.verification_totp_enabled" active-text="开启" inactive-text="关闭" />
+                  <span class="form-hint">控制 TOTP 验证入口与后端验证能力</span>
+                </el-form-item>
                 <el-form-item><el-button v-permission="'POST /api/v1/system-config/update'" type="primary"
                     :loading="saving" @click="save">保存配置</el-button></el-form-item>
               </el-form>

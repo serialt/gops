@@ -27,6 +27,11 @@ export interface SystemConfigResponse {
   verification_webhook_enabled: boolean
   verification_webhook_url: string
   verification_webhook_secret: string
+  verification_passkey_enabled: boolean
+  verification_totp_enabled: boolean
+  direct_verification_email_enabled: boolean
+  direct_verification_passkey_enabled: boolean
+  direct_verification_totp_enabled: boolean
 }
 export interface SystemConfigUpdateRequest extends SystemConfigResponse {}
 export interface SystemConfigEmailTestRequest { recipient: string }

@@ -44,9 +44,15 @@ type ProfileUpdateRequest struct {
 }
 
 type LoginSecurityConfigResponse struct {
-	CaptchaEnabled           bool   `json:"captcha_enabled"`
-	LoginVerificationEnabled bool   `json:"login_verification_enabled"`
-	LoginVerificationMethod  string `json:"login_verification_method"`
+	CaptchaEnabled                   bool   `json:"captcha_enabled"`
+	LoginVerificationEnabled         bool   `json:"login_verification_enabled"`
+	LoginVerificationMethod          string `json:"login_verification_method"`
+	VerificationEmailEnabled         bool   `json:"verification_email_enabled"`
+	VerificationPasskeyEnabled       bool   `json:"verification_passkey_enabled"`
+	VerificationTOTPEnabled          bool   `json:"verification_totp_enabled"`
+	DirectVerificationEmailEnabled   bool   `json:"direct_verification_email_enabled"`
+	DirectVerificationPasskeyEnabled bool   `json:"direct_verification_passkey_enabled"`
+	DirectVerificationTOTPEnabled    bool   `json:"direct_verification_totp_enabled"`
 }
 
 type CaptchaResponse struct {
@@ -193,7 +199,7 @@ type PasskeyRenameRequest struct {
 }
 
 type DirectPasskeyLoginBeginRequest struct {
-	Username    string `json:"username" binding:"required"`
+	Username    string `json:"username"`
 	CaptchaID   string `json:"captcha_id"`
 	CaptchaCode string `json:"captcha_code"`
 }
@@ -206,6 +212,13 @@ type DirectPasskeyLoginBeginResponse struct {
 type DirectPasskeyLoginFinishRequest struct {
 	LoginToken string          `json:"login_token" binding:"required"`
 	Credential json.RawMessage `json:"credential" binding:"required"`
+}
+
+type DirectTOTPLoginRequest struct {
+	Username    string `json:"username" binding:"required"`
+	CaptchaID   string `json:"captcha_id"`
+	CaptchaCode string `json:"captcha_code"`
+	Code        string `json:"code" binding:"required"`
 }
 
 type PasskeyLoginBeginRequest struct {

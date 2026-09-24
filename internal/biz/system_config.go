@@ -35,6 +35,8 @@ var systemConfigKeys = []string{
 	"verification_email_enabled", "verification_email_expire_minutes", "verification_email_sender_name", "verification_smtp_host", "verification_smtp_port",
 	"verification_smtp_username", "verification_smtp_password", "verification_smtp_tls", "verification_webhook_enabled",
 	"verification_webhook_url", "verification_webhook_secret",
+	"verification_passkey_enabled", "verification_totp_enabled",
+	"direct_verification_email_enabled", "direct_verification_passkey_enabled", "direct_verification_totp_enabled",
 }
 
 var ErrInvalidVerificationConfig = errors.New("selected login verification method is not enabled")
@@ -63,11 +65,14 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 		"verification_email_enabled": "true", "verification_email_expire_minutes": "5", "verification_email_sender_name": "", "verification_smtp_host": "",
 		"verification_smtp_port": "465", "verification_smtp_username": "", "verification_smtp_password": "", "verification_smtp_tls": "true",
 		"verification_webhook_enabled": "false", "verification_webhook_url": "", "verification_webhook_secret": "",
+		"verification_passkey_enabled": "true", "verification_totp_enabled": "true",
+		"direct_verification_email_enabled":   "true",
+		"direct_verification_passkey_enabled": "true", "direct_verification_totp_enabled": "true",
 	}
 	for _, row := range rows {
 		values[row.ConfigKey] = row.ConfigValue
 	}
-	if !parseConfigBool(values["verification_email_enabled"]) && !parseConfigBool(values["verification_webhook_enabled"]) {
+	if !parseConfigBool(values["verification_email_enabled"]) && !parseConfigBool(values["verification_webhook_enabled"]) && !parseConfigBool(values["verification_passkey_enabled"]) && !parseConfigBool(values["verification_totp_enabled"]) {
 		values["verification_email_enabled"] = "true"
 	}
 	for _, key := range []string{"verification_smtp_password", "verification_webhook_secret"} {
@@ -79,39 +84,44 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 	}
 	return &api.SystemConfigResponse{
 		SystemName: values["system_name"], SystemDescription: values["system_description"],
-		PasswordMinLength:              parseConfigInt(values["password_min_length"], 8),
-		PasswordRequireDigit:           parseConfigBool(values["password_require_digit"]),
-		PasswordRequireLetter:          parseConfigBool(values["password_require_letter"]),
-		PasswordRequireUpper:           parseConfigBool(values["password_require_upper"]),
-		PasswordRequireLower:           parseConfigBool(values["password_require_lower"]),
-		PasswordRequireSpecial:         parseConfigBool(values["password_require_special"]),
-		SessionTimeoutMinutes:          parseConfigInt(values["session_timeout_minutes"], 30),
-		CaptchaEnabled:                 parseConfigBool(values["captcha_enabled"]),
-		CaptchaExpireMinutes:           parseConfigInt(values["captcha_expire_minutes"], 1),
-		LoginVerificationEnabled:       parseConfigBool(values["login_verification_enabled"]),
-		LoginVerificationMethod:        values["login_verification_method"],
-		MaxLoginFailures:               parseConfigInt(values["max_login_failures"], 5),
-		AccountLockMinutes:             parseConfigInt(values["account_lock_minutes"], 30),
-		VerificationEmailEnabled:       parseConfigBool(values["verification_email_enabled"]),
-		VerificationEmailExpireMinutes: parseConfigInt(values["verification_email_expire_minutes"], 5),
-		VerificationEmailSenderName:    values["verification_email_sender_name"],
-		VerificationSMTPHost:           values["verification_smtp_host"],
-		VerificationSMTPPort:           parseConfigInt(values["verification_smtp_port"], 465),
-		VerificationSMTPUsername:       values["verification_smtp_username"],
-		VerificationSMTPPassword:       values["verification_smtp_password"],
-		VerificationSMTPTLS:            parseConfigBool(values["verification_smtp_tls"]),
-		VerificationWebhookEnabled:     parseConfigBool(values["verification_webhook_enabled"]),
-		VerificationWebhookURL:         values["verification_webhook_url"],
-		VerificationWebhookSecret:      values["verification_webhook_secret"],
+		PasswordMinLength:                parseConfigInt(values["password_min_length"], 8),
+		PasswordRequireDigit:             parseConfigBool(values["password_require_digit"]),
+		PasswordRequireLetter:            parseConfigBool(values["password_require_letter"]),
+		PasswordRequireUpper:             parseConfigBool(values["password_require_upper"]),
+		PasswordRequireLower:             parseConfigBool(values["password_require_lower"]),
+		PasswordRequireSpecial:           parseConfigBool(values["password_require_special"]),
+		SessionTimeoutMinutes:            parseConfigInt(values["session_timeout_minutes"], 30),
+		CaptchaEnabled:                   parseConfigBool(values["captcha_enabled"]),
+		CaptchaExpireMinutes:             parseConfigInt(values["captcha_expire_minutes"], 1),
+		LoginVerificationEnabled:         parseConfigBool(values["login_verification_enabled"]),
+		LoginVerificationMethod:          values["login_verification_method"],
+		MaxLoginFailures:                 parseConfigInt(values["max_login_failures"], 5),
+		AccountLockMinutes:               parseConfigInt(values["account_lock_minutes"], 30),
+		VerificationEmailEnabled:         parseConfigBool(values["verification_email_enabled"]),
+		VerificationEmailExpireMinutes:   parseConfigInt(values["verification_email_expire_minutes"], 5),
+		VerificationEmailSenderName:      values["verification_email_sender_name"],
+		VerificationSMTPHost:             values["verification_smtp_host"],
+		VerificationSMTPPort:             parseConfigInt(values["verification_smtp_port"], 465),
+		VerificationSMTPUsername:         values["verification_smtp_username"],
+		VerificationSMTPPassword:         values["verification_smtp_password"],
+		VerificationSMTPTLS:              parseConfigBool(values["verification_smtp_tls"]),
+		VerificationWebhookEnabled:       parseConfigBool(values["verification_webhook_enabled"]),
+		VerificationWebhookURL:           values["verification_webhook_url"],
+		VerificationWebhookSecret:        values["verification_webhook_secret"],
+		VerificationPasskeyEnabled:       parseConfigBool(values["verification_passkey_enabled"]),
+		VerificationTOTPEnabled:          parseConfigBool(values["verification_totp_enabled"]),
+		DirectVerificationEmailEnabled:   parseConfigBool(values["direct_verification_email_enabled"]),
+		DirectVerificationPasskeyEnabled: parseConfigBool(values["direct_verification_passkey_enabled"]),
+		DirectVerificationTOTPEnabled:    parseConfigBool(values["direct_verification_totp_enabled"]),
 	}, nil
 }
 
 func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfigResponse, error) {
-	if !req.VerificationEmailEnabled && !req.VerificationWebhookEnabled {
+	if !req.VerificationEmailEnabled && !req.VerificationWebhookEnabled && !req.VerificationPasskeyEnabled && !req.VerificationTOTPEnabled {
 		return nil, ErrInvalidVerificationConfig
 	}
 	if req.LoginVerificationEnabled {
-		if req.LoginVerificationMethod == "" {
+		if req.LoginVerificationMethod == "" && (req.VerificationEmailEnabled || req.VerificationWebhookEnabled) {
 			return nil, ErrInvalidVerificationConfig
 		}
 		if req.LoginVerificationMethod == "email" && !req.VerificationEmailEnabled {
@@ -120,6 +130,15 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 		if req.LoginVerificationMethod == "webhook" && (!req.VerificationWebhookEnabled || req.VerificationWebhookURL == "") {
 			return nil, ErrInvalidVerificationConfig
 		}
+	}
+	if !req.VerificationPasskeyEnabled {
+		req.DirectVerificationPasskeyEnabled = false
+	}
+	if !req.VerificationEmailEnabled {
+		req.DirectVerificationEmailEnabled = false
+	}
+	if !req.VerificationTOTPEnabled {
+		req.DirectVerificationTOTPEnabled = false
 	}
 	smtpPassword, err := cryptox.Encrypt(b.aesKey, req.VerificationSMTPPassword)
 	if err != nil {
@@ -156,6 +175,11 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 		{ConfigKey: "verification_webhook_enabled", ConfigValue: strconv.FormatBool(req.VerificationWebhookEnabled)},
 		{ConfigKey: "verification_webhook_url", ConfigValue: req.VerificationWebhookURL},
 		{ConfigKey: "verification_webhook_secret", ConfigValue: webhookSecret},
+		{ConfigKey: "verification_passkey_enabled", ConfigValue: strconv.FormatBool(req.VerificationPasskeyEnabled)},
+		{ConfigKey: "verification_totp_enabled", ConfigValue: strconv.FormatBool(req.VerificationTOTPEnabled)},
+		{ConfigKey: "direct_verification_email_enabled", ConfigValue: strconv.FormatBool(req.DirectVerificationEmailEnabled)},
+		{ConfigKey: "direct_verification_passkey_enabled", ConfigValue: strconv.FormatBool(req.DirectVerificationPasskeyEnabled)},
+		{ConfigKey: "direct_verification_totp_enabled", ConfigValue: strconv.FormatBool(req.DirectVerificationTOTPEnabled)},
 	}
 	if err := b.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "config_key"}},

@@ -16,6 +16,12 @@ export interface LoginSecurityConfig {
   captcha_enabled: boolean
   login_verification_enabled: boolean
   login_verification_method: '' | 'email' | 'webhook'
+  verification_email_enabled: boolean
+  verification_passkey_enabled: boolean
+  verification_totp_enabled: boolean
+  direct_verification_email_enabled: boolean
+  direct_verification_passkey_enabled: boolean
+  direct_verification_totp_enabled: boolean
 }
 export interface CaptchaResponse { captcha_id: string; image: string }
 export interface EmailCodeResponse {
@@ -61,7 +67,8 @@ export const renamePasskey = (id:number, name:string) => request.post<null>('/au
 export const updateEmailMFAStatus = (data:{mfa_enabled:boolean;direct_login_enabled:boolean}) => request.post<null>('/auth/mfa/email/status', data)
 export const beginPasskeyLogin = (mfa_token:string) => request.post<{options:any}>('/auth/mfa/passkey/login/begin', { mfa_token })
 export const finishPasskeyLogin = (data:{mfa_token:string;credential:unknown}) => request.post<LoginResponse>('/auth/mfa/passkey/login/finish', data)
-export const beginDirectPasskeyLogin = (data:{username:string;captcha_id?:string;captcha_code?:string}) => request.post<{login_token:string;options:any}>('/auth/passkey/login/begin', data)
+export const beginDirectPasskeyLogin = (data:{captcha_id?:string;captcha_code?:string}) => request.post<{login_token:string;options:any}>('/auth/passkey/login/begin', data)
 export const finishDirectPasskeyLogin = (data:{login_token:string;credential:unknown}) => request.post<LoginResponse>('/auth/passkey/login/finish', data)
 export const beginDirectEmailLogin = (data:{username:string;captcha_id?:string;captcha_code?:string}) => request.post<{login_token:string;sent:boolean;retry_after_seconds:number;expires_in_seconds:number}>('/auth/email/login/begin', data)
 export const finishDirectEmailLogin = (data:{login_token:string;code:string}) => request.post<LoginResponse>('/auth/email/login/finish', data)
+export const directTOTPLogin = (data:{username:string;captcha_id?:string;captcha_code?:string;code:string}) => request.post<LoginResponse>('/auth/totp/login', data)

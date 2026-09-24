@@ -604,7 +604,7 @@ function toggleCollapse() {
                 <label><span><strong>二次验证</strong><small>密码验证后发送邮箱验证码</small></span><el-switch v-model="mfaStatus.email_mfa_enabled" @change="toggleEmailMFA('email_mfa_enabled')" /></label>
                 <label><span><strong>验证码直接登录</strong><small>无需密码，通过邮箱验证码登录</small></span><el-switch v-model="mfaStatus.email_direct_login_enabled" @change="toggleEmailMFA('email_direct_login_enabled')" /></label>
               </div>
-              <div v-else class="mfa-unavailable">请先配置用户邮箱，并在系统配置的验证码配置中开启邮件验证码。</div>
+              <div v-else class="mfa-unavailable">请先配置用户邮箱，并在系统配置的验证配置中开启邮件验证码。</div>
             </div>
           </el-tab-pane>
           <el-tab-pane name="totp">

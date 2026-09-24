@@ -109,6 +109,9 @@ func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, e
 
 func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigResponse, user *model.User) ([]string, error) {
 	methods := make([]string, 0, 3)
+	if !config.LoginVerificationEnabled {
+		return methods, nil
+	}
 	var emailMFA model.UserMfaEmail
 	emailEnabled := config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != "" && b.db.Where("user_id = ? AND mfa_enabled = ?", userID, 1).First(&emailMFA).Error == nil
 	webhookEnabled := config.LoginVerificationEnabled && config.LoginVerificationMethod == "webhook" && config.VerificationWebhookEnabled
@@ -119,13 +122,13 @@ func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigRespo
 	if err := b.db.Model(&model.UserMfaTotp{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
 		return nil, err
 	}
-	if count > 0 {
+	if config.VerificationTOTPEnabled && count > 0 {
 		methods = append(methods, "totp")
 	}
 	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
 		return nil, err
 	}
-	if count > 0 {
+	if config.VerificationPasskeyEnabled && count > 0 {
 		methods = append(methods, "passkey")
 	}
 	return methods, nil
@@ -158,7 +161,13 @@ func (b *AuthBiz) SecurityConfig() (*api.LoginSecurityConfigResponse, error) {
 	}
 	return &api.LoginSecurityConfigResponse{
 		CaptchaEnabled: config.CaptchaEnabled, LoginVerificationEnabled: config.LoginVerificationEnabled,
-		LoginVerificationMethod: config.LoginVerificationMethod,
+		LoginVerificationMethod:          config.LoginVerificationMethod,
+		VerificationEmailEnabled:         config.VerificationEmailEnabled,
+		VerificationPasskeyEnabled:       config.VerificationPasskeyEnabled,
+		VerificationTOTPEnabled:          config.VerificationTOTPEnabled,
+		DirectVerificationEmailEnabled:   config.DirectVerificationEmailEnabled,
+		DirectVerificationPasskeyEnabled: config.DirectVerificationPasskeyEnabled,
+		DirectVerificationTOTPEnabled:    config.DirectVerificationTOTPEnabled,
 	}, nil
 }
 
@@ -229,7 +238,7 @@ func (b *AuthBiz) SendPasswordResetCode(req *api.PasswordResetCodeRequest) (*api
 	}
 	resetMethod := passwordResetVerificationMethod(config, user)
 	if resetMethod == "" {
-		return nil, errors.New("验证码配置中没有适用于当前用户的发送方式")
+		return nil, errors.New("验证配置中没有适用于当前用户的发送方式")
 	}
 	resetConfig := *config
 	resetConfig.LoginVerificationEnabled = true

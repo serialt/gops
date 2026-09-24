@@ -16,6 +16,7 @@ import (
 	"gops/internal/pkg/auth"
 	"gops/internal/pkg/cryptox"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -112,6 +113,13 @@ func (b *AuthBiz) VerifyMFA(req *api.MFAVerifyRequest) (*api.LoginResponse, erro
 	case "code":
 		valid = b.verifyEmailCode("mfa:"+req.MFAToken, req.Code)
 	case "totp":
+		config, err := b.config.Get()
+		if err != nil {
+			return nil, err
+		}
+		if !config.VerificationTOTPEnabled {
+			return nil, errors.New("系统未开启 TOTP 验证")
+		}
 		var row model.UserMfaTotp
 		if err := b.db.Where("user_id = ? AND enabled = ?", challenge.userID, 1).First(&row).Error; err == nil {
 			secret, decryptErr := cryptox.Decrypt(b.config.aesKey, row.Secret)
@@ -201,7 +209,7 @@ func (b *AuthBiz) BeginPasskeyRegistration(userID uint, name, origin string) (*a
 	if err != nil {
 		return nil, err
 	}
-	options, session, err := wa.BeginRegistration(user)
+	options, session, err := wa.BeginRegistration(user, webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired))
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +336,7 @@ func (b *AuthBiz) BeginDirectEmailLogin(req *api.DirectEmailLoginBeginRequest, i
 		return nil, ErrInvalidCaptcha
 	}
 	var emailMFA model.UserMfaEmail
-	if !config.VerificationEmailEnabled || strings.TrimSpace(user.Email) == "" || b.db.Where("user_id = ? AND direct_login_enabled = ?", user.ID, 1).First(&emailMFA).Error != nil {
+	if !config.VerificationEmailEnabled || !config.DirectVerificationEmailEnabled || strings.TrimSpace(user.Email) == "" || b.db.Where("user_id = ? AND direct_login_enabled = ?", user.ID, 1).First(&emailMFA).Error != nil {
 		return nil, errors.New("当前用户未开启邮箱验证码直接登录")
 	}
 	token, err := randomToken()
@@ -358,6 +366,13 @@ func (b *AuthBiz) BeginDirectEmailLogin(req *api.DirectEmailLoginBeginRequest, i
 }
 
 func (b *AuthBiz) FinishDirectEmailLogin(req *api.DirectEmailLoginFinishRequest) (*api.LoginResponse, error) {
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	if !config.VerificationEmailEnabled || !config.DirectVerificationEmailEnabled {
+		return nil, errors.New("系统未开启邮件验证码直接登录")
+	}
 	b.mu.Lock()
 	challenge, ok := b.directEmailLogins[req.LoginToken]
 	if ok && time.Now().After(challenge.expiresAt) {
@@ -401,6 +416,9 @@ func (b *AuthBiz) VerifyPasswordResetTOTP(req *api.PasswordResetTOTPRequest) (*a
 	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
 		return nil, ErrInvalidCaptcha
 	}
+	if !config.VerificationTOTPEnabled {
+		return nil, errors.New("系统未开启 TOTP 验证")
+	}
 	var row model.UserMfaTotp
 	if err := b.db.Where("user_id = ? AND enabled = ?", user.ID, 1).First(&row).Error; err != nil {
 		return nil, errors.New("当前用户未启用 TOTP")
@@ -423,6 +441,9 @@ func (b *AuthBiz) BeginPasswordResetPasskey(req *api.PasswordResetPasskeyBeginRe
 	}
 	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
 		return nil, ErrInvalidCaptcha
+	}
+	if !config.VerificationPasskeyEnabled {
+		return nil, errors.New("系统未开启 Passkey 验证")
 	}
 	user, err := b.loadWebAuthnUser(uint(userModel.ID), "recovery")
 	if err != nil {
@@ -465,6 +486,9 @@ func (b *AuthBiz) FinishPasswordResetPasskey(req *api.PasswordResetPasskeyFinish
 	if err != nil {
 		return nil, err
 	}
+	if !config.VerificationPasskeyEnabled {
+		return nil, errors.New("系统未开启 Passkey 验证")
+	}
 	wa, err := webAuthnForOrigin(session.origin, config.SystemName)
 	if err != nil {
 		return nil, err
@@ -500,6 +524,9 @@ func (b *AuthBiz) BeginPasskeyLogin(req *api.PasskeyLoginBeginRequest, origin st
 	if err != nil {
 		return nil, err
 	}
+	if !config.VerificationPasskeyEnabled {
+		return nil, errors.New("系统未开启 Passkey 验证")
+	}
 	wa, err := webAuthnForOrigin(origin, config.SystemName)
 	if err != nil {
 		return nil, err
@@ -534,6 +561,9 @@ func (b *AuthBiz) FinishPasskeyLogin(req *api.PasskeyLoginFinishRequest) (*api.L
 	if err != nil {
 		return nil, err
 	}
+	if !config.VerificationPasskeyEnabled {
+		return nil, errors.New("系统未开启 Passkey 验证")
+	}
 	wa, err := webAuthnForOrigin(session.origin, config.SystemName)
 	if err != nil {
 		return nil, err
@@ -557,10 +587,6 @@ func (b *AuthBiz) FinishPasskeyLogin(req *api.PasskeyLoginFinishRequest) (*api.L
 }
 
 func (b *AuthBiz) BeginDirectPasskeyLogin(req *api.DirectPasskeyLoginBeginRequest, origin, ip string) (*api.DirectPasskeyLoginBeginResponse, error) {
-	userModel, err := b.findLoginUser(req.Username)
-	if err != nil {
-		return nil, ErrInvalidCredentials
-	}
 	config, err := b.config.Get()
 	if err != nil {
 		return nil, err
@@ -568,18 +594,14 @@ func (b *AuthBiz) BeginDirectPasskeyLogin(req *api.DirectPasskeyLoginBeginReques
 	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
 		return nil, ErrInvalidCaptcha
 	}
-	user, err := b.loadWebAuthnUser(uint(userModel.ID), "direct")
-	if err != nil {
-		return nil, err
-	}
-	if len(user.credentials) == 0 {
-		return nil, errors.New("当前用户没有启用可直接登录的 Passkey")
+	if !config.VerificationPasskeyEnabled || !config.DirectVerificationPasskeyEnabled {
+		return nil, errors.New("系统未开启 Passkey 直接登录")
 	}
 	wa, err := webAuthnForOrigin(origin, config.SystemName)
 	if err != nil {
 		return nil, err
 	}
-	options, session, err := wa.BeginLogin(user)
+	options, session, err := wa.BeginDiscoverableLogin()
 	if err != nil {
 		return nil, err
 	}
@@ -588,7 +610,7 @@ func (b *AuthBiz) BeginDirectPasskeyLogin(req *api.DirectPasskeyLoginBeginReques
 		return nil, err
 	}
 	b.mu.Lock()
-	b.directPasskeyLogins[token] = passkeySession{userID: uint(userModel.ID), username: userModel.Username, ip: ip, origin: origin, session: session, expiresAt: time.Now().Add(5 * time.Minute)}
+	b.directPasskeyLogins[token] = passkeySession{ip: ip, origin: origin, session: session, expiresAt: time.Now().Add(5 * time.Minute)}
 	b.mu.Unlock()
 	return &api.DirectPasskeyLoginBeginResponse{LoginToken: token, Options: options}, nil
 }
@@ -601,22 +623,35 @@ func (b *AuthBiz) FinishDirectPasskeyLogin(req *api.DirectPasskeyLoginFinishRequ
 	if !ok || time.Now().After(session.expiresAt) {
 		return nil, errors.New("Passkey 登录会话无效或已过期")
 	}
-	user, err := b.loadWebAuthnUser(session.userID, "direct")
-	if err != nil {
-		return nil, err
-	}
 	config, err := b.config.Get()
 	if err != nil {
 		return nil, err
+	}
+	if !config.VerificationPasskeyEnabled || !config.DirectVerificationPasskeyEnabled {
+		return nil, errors.New("系统未开启 Passkey 直接登录")
 	}
 	wa, err := webAuthnForOrigin(session.origin, config.SystemName)
 	if err != nil {
 		return nil, err
 	}
-	credential, err := wa.FinishLogin(user, *session.session, credentialRequest(session.origin, req.Credential))
+	resolvedUser, credential, err := wa.FinishPasskeyLogin(func(_ []byte, userHandle []byte) (webauthn.User, error) {
+		var userID uint
+		if _, scanErr := fmt.Sscanf(string(userHandle), "gops-user-%d", &userID); scanErr != nil || userID == 0 {
+			return nil, errors.New("无法识别 Passkey 所属用户")
+		}
+		return b.loadWebAuthnUser(userID, "direct")
+	}, *session.session, credentialRequest(session.origin, req.Credential))
 	if err != nil {
-		b.recordLogin(int64(session.userID), session.username, session.ip, "failed", "Passkey 直接登录失败")
+		b.recordLogin(0, "", session.ip, "failed", "Passkey 直接登录失败")
 		return nil, errors.New("Passkey 验证失败")
+	}
+	user, ok := resolvedUser.(*webAuthnUser)
+	if !ok {
+		return nil, errors.New("无法识别 Passkey 所属用户")
+	}
+	var userModel model.User
+	if err := b.db.Select("id", "username", "status").First(&userModel, user.id).Error; err != nil || !userModel.Status {
+		return nil, ErrInvalidCredentials
 	}
 	encoded, err := json.Marshal(credential)
 	if err != nil {
@@ -626,13 +661,45 @@ func (b *AuthBiz) FinishDirectPasskeyLogin(req *api.DirectPasskeyLoginFinishRequ
 	if err != nil {
 		return nil, err
 	}
-	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND credential_id = ? AND direct_login_enabled = ?", session.userID, credentialID(credential.ID), 1).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
+	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND credential_id = ? AND direct_login_enabled = ?", user.id, credentialID(credential.ID), 1).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
 		return nil, err
 	}
-	tokens, err := b.jwt.GeneratePair(session.userID)
+	tokens, err := b.jwt.GeneratePair(user.id)
 	if err != nil {
 		return nil, ErrGenerateToken
 	}
-	b.recordLogin(int64(session.userID), session.username, session.ip, "success", "Passkey 直接登录成功")
+	b.recordLogin(int64(user.id), userModel.Username, session.ip, "success", "Passkey 直接登录成功")
+	return tokenResponse(tokens), nil
+}
+
+func (b *AuthBiz) DirectTOTPLogin(req *api.DirectTOTPLoginRequest, ip string) (*api.LoginResponse, error) {
+	user, err := b.findLoginUser(req.Username)
+	if err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+		return nil, ErrInvalidCaptcha
+	}
+	if !config.VerificationTOTPEnabled || !config.DirectVerificationTOTPEnabled {
+		return nil, errors.New("系统未开启 TOTP 直接登录")
+	}
+	var row model.UserMfaTotp
+	if err := b.db.Where("user_id = ? AND enabled = ?", user.ID, 1).First(&row).Error; err != nil {
+		return nil, errors.New("当前用户未启用 TOTP")
+	}
+	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)
+	if err != nil || !auth.ValidateTOTP(secret, req.Code, time.Now()) {
+		b.recordLogin(user.ID, user.Username, ip, "failed", "TOTP 直接登录失败")
+		return nil, errors.New("TOTP 验证码错误")
+	}
+	tokens, err := b.jwt.GeneratePair(uint(user.ID))
+	if err != nil {
+		return nil, ErrGenerateToken
+	}
+	b.recordLogin(user.ID, user.Username, ip, "success", "TOTP 直接登录成功")
 	return tokenResponse(tokens), nil
 }

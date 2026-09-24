@@ -183,8 +183,24 @@ func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
 	g.POST("/auth/mfa/passkey/login/finish", h.FinishPasskeyLogin)
 	g.POST("/auth/passkey/login/begin", h.BeginDirectPasskeyLogin)
 	g.POST("/auth/passkey/login/finish", h.FinishDirectPasskeyLogin)
+	g.POST("/auth/totp/login", h.DirectTOTPLogin)
 	g.POST("/auth/email/login/begin", h.BeginDirectEmailLogin)
 	g.POST("/auth/email/login/finish", h.FinishDirectEmailLogin)
+}
+
+// DirectTOTPLogin POST /api/v1/auth/totp/login 使用 TOTP 动态码直接登录。
+func (h *AuthHandler) DirectTOTPLogin(c *gin.Context) {
+	req := new(api.DirectTOTPLoginRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入用户名或邮箱及 TOTP 动态码")
+		return
+	}
+	result, err := h.biz.DirectTOTPLogin(req, c.ClientIP())
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 // VerifyPasswordResetTOTP POST /api/v1/auth/password-reset/totp/verify 使用 TOTP 验证密码重置身份。
@@ -266,7 +282,7 @@ func (h *AuthHandler) FinishDirectEmailLogin(c *gin.Context) {
 func (h *AuthHandler) BeginDirectPasskeyLogin(c *gin.Context) {
 	req := new(api.DirectPasskeyLoginBeginRequest)
 	if err := c.ShouldBindJSON(req); err != nil {
-		response.Error(c, 400, "请输入用户名或邮箱")
+		response.Error(c, 400, "Passkey 登录参数不完整")
 		return
 	}
 	result, err := h.biz.BeginDirectPasskeyLogin(req, requestOrigin(c), c.ClientIP())
