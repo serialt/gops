@@ -36,6 +36,7 @@ func (h *AuthHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/auth/mfa/passkeys/delete", h.DeletePasskey)
 	g.POST("/auth/mfa/passkeys/status", h.UpdatePasskeyStatus)
 	g.POST("/auth/mfa/passkeys/rename", h.RenamePasskey)
+	g.POST("/auth/mfa/email/status", h.UpdateEmailMFAStatus)
 }
 
 // MFAStatus POST /api/v1/auth/mfa/status 查询当前用户 MFA 绑定状态。
@@ -179,6 +180,38 @@ func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
 	g.POST("/auth/mfa/passkey/login/finish", h.FinishPasskeyLogin)
 	g.POST("/auth/passkey/login/begin", h.BeginDirectPasskeyLogin)
 	g.POST("/auth/passkey/login/finish", h.FinishDirectPasskeyLogin)
+	g.POST("/auth/email/login/begin", h.BeginDirectEmailLogin)
+	g.POST("/auth/email/login/finish", h.FinishDirectEmailLogin)
+}
+
+// BeginDirectEmailLogin POST /api/v1/auth/email/login/begin 发送邮箱验证码并创建直接登录会话。
+func (h *AuthHandler) BeginDirectEmailLogin(c *gin.Context) {
+	req := new(api.DirectEmailLoginBeginRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入用户名或邮箱")
+		return
+	}
+	result, err := h.biz.BeginDirectEmailLogin(req, c.ClientIP())
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// FinishDirectEmailLogin POST /api/v1/auth/email/login/finish 验证邮箱验证码并直接登录。
+func (h *AuthHandler) FinishDirectEmailLogin(c *gin.Context) {
+	req := new(api.DirectEmailLoginFinishRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入邮箱验证码")
+		return
+	}
+	result, err := h.biz.FinishDirectEmailLogin(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 // BeginDirectPasskeyLogin POST /api/v1/auth/passkey/login/begin 创建无需密码的 Passkey 登录挑战。
@@ -361,6 +394,25 @@ func (h *AuthHandler) RenamePasskey(c *gin.Context) {
 		return
 	}
 	if err := h.biz.RenamePasskey(userID, req); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// UpdateEmailMFAStatus POST /api/v1/auth/mfa/email/status 更新当前用户的邮箱验证用途。
+func (h *AuthHandler) UpdateEmailMFAStatus(c *gin.Context) {
+	req := new(api.EmailMFAStatusRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "邮箱验证配置不完整")
+		return
+	}
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	if err := h.biz.UpdateEmailMFAStatus(userID, req); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}

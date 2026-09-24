@@ -8,7 +8,7 @@ import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
-import { beginDirectPasskeyLogin, beginPasskeyLogin, finishDirectPasskeyLogin, finishPasskeyLogin, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, type MFAMethod } from '@/api/auth'
+import { beginDirectEmailLogin, beginDirectPasskeyLogin, beginPasskeyLogin, finishDirectEmailLogin, finishDirectPasskeyLogin, finishPasskeyLogin, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, type MFAMethod } from '@/api/auth'
 import { credentialJSON, requestOptions } from '@/utils/webauthn'
 
 const auth = useAuthStore()
@@ -21,7 +21,7 @@ const resendCountdown = ref(0)
 let resendTimer: ReturnType<typeof setInterval> | undefined
 const verificationCountdown = ref(0)
 let verificationTimer: ReturnType<typeof setInterval> | undefined
-const loginStep = ref<'credentials' | 'verification' | 'forgot' | 'reset_verify' | 'reset_password'>('credentials')
+const loginStep = ref<'credentials' | 'verification' | 'email_login' | 'forgot' | 'reset_verify' | 'reset_password'>('credentials')
 const security = reactive({
   captcha_enabled: false,
   login_verification_enabled: false,
@@ -30,15 +30,17 @@ const security = reactive({
 const captcha = reactive({ id: '', image: '' })
 const emailCodeRequired = ref(false)
 const mfaToken = ref('')
+const directEmailToken = ref('')
 const mfaMethods = ref<MFAMethod[]>([])
 const selectedMFAMethod = ref<MFAMethod>('code')
 const form = reactive({ username: 'admin', password: 'password', captcha_code: '', email_code: '' })
 const resetForm = reactive({ code: '', new_password: '', confirm_password: '' })
 const resetToken = ref('')
-const stepTitle = computed(() => ({ credentials: '欢迎登录', verification: '二次验证', forgot: '忘记密码', reset_verify: '身份验证', reset_password: '重置密码' })[loginStep.value])
+const stepTitle = computed(() => ({ credentials: '欢迎登录', verification: '二次验证', email_login: '验证码登录', forgot: '忘记密码', reset_verify: '身份验证', reset_password: '重置密码' })[loginStep.value])
 const stepDescription = computed(() => ({
   credentials: '登录管理控制台，开始你的工作。',
   verification: '请输入收到的验证码以继续登录。',
+  email_login: '请输入发送至邮箱的登录验证码。',
   forgot: '验证身份后即可重新设置密码。',
   reset_verify: '请输入收到的验证码。',
   reset_password: '身份验证已通过，请设置新密码。',
@@ -115,6 +117,11 @@ async function submit() {
 				if (selectedMFAMethod.value === 'code') await requestEmailCode()
 				return
 			}
+		} else if (loginStep.value === 'email_login') {
+			if (verificationCountdown.value <= 0) return ElMessage.warning('验证码已过期，请返回后重新获取')
+			if (!form.email_code.trim()) return ElMessage.warning('请输入邮箱验证码')
+			const { data } = await finishDirectEmailLogin({ login_token: directEmailToken.value, code: form.email_code.trim() })
+			await auth.acceptLogin(data.data)
 		} else if (selectedMFAMethod.value === 'passkey') {
 			await loginWithPasskey()
 			return
@@ -132,6 +139,26 @@ async function submit() {
   } finally {
     loading.value = false
   }
+}
+
+async function directEmailLogin() {
+	if (!form.username.trim()) return ElMessage.warning('请输入用户名或邮箱')
+	if (security.captcha_enabled && !form.captcha_code.trim()) return ElMessage.warning('请输入图形验证码')
+	sendingEmailCode.value = true
+	try {
+		const { data } = await beginDirectEmailLogin({ username: form.username.trim(), captcha_id: captcha.id, captcha_code: form.captcha_code })
+		directEmailToken.value = data.data.login_token
+		form.email_code = ''
+		startResendCountdown(data.data.retry_after_seconds)
+		startVerificationCountdown(data.data.expires_in_seconds)
+		loginStep.value = 'email_login'
+		ElMessage.success('验证码已发送至用户邮箱')
+	} catch (error) {
+		await refreshCaptcha()
+		throw error
+	} finally {
+		sendingEmailCode.value = false
+	}
 }
 
 async function loginWithPasskey() {
@@ -173,6 +200,7 @@ function backToCredentials() {
   loginStep.value = 'credentials'
 	emailCodeRequired.value = false
 	mfaToken.value = ''
+	directEmailToken.value = ''
 	mfaMethods.value = []
   form.email_code = ''
   resetToken.value = ''
@@ -280,6 +308,11 @@ onBeforeUnmount(() => {
                 </el-icon></template>
             </el-input>
           </el-form-item>
+          <el-form-item v-if="loginStep === 'email_login'">
+            <el-input v-model="form.email_code" size="large" maxlength="6" placeholder="请输入邮箱验证码">
+              <template #prefix><el-icon><Message /></el-icon></template>
+            </el-input>
+          </el-form-item>
           <el-form-item v-if="loginStep === 'credentials'">
             <el-input v-model="form.password" type="password" show-password size="large" placeholder="请输入密码"
               autocomplete="current-password">
@@ -326,16 +359,19 @@ onBeforeUnmount(() => {
             <el-input v-model="resetForm.confirm_password" type="password" show-password size="large" placeholder="请再次输入新密码"
               autocomplete="new-password"><template #prefix><el-icon><Lock /></el-icon></template></el-input>
           </el-form-item>
-			<p v-if="(loginStep === 'verification' && selectedMFAMethod === 'code') || loginStep === 'reset_verify'" class="verification-expiry" :class="{ expired: verificationCountdown <= 0 }">
+			<p v-if="(loginStep === 'verification' && selectedMFAMethod === 'code') || loginStep === 'email_login' || loginStep === 'reset_verify'" class="verification-expiry" :class="{ expired: verificationCountdown <= 0 }">
             {{ verificationCountdown > 0 ? `验证码有效期剩余 ${formatCountdown(verificationCountdown)}` : '验证码已过期，请重新获取' }}
           </p>
           
           <button v-if="loginStep === 'credentials'" type="button" class="forgot-password" @click="openForgotPassword">忘记密码？</button>
           <el-button type="primary" size="large" :loading="loading || sendingEmailCode" class="submit" @click="handlePrimaryAction">
-            {{ loginStep === 'verification' ? '验证并登录' : loginStep === 'forgot' ? '发送验证码' : loginStep === 'reset_verify' ? '验证身份' : loginStep === 'reset_password' ? '修改密码' : '登录' }}
+            {{ loginStep === 'verification' || loginStep === 'email_login' ? '验证并登录' : loginStep === 'forgot' ? '发送验证码' : loginStep === 'reset_verify' ? '验证身份' : loginStep === 'reset_password' ? '修改密码' : '登录' }}
           </el-button>
           <el-button v-if="loginStep === 'credentials'" class="passkey-login-button" plain :disabled="loading" @click="directPasskeyLogin">
             使用 Passkey 直接登录
+          </el-button>
+          <el-button v-if="loginStep === 'credentials'" class="passkey-login-button" plain :loading="sendingEmailCode" @click="directEmailLogin">
+            使用邮箱验证码直接登录
           </el-button>
           <el-button v-if="loginStep !== 'credentials'" class="back-button" text @click="backToCredentials">
             返回账号登录

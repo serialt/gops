@@ -6,7 +6,7 @@ import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDo
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
 import gopsLogoUrl from '@/assets/gops.svg'
-import { beginPasskeyRegistration, confirmTOTP, deletePasskey, deleteTOTP, disableTOTP, enableTOTP as enableTOTPApi, finishPasskeyRegistration, getMFAStatus, renamePasskey, setupTOTP, updatePasskeyStatus, updateProfile, type MFAPasskey, type MFAStatus, type TOTPSetup } from '@/api/auth'
+import { beginPasskeyRegistration, confirmTOTP, deletePasskey, deleteTOTP, disableTOTP, enableTOTP as enableTOTPApi, finishPasskeyRegistration, getMFAStatus, renamePasskey, setupTOTP, updateEmailMFAStatus, updatePasskeyStatus, updateProfile, type MFAPasskey, type MFAStatus, type TOTPSetup } from '@/api/auth'
 import { creationOptions, credentialJSON } from '@/utils/webauthn'
 
 const route = useRoute()
@@ -19,7 +19,7 @@ const profileVisible = ref(false)
 const profileSaving = ref(false)
 const profileForm = reactive({ username: '', nickname: '', email: '', current_password: '', new_password: '', confirm_password: '' })
 const pageRefreshKey = ref(0)
-const mfaStatus = ref<MFAStatus>({ code_available: false, totp_configured: false, totp_enabled: false, passkeys: [] })
+const mfaStatus = ref<MFAStatus>({ code_available: false, email_available: false, email: '', email_mfa_enabled: false, email_direct_login_enabled: false, totp_configured: false, totp_enabled: false, passkeys: [] })
 const totpSetup = ref<TOTPSetup | null>(null)
 const mfaBusy = ref(false)
 
@@ -257,6 +257,16 @@ async function togglePasskey(item: MFAPasskey, field: 'mfa_enabled' | 'direct_lo
 		ElMessage.success(item[field] ? '已启用' : '已停用')
 	} catch (error) {
 		item[field] = !item[field]
+		throw error
+	}
+}
+
+async function toggleEmailMFA(field: 'email_mfa_enabled' | 'email_direct_login_enabled') {
+	try {
+		await updateEmailMFAStatus({ mfa_enabled: mfaStatus.value.email_mfa_enabled, direct_login_enabled: mfaStatus.value.email_direct_login_enabled })
+		ElMessage.success(mfaStatus.value[field] ? '已启用' : '已停用')
+	} catch (error) {
+		mfaStatus.value[field] = !mfaStatus.value[field]
 		throw error
 	}
 }
@@ -582,6 +592,21 @@ function toggleCollapse() {
       <section class="profile-section">
         <div class="profile-section-heading"><strong>多因素认证</strong><span>为当前账号增加额外身份验证</span></div>
         <el-tabs tab-position="left" class="mfa-tabs">
+          <el-tab-pane name="email">
+            <template #label>
+              <span class="mfa-tab-label"><strong>邮箱验证码</strong><small><i :class="{ enabled: mfaStatus.email_mfa_enabled || mfaStatus.email_direct_login_enabled }" />{{ mfaStatus.email_available ? '可用' : '不可用' }}</small></span>
+            </template>
+            <div class="mfa-pane">
+              <div class="mfa-setting-row">
+                <div><strong>邮箱验证码</strong><small>{{ mfaStatus.email || '当前用户未配置邮箱' }}</small></div>
+              </div>
+              <div v-if="mfaStatus.email_available" class="email-mfa-options">
+                <label><span><strong>二次验证</strong><small>密码验证后发送邮箱验证码</small></span><el-switch v-model="mfaStatus.email_mfa_enabled" @change="toggleEmailMFA('email_mfa_enabled')" /></label>
+                <label><span><strong>验证码直接登录</strong><small>无需密码，通过邮箱验证码登录</small></span><el-switch v-model="mfaStatus.email_direct_login_enabled" @change="toggleEmailMFA('email_direct_login_enabled')" /></label>
+              </div>
+              <div v-else class="mfa-unavailable">请先配置用户邮箱，并在系统配置的验证码配置中开启邮件验证码。</div>
+            </div>
+          </el-tab-pane>
           <el-tab-pane name="totp">
             <template #label>
               <span class="mfa-tab-label"><strong>TOTP 动态码</strong><small><i :class="{ enabled: mfaStatus.totp_enabled }" />{{ mfaStatus.totp_enabled ? '已启用' : mfaStatus.totp_configured ? '已停用' : '未配置' }}</small></span>
@@ -1288,6 +1313,12 @@ function toggleCollapse() {
 .passkey-actions :deep(.el-button) { margin: 0; }
 .passkey-option { display: inline-flex; align-items: center; gap: 5px; color: var(--text-soft); font-size: 9px; white-space: nowrap; }
 .mfa-empty { padding: 24px 0 12px; color: var(--text-soft); font-size: 10px; text-align: center; }
+.email-mfa-options { display: grid; gap: 8px; margin-top: 10px; }
+.email-mfa-options > label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
+.email-mfa-options span { display: flex; min-width: 0; flex-direction: column; }
+.email-mfa-options strong { font-size: 10px; }
+.email-mfa-options small { margin-top: 2px; color: var(--text-soft); font-size: 9px; }
+.mfa-unavailable { margin-top: 10px; padding: 10px; border-radius: 7px; color: var(--text-soft); background: #fff8e8; font-size: 10px; }
 
 @media (max-width: 768px) {
 	.profile-field-grid { grid-template-columns: minmax(0, 1fr); }

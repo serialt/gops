@@ -61,10 +61,11 @@ type AuthBiz struct {
 	passkeyRegistrations map[string]passkeySession
 	passkeyLogins        map[string]passkeySession
 	directPasskeyLogins  map[string]passkeySession
+	directEmailLogins    map[string]loginMFAChallenge
 }
 
 func NewAuthBiz(db *gorm.DB, jwt *auth.JWTManager, casbinService *casbinx.Service, config *SystemConfigBiz) *AuthBiz {
-	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue), pendingTOTP: make(map[uint]verificationValue), mfaChallenges: make(map[string]loginMFAChallenge), passkeyRegistrations: make(map[string]passkeySession), passkeyLogins: make(map[string]passkeySession), directPasskeyLogins: make(map[string]passkeySession)}
+	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue), pendingTOTP: make(map[uint]verificationValue), mfaChallenges: make(map[string]loginMFAChallenge), passkeyRegistrations: make(map[string]passkeySession), passkeyLogins: make(map[string]passkeySession), directPasskeyLogins: make(map[string]passkeySession), directEmailLogins: make(map[string]loginMFAChallenge)}
 }
 
 func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, error) {
@@ -107,7 +108,10 @@ func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, e
 
 func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigResponse, user *model.User) ([]string, error) {
 	methods := make([]string, 0, 3)
-	if b.loginVerificationRequired(config, user) {
+	var emailMFA model.UserMfaEmail
+	emailEnabled := config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != "" && b.db.Where("user_id = ? AND mfa_enabled = ?", userID, 1).First(&emailMFA).Error == nil
+	webhookEnabled := config.LoginVerificationEnabled && config.LoginVerificationMethod == "webhook" && config.VerificationWebhookEnabled
+	if emailEnabled || webhookEnabled {
 		methods = append(methods, "code")
 	}
 	var count int64
@@ -518,7 +522,10 @@ func (b *AuthBiz) MFAStatus(userID uint) (*api.MFAStatusResponse, error) {
 	for _, passkey := range passkeys {
 		items = append(items, &api.MFAPasskeyResponse{ID: passkey.ID, Name: passkey.Name, MFAEnabled: passkey.Enabled == 1, DirectLoginEnabled: passkey.DirectLoginEnabled == 1})
 	}
-	return &api.MFAStatusResponse{CodeAvailable: passwordResetVerificationMethod(config, &user) != "", TOTPConfigured: totpConfigured, TOTPEnabled: totpEnabled, Passkeys: items}, nil
+	var emailMFA model.UserMfaEmail
+	_ = b.db.Where("user_id = ?", userID).First(&emailMFA).Error
+	emailAvailable := config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != ""
+	return &api.MFAStatusResponse{CodeAvailable: passwordResetVerificationMethod(config, &user) != "", EmailAvailable: emailAvailable, Email: user.Email, EmailMFAEnabled: emailAvailable && emailMFA.MfaEnabled == 1, EmailDirectLoginEnabled: emailAvailable && emailMFA.DirectLoginEnabled == 1, TOTPConfigured: totpConfigured, TOTPEnabled: totpEnabled, Passkeys: items}, nil
 }
 
 func (b *AuthBiz) BeginTOTPSetup(userID uint) (*api.TOTPSetupResponse, error) {

@@ -87,7 +87,15 @@ func (b *AuthBiz) SendMFACode(req *api.MFACodeSendRequest) (*api.EmailCodeRespon
 		return &api.EmailCodeResponse{Required: true, Sent: false, RetryAfterSeconds: retryAfter, ExpiresInSeconds: expiresAfter}, nil
 	}
 	go func() {
-		if sendErr := b.config.SendLoginVerification(config, user.Username, user.Email, code); sendErr != nil {
+		var emailMFA model.UserMfaEmail
+		useEmail := config.VerificationEmailEnabled && user.Email != "" && b.db.Where("user_id = ? AND mfa_enabled = ?", user.ID, 1).First(&emailMFA).Error == nil
+		var sendErr error
+		if useEmail {
+			sendErr = b.config.SendEmailLoginCode(config, user.Email, code)
+		} else {
+			sendErr = b.config.SendLoginVerification(config, user.Username, user.Email, code)
+		}
+		if sendErr != nil {
 			b.discardEmailCode(key, code)
 		}
 	}()
@@ -279,6 +287,93 @@ func (b *AuthBiz) RenamePasskey(userID uint, req *api.PasskeyRenameRequest) erro
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (b *AuthBiz) UpdateEmailMFAStatus(userID uint, req *api.EmailMFAStatusRequest) error {
+	var user model.User
+	if err := b.db.Select("id", "email").First(&user, userID).Error; err != nil {
+		return ErrNotFound
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return err
+	}
+	if !config.VerificationEmailEnabled || strings.TrimSpace(user.Email) == "" {
+		return errors.New("请先配置用户邮箱并在系统配置中开启邮件验证码")
+	}
+	values := map[string]any{"mfa_enabled": req.MFAEnabled, "direct_login_enabled": req.DirectLoginEnabled, "updated_at": time.Now()}
+	row := &model.UserMfaEmail{UserID: int64(userID), MfaEnabled: boolInt(req.MFAEnabled), DirectLoginEnabled: boolInt(req.DirectLoginEnabled)}
+	return b.db.Where("user_id = ?", userID).Assign(values).FirstOrCreate(row).Error
+}
+
+func boolInt(value bool) int64 {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func (b *AuthBiz) BeginDirectEmailLogin(req *api.DirectEmailLoginBeginRequest, ip string) (*api.DirectEmailLoginBeginResponse, error) {
+	user, err := b.findLoginUser(req.Username)
+	if err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+		return nil, ErrInvalidCaptcha
+	}
+	var emailMFA model.UserMfaEmail
+	if !config.VerificationEmailEnabled || strings.TrimSpace(user.Email) == "" || b.db.Where("user_id = ? AND direct_login_enabled = ?", user.ID, 1).First(&emailMFA).Error != nil {
+		return nil, errors.New("当前用户未开启邮箱验证码直接登录")
+	}
+	token, err := randomToken()
+	if err != nil {
+		return nil, err
+	}
+	code, err := randomDigits(6)
+	if err != nil {
+		return nil, err
+	}
+	expiresIn := time.Duration(config.VerificationEmailExpireMinutes) * time.Minute
+	key := "direct-email:" + token
+	b.reserveEmailCode(key, code, expiresIn)
+	b.mu.Lock()
+	b.directEmailLogins[token] = loginMFAChallenge{userID: uint(user.ID), username: user.Username, ip: ip, expiresAt: time.Now().Add(expiresIn)}
+	b.mu.Unlock()
+	go func() {
+		if sendErr := b.config.SendEmailLoginCode(config, user.Email, code); sendErr != nil {
+			b.discardEmailCode(key, code)
+			b.mu.Lock()
+			delete(b.directEmailLogins, token)
+			b.mu.Unlock()
+		}
+	}()
+	seconds := int(expiresIn.Seconds())
+	return &api.DirectEmailLoginBeginResponse{LoginToken: token, Sent: true, RetryAfterSeconds: seconds, ExpiresInSeconds: seconds}, nil
+}
+
+func (b *AuthBiz) FinishDirectEmailLogin(req *api.DirectEmailLoginFinishRequest) (*api.LoginResponse, error) {
+	b.mu.Lock()
+	challenge, ok := b.directEmailLogins[req.LoginToken]
+	if ok && time.Now().After(challenge.expiresAt) {
+		ok = false
+	}
+	b.mu.Unlock()
+	if !ok || !b.verifyEmailCode("direct-email:"+req.LoginToken, req.Code) {
+		return nil, errors.New("验证码错误或已过期")
+	}
+	tokens, err := b.jwt.GeneratePair(challenge.userID)
+	if err != nil {
+		return nil, ErrGenerateToken
+	}
+	b.mu.Lock()
+	delete(b.directEmailLogins, req.LoginToken)
+	b.mu.Unlock()
+	b.recordLogin(int64(challenge.userID), challenge.username, challenge.ip, "success", "邮箱验证码直接登录成功")
+	return tokenResponse(tokens), nil
 }
 
 func (b *AuthBiz) BeginPasskeyLogin(req *api.PasskeyLoginBeginRequest, origin string) (*api.PasskeyLoginBeginResponse, error) {

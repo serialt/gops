@@ -174,6 +174,17 @@ func (b *SystemConfigBiz) SendLoginVerification(config *api.SystemConfigResponse
 	return b.sendVerification(config, username, email, code, "login_verification", "登录验证码")
 }
 
+func (b *SystemConfigBiz) SendEmailLoginCode(config *api.SystemConfigResponse, email, code string) error {
+	if !config.VerificationEmailEnabled || strings.TrimSpace(email) == "" {
+		return ErrInvalidVerificationConfig
+	}
+	content, err := renderVerificationEmail("登录验证码", code, config.VerificationEmailExpireMinutes)
+	if err != nil {
+		return err
+	}
+	return b.sendEmail(email, "登录验证码", content, true)
+}
+
 func (b *SystemConfigBiz) SendPasswordResetVerification(config *api.SystemConfigResponse, username, email, code string) error {
 	return b.sendVerification(config, username, email, code, "password_reset", "密码重置验证码")
 }

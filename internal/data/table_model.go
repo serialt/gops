@@ -39,6 +39,7 @@ func gopsTable(g *gen.Generator) {
 	userRole := g.GenerateModel("user_role")
 	userMFATOTP := g.GenerateModel("user_mfa_totp")
 	userMFAPasskey := g.GenerateModel("user_mfa_passkey")
+	userMFAEmail := g.GenerateModel("user_mfa_email")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
 		&field.RelateConfig{
 			RelateSlicePointer: true,
@@ -57,6 +58,7 @@ func gopsTable(g *gen.Generator) {
 		user,
 		userMFATOTP,
 		userMFAPasskey,
+		userMFAEmail,
 		organization,
 		organizationUser,
 		systemConfig,

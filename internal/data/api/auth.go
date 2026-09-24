@@ -89,10 +89,37 @@ type PasswordResetRequest struct {
 }
 
 type MFAStatusResponse struct {
-	CodeAvailable  bool                  `json:"code_available"`
-	TOTPConfigured bool                  `json:"totp_configured"`
-	TOTPEnabled    bool                  `json:"totp_enabled"`
-	Passkeys       []*MFAPasskeyResponse `json:"passkeys"`
+	CodeAvailable           bool                  `json:"code_available"`
+	EmailAvailable          bool                  `json:"email_available"`
+	Email                   string                `json:"email"`
+	EmailMFAEnabled         bool                  `json:"email_mfa_enabled"`
+	EmailDirectLoginEnabled bool                  `json:"email_direct_login_enabled"`
+	TOTPConfigured          bool                  `json:"totp_configured"`
+	TOTPEnabled             bool                  `json:"totp_enabled"`
+	Passkeys                []*MFAPasskeyResponse `json:"passkeys"`
+}
+
+type EmailMFAStatusRequest struct {
+	MFAEnabled         bool `json:"mfa_enabled"`
+	DirectLoginEnabled bool `json:"direct_login_enabled"`
+}
+
+type DirectEmailLoginBeginRequest struct {
+	Username    string `json:"username" binding:"required"`
+	CaptchaID   string `json:"captcha_id"`
+	CaptchaCode string `json:"captcha_code"`
+}
+
+type DirectEmailLoginBeginResponse struct {
+	LoginToken        string `json:"login_token"`
+	Sent              bool   `json:"sent"`
+	RetryAfterSeconds int    `json:"retry_after_seconds"`
+	ExpiresInSeconds  int    `json:"expires_in_seconds"`
+}
+
+type DirectEmailLoginFinishRequest struct {
+	LoginToken string `json:"login_token" binding:"required"`
+	Code       string `json:"code" binding:"required"`
 }
 
 type MFAPasskeyResponse struct {
