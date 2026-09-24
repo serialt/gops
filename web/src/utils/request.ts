@@ -93,7 +93,7 @@ request.interceptors.response.use(
       if (location.pathname !== '/login') redirectToLogin()
       else ElMessage.error(message)
     } else if (status === 403) {
-      redirectToError(403)
+      ElMessage.error(message || '暂无操作权限')
     } else if (status === 429) {
       redirectToError(429)
     } else {

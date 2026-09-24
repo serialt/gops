@@ -42,7 +42,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'audit/logins', name: 'audit-logins', component: () => import('@/views/audit/LoginLogsView.vue'), meta: { title: '登录日志', permission: 'POST /api/v1/audit/login-logs/list' } },
       { path: 'audit/data', name: 'audit-data', component: () => import('@/views/audit/AuditLogsView.vue'), meta: { title: '数据日志', audit: 'data', permission: 'POST /api/v1/audit/data-logs/list' } },
       { path: 'ssl-cert/certificates', name: 'ssl-certificates', component: () => import('@/views/ssl-cert/CertificatesView.vue'), meta: { title: '证书管理', permission: 'POST /api/v1/ssl-cert/certificates/list' } },
-      { path: 'system-config', name: 'system-config', component: () => import('@/views/SystemConfigView.vue'), meta: { title: '系统配置' } },
+      { path: 'system-config', name: 'system-config', component: () => import('@/views/SystemConfigView.vue'), meta: { title: '系统配置', permission: 'POST /api/v1/system-config/get' } },
     ],
   },
   { path: '/:pathMatch(.*)*', name: 'catch-all', component: () => import('@/views/HttpErrorView.vue'), props: { code: 404 }, meta: { public: true, title: '页面不存在' } },

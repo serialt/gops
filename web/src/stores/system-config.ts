@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { getSystemConfig } from '@/api/system-config'
+import { getLoginSecurityConfig } from '@/api/auth'
 
 export const useSystemConfigStore = defineStore('system-config', () => {
   const fallbackName = 'Gops'
@@ -9,7 +9,7 @@ export const useSystemConfigStore = defineStore('system-config', () => {
 
   async function fetchConfig() {
     try {
-      const { data } = await getSystemConfig()
+      const { data } = await getLoginSecurityConfig()
       systemName.value = data.data.system_name?.trim() || fallbackName
       systemDescription.value = data.data.system_description || ''
     } catch {

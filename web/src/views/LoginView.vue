@@ -354,6 +354,7 @@ function handlePrimaryAction() {
 onMounted(async () => {
   const { data } = await getLoginSecurityConfig()
   Object.assign(security, data.data)
+  systemConfig.updateConfig(data.data.system_name, data.data.system_description)
   if (!directLoginOptions.value.some((item) => item.value === directLoginMethod.value) && directLoginOptions.value[0]) directLoginMethod.value = directLoginOptions.value[0].value
   if (!resetMethodOptions.value.some((item) => item.value === resetMethod.value) && resetMethodOptions.value[0]) resetMethod.value = resetMethodOptions.value[0].value
   await refreshCaptcha()

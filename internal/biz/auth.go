@@ -177,6 +177,7 @@ func (b *AuthBiz) SecurityConfig() (*api.LoginSecurityConfigResponse, error) {
 		return nil, err
 	}
 	return &api.LoginSecurityConfigResponse{
+		SystemName: config.SystemName, SystemDescription: config.SystemDescription,
 		CaptchaEnabled: config.CaptchaEnabled, LoginVerificationEnabled: config.LoginVerificationEnabled,
 		LoginVerificationMethods:         config.LoginVerificationMethods,
 		VerificationEmailEnabled:         config.VerificationEmailEnabled,

@@ -13,6 +13,8 @@ export interface ProfileUpdateRequest {
   new_password: string
 }
 export interface LoginSecurityConfig {
+  system_name: string
+  system_description: string
   captcha_enabled: boolean
   login_verification_enabled: boolean
   login_verification_methods: Array<'email' | 'webhook' | 'passkey' | 'totp'>

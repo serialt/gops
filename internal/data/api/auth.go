@@ -45,6 +45,8 @@ type ProfileUpdateRequest struct {
 }
 
 type LoginSecurityConfigResponse struct {
+	SystemName                       string   `json:"system_name"`
+	SystemDescription                string   `json:"system_description"`
 	CaptchaEnabled                   bool     `json:"captcha_enabled"`
 	LoginVerificationEnabled         bool     `json:"login_verification_enabled"`
 	LoginVerificationMethods         []string `json:"login_verification_methods"`

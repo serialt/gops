@@ -25,6 +25,7 @@ const roleColumnDefs = computed<ColDef[]>(() => [
   { field: 'description', headerName: '说明' },
   {
     headerName: '操作', pinned: 'right', width: 220,
+    headerClass: 'role-action-header', cellClass: 'role-action-cell',
     cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(actionButton('配置权限', 'permission', () => openPermissions(params.data)), actionButton('编辑', 'edit', () => openEdit(params.data))); if (params.data.code !== 'admin') wrap.append(actionButton('删除', 'delete', () => remove(params.data))); return wrap },
   },
 ])
@@ -316,9 +317,19 @@ onMounted(load)
   display: flex;
   box-sizing: border-box;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
+  padding: 0 6px;
   white-space: nowrap;
+}
+
+:deep(.role-action-header .ag-header-cell-label) {
+  justify-content: flex-start;
+}
+
+:deep(.role-action-cell) {
+  display: flex;
+  align-items: center;
 }
 
 :deep(.grid-action) {

@@ -3,12 +3,22 @@ import { onMounted, ref, watch } from 'vue'
 import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
+import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
 const rows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
 const importInput = ref<HTMLInputElement>(); const exporting = ref(false); const importing = ref(false)
 const requestClientOptions: Array<{ label: string; value: MonitorRequestClient }> = [{ label: 'Google Chrome', value: 'chrome' }, { label: 'Mozilla Firefox', value: 'firefox' }, { label: 'Microsoft Edge', value: 'edge' }, { label: 'Apple Safari', value: 'safari' }, { label: 'curl', value: 'curl' }]
 const form = ref<MonitorDomainRequest>({ domain: '', port: 443, request_client: 'chrome', check_interval: 300, check_jitter: 30, enable_ssl: true, verify_certificate: true, enable_alert: true, response_threshold: 3000, ssl_expiry_days: 30 })
-async function load() { const [domainResult, statsResult] = await Promise.all([listMonitorDomains(keyword.value), monitorStats()]); rows.value = domainResult.data.data; stats.value = statsResult.data.data }
+async function load() {
+  const { data } = await listMonitorDomains(keyword.value)
+  rows.value = data.data
+  stats.value = rows.value.reduce<MonitorStats>((result, row) => {
+    result.total += 1
+    if (row.status === 'normal') result.normal += 1
+    else if (row.status === 'abnormal') result.abnormal += 1
+    else if (row.status === 'paused') result.paused += 1
+    return result
+  }, { total: 0, normal: 0, abnormal: 0, paused: 0 })
+}
 function open(row?: MonitorDomain) { editing.value = row ?? null; form.value = row ? { id: row.id, domain: row.domain, port: row.port, request_client: row.request_client || 'chrome', check_interval: row.check_interval, check_jitter: row.check_jitter ?? 30, enable_ssl: row.enable_ssl, verify_certificate: row.verify_certificate, enable_alert: row.enable_alert, response_threshold: row.response_threshold, ssl_expiry_days: row.ssl_expiry_days } : { domain: '', port: 443, request_client: 'chrome', check_interval: 300, check_jitter: 30, enable_ssl: true, verify_certificate: true, enable_alert: true, response_threshold: 3000, ssl_expiry_days: 30 }; dialog.value = true }
 function handleHTTPSChange(value: boolean | string | number) { if (!value) form.value.verify_certificate = false }
 async function save() {

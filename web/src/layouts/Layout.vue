@@ -34,7 +34,7 @@ const systemMenus = computed(() => [
   { path: '/users', title: '用户管理', icon: User, permission: 'POST /api/v1/users/list' },
   { path: '/roles', title: '角色权限', icon: Key, permission: 'POST /api/v1/roles/list' },
   { path: '/organizations', title: '组织管理', icon: OfficeBuilding, permission: 'POST /api/v1/organizations/list' },
-  { path: '/system-config', title: '系统配置', icon: Setting },
+  { path: '/system-config', title: '系统配置', icon: Setting, permission: 'POST /api/v1/system-config/get' },
 ].filter((item) => auth.hasPermission(item.permission)))
 const assetMenus = computed(() => [
   { path: '/assets/groups', title: '资产分组', icon: FolderOpened, permission: 'POST /api/v1/assets/groups/list' },
