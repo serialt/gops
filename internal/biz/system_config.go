@@ -121,13 +121,19 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 		return nil, ErrInvalidVerificationConfig
 	}
 	if req.LoginVerificationEnabled {
-		if req.LoginVerificationMethod == "" && (req.VerificationEmailEnabled || req.VerificationWebhookEnabled) {
+		if req.LoginVerificationMethod == "" {
 			return nil, ErrInvalidVerificationConfig
 		}
 		if req.LoginVerificationMethod == "email" && !req.VerificationEmailEnabled {
 			return nil, ErrInvalidVerificationConfig
 		}
 		if req.LoginVerificationMethod == "webhook" && (!req.VerificationWebhookEnabled || req.VerificationWebhookURL == "") {
+			return nil, ErrInvalidVerificationConfig
+		}
+		if req.LoginVerificationMethod == "passkey" && !req.VerificationPasskeyEnabled {
+			return nil, ErrInvalidVerificationConfig
+		}
+		if req.LoginVerificationMethod == "totp" && !req.VerificationTOTPEnabled {
 			return nil, ErrInvalidVerificationConfig
 		}
 	}

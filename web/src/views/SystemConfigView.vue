@@ -16,7 +16,7 @@ const form = reactive({
   password_require_digit: false, password_require_letter: false, password_require_upper: false,
   password_require_lower: false, password_require_special: false,
   session_timeout_minutes: 30, captcha_enabled: false, captcha_expire_minutes: 1,
-  login_verification_enabled: false, login_verification_method: '' as '' | 'email' | 'webhook',
+  login_verification_enabled: false, login_verification_method: '' as '' | 'email' | 'webhook' | 'passkey' | 'totp',
   max_login_failures: 5, account_lock_minutes: 30,
   verification_email_enabled: true, verification_email_expire_minutes: 5,
   verification_email_sender_name: '', verification_smtp_host: '', verification_smtp_port: 465,
@@ -39,7 +39,7 @@ async function save() {
     ElMessage.warning('验证配置至少需要启用一种方式')
     return
   }
-  if (form.login_verification_enabled && (form.verification_email_enabled || form.verification_webhook_enabled) && !form.login_verification_method) {
+  if (form.login_verification_enabled && !form.login_verification_method) {
     ElMessage.warning('开启登录二次验证后，请选择验证方式')
     return
   }
@@ -85,10 +85,12 @@ watch(
 )
 
 watch(
-  () => [form.verification_email_enabled, form.verification_webhook_enabled] as const,
-  ([emailEnabled, webhookEnabled]) => {
+  () => [form.verification_email_enabled, form.verification_webhook_enabled, form.verification_passkey_enabled, form.verification_totp_enabled] as const,
+  ([emailEnabled, webhookEnabled, passkeyEnabled, totpEnabled]) => {
     if (form.login_verification_method === 'email' && !emailEnabled) form.login_verification_method = ''
     if (form.login_verification_method === 'webhook' && !webhookEnabled) form.login_verification_method = ''
+    if (form.login_verification_method === 'passkey' && !passkeyEnabled) form.login_verification_method = ''
+    if (form.login_verification_method === 'totp' && !totpEnabled) form.login_verification_method = ''
   },
 )
 
@@ -168,14 +170,16 @@ watch(
                   <el-switch v-model="form.login_verification_enabled" active-text="开启" inactive-text="关闭" />
                   <span class="form-hint">登录时通过已配置的方式发送验证码</span>
                 </el-form-item>
-                <el-form-item label="验证码方式" :required="form.login_verification_enabled && (form.verification_email_enabled || form.verification_webhook_enabled)">
+                <el-form-item label="验证方式" :required="form.login_verification_enabled">
                   <el-select v-model="form.login_verification_method" :disabled="!form.login_verification_enabled"
                     placeholder="请选择验证码方式">
                     <el-option v-if="form.verification_email_enabled" label="邮件" value="email" />
                     <el-option v-if="form.verification_webhook_enabled" label="Webhook" value="webhook" />
+                    <el-option v-if="form.verification_passkey_enabled" label="Passkey" value="passkey" />
+                    <el-option v-if="form.verification_totp_enabled" label="TOTP" value="totp" />
                   </el-select>
-                  <span v-if="!form.verification_email_enabled && !form.verification_webhook_enabled" class="form-hint">
-                    Passkey/TOTP 将按用户已启用方式提供
+                  <span v-if="!form.verification_email_enabled && !form.verification_webhook_enabled && !form.verification_passkey_enabled && !form.verification_totp_enabled" class="form-hint">
+                    请先在“验证配置”中启用至少一种方式
                   </span>
                   <span v-else class="form-hint">仅显示已在“验证配置”中启用的方式</span>
                 </el-form-item>

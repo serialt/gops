@@ -13,7 +13,7 @@ type SystemConfigRequest struct {
 	CaptchaEnabled                   bool   `json:"captcha_enabled"`
 	CaptchaExpireMinutes             int    `json:"captcha_expire_minutes" binding:"min=1,max=60"`
 	LoginVerificationEnabled         bool   `json:"login_verification_enabled"`
-	LoginVerificationMethod          string `json:"login_verification_method" binding:"omitempty,oneof=email webhook"`
+	LoginVerificationMethod          string `json:"login_verification_method" binding:"omitempty,oneof=email webhook passkey totp"`
 	MaxLoginFailures                 int    `json:"max_login_failures" binding:"min=1,max=100"`
 	AccountLockMinutes               int    `json:"account_lock_minutes" binding:"min=1,max=10080"`
 	VerificationEmailEnabled         bool   `json:"verification_email_enabled"`

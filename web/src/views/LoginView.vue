@@ -25,7 +25,7 @@ const loginStep = ref<'credentials' | 'verification' | 'email_login' | 'forgot' 
 const security = reactive({
   captcha_enabled: false,
   login_verification_enabled: false,
-  login_verification_method: '' as '' | 'email' | 'webhook',
+  login_verification_method: '' as '' | 'email' | 'webhook' | 'passkey' | 'totp',
   verification_email_enabled: false,
   verification_passkey_enabled: false,
   verification_totp_enabled: false,

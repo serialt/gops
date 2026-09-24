@@ -15,7 +15,7 @@ export interface ProfileUpdateRequest {
 export interface LoginSecurityConfig {
   captcha_enabled: boolean
   login_verification_enabled: boolean
-  login_verification_method: '' | 'email' | 'webhook'
+  login_verification_method: '' | 'email' | 'webhook' | 'passkey' | 'totp'
   verification_email_enabled: boolean
   verification_passkey_enabled: boolean
   verification_totp_enabled: boolean
