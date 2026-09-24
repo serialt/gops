@@ -494,46 +494,65 @@ function toggleCollapse() {
       <el-main class="main"><router-view /></el-main>
     </el-container>
   </el-container>
-  <el-dialog v-model="profileVisible" title="个性化配置" width="460px" class="profile-dialog" destroy-on-close>
-    <el-form :model="profileForm" label-width="82px" class="profile-form">
-      <el-form-item label="用户名" required>
-        <el-input v-model="profileForm.username" maxlength="64" autocomplete="username" />
-      </el-form-item>
-      <el-form-item label="昵称" required>
-        <el-input v-model="profileForm.nickname" maxlength="64" />
-      </el-form-item>
-      <el-form-item label="邮箱">
-        <el-input v-model="profileForm.email" maxlength="255" placeholder="允许为空" autocomplete="email" />
-      </el-form-item>
-      <div class="profile-password-title">修改密码（不修改请留空）</div>
-      <el-form-item label="当前密码">
-        <el-input v-model="profileForm.current_password" type="password" show-password autocomplete="current-password" />
-      </el-form-item>
-      <el-form-item label="新密码">
-        <el-input v-model="profileForm.new_password" type="password" show-password autocomplete="new-password" />
-      </el-form-item>
-		<el-form-item label="确认密码">
-			<el-input v-model="profileForm.confirm_password" type="password" show-password autocomplete="new-password" />
-		</el-form-item>
-		<div class="profile-password-title">多因素认证</div>
-		<div class="mfa-setting-row">
-			<div><strong>TOTP 动态码</strong><small>{{ mfaStatus.totp_enabled ? '已启用' : '未启用' }}</small></div>
-			<el-button v-if="mfaStatus.totp_enabled" type="danger" plain @click="turnOffTOTP">停用</el-button>
-			<el-button v-else type="primary" plain @click="startTOTPSetup">配置</el-button>
-		</div>
-		<div v-if="totpSetup" class="totp-setup">
-			<p>在身份验证器中添加以下密钥，然后输入动态码确认：</p>
-			<code>{{ totpSetup.secret }}</code>
-			<el-button type="primary" @click="enableTOTP">验证并启用</el-button>
-		</div>
-		<div class="mfa-setting-row">
-			<div><strong>Passkey</strong><small>已添加 {{ mfaStatus.passkeys.length }} 个</small></div>
-			<el-button type="primary" plain :loading="mfaBusy" @click="addPasskey">添加</el-button>
-		</div>
-		<div v-for="item in mfaStatus.passkeys" :key="item.id" class="passkey-item">
-			<span>{{ item.name }}</span><el-button type="danger" text @click="removePasskey(item.id)">删除</el-button>
-		</div>
-	</el-form>
+  <el-dialog v-model="profileVisible" title="个性化配置" width="720px" class="profile-dialog" destroy-on-close>
+    <el-form :model="profileForm" label-position="top" class="profile-form">
+      <section class="profile-section">
+        <div class="profile-section-heading"><strong>基本信息</strong><span>维护账号名称和联系方式</span></div>
+        <div class="profile-field-grid">
+          <el-form-item label="用户名" required>
+            <el-input v-model="profileForm.username" maxlength="64" autocomplete="username" />
+          </el-form-item>
+          <el-form-item label="昵称" required>
+            <el-input v-model="profileForm.nickname" maxlength="64" />
+          </el-form-item>
+          <el-form-item label="邮箱">
+            <el-input v-model="profileForm.email" maxlength="255" placeholder="允许为空" autocomplete="email" />
+          </el-form-item>
+        </div>
+      </section>
+
+      <section class="profile-section">
+        <div class="profile-section-heading"><strong>修改密码</strong><span>不修改密码时保持为空</span></div>
+        <div class="profile-field-grid">
+          <el-form-item label="当前密码">
+            <el-input v-model="profileForm.current_password" type="password" show-password autocomplete="current-password" />
+          </el-form-item>
+          <el-form-item label="新密码">
+            <el-input v-model="profileForm.new_password" type="password" show-password autocomplete="new-password" />
+          </el-form-item>
+          <el-form-item label="确认密码">
+            <el-input v-model="profileForm.confirm_password" type="password" show-password autocomplete="new-password" />
+          </el-form-item>
+        </div>
+      </section>
+
+      <section class="profile-section">
+        <div class="profile-section-heading"><strong>多因素认证</strong><span>为当前账号增加额外身份验证</span></div>
+        <div class="mfa-card-grid">
+          <div class="mfa-card">
+            <div class="mfa-setting-row">
+              <div><strong>TOTP 动态码</strong><small>{{ mfaStatus.totp_enabled ? '已启用' : '未启用' }}</small></div>
+              <el-button v-if="mfaStatus.totp_enabled" type="danger" plain @click="turnOffTOTP">停用</el-button>
+              <el-button v-else type="primary" plain @click="startTOTPSetup">配置</el-button>
+            </div>
+            <div v-if="totpSetup" class="totp-setup">
+              <p>在身份验证器中添加以下密钥，然后输入动态码确认：</p>
+              <code>{{ totpSetup.secret }}</code>
+              <el-button type="primary" @click="enableTOTP">验证并启用</el-button>
+            </div>
+          </div>
+          <div class="mfa-card">
+            <div class="mfa-setting-row">
+              <div><strong>Passkey</strong><small>已添加 {{ mfaStatus.passkeys.length }} 个</small></div>
+              <el-button type="primary" plain :loading="mfaBusy" @click="addPasskey">添加</el-button>
+            </div>
+            <div v-for="item in mfaStatus.passkeys" :key="item.id" class="passkey-item">
+              <span>{{ item.name }}</span><el-button type="danger" text @click="removePasskey(item.id)">删除</el-button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </el-form>
     <template #footer>
       <el-button @click="profileVisible = false">取消</el-button>
       <el-button type="primary" :loading="profileSaving" @click="saveProfile">保存</el-button>
@@ -1071,19 +1090,58 @@ function toggleCollapse() {
 }
 
 .profile-form {
-  padding: 4px 10px 0 0;
+	display: grid;
+	gap: 14px;
+	padding: 2px 2px 0;
 }
 
 .profile-form :deep(.el-form-item) {
-  margin-bottom: 16px;
+	margin-bottom: 0;
 }
 
-.profile-password-title {
-  margin: 22px 0 16px 82px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-  color: var(--text-soft);
-  font-size: 11px;
+.profile-form :deep(.el-form-item__label) {
+	margin-bottom: 5px;
+	font-size: 11px;
+	line-height: 1.2;
+}
+
+.profile-section {
+	padding: 14px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: #fff;
+}
+
+.profile-section-heading {
+	display: flex;
+	align-items: baseline;
+	gap: 9px;
+	margin-bottom: 13px;
+}
+
+.profile-section-heading strong { color: var(--text); font-size: 13px; }
+.profile-section-heading span { color: var(--text-soft); font-size: 10px; }
+
+.profile-field-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px 14px;
+}
+
+.mfa-card-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px 14px;
+}
+
+:deep(.profile-dialog) { max-width: calc(100vw - 24px); }
+
+.mfa-card {
+	min-width: 0;
+	padding: 11px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--bg);
 }
 
 .mfa-setting-row,
@@ -1092,17 +1150,33 @@ function toggleCollapse() {
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-	margin: 0 0 10px 82px;
+	margin: 0;
 }
 
 .mfa-setting-row strong { display: block; font-size: 12px; }
 .mfa-setting-row small { display: block; margin-top: 2px; color: var(--text-soft); font-size: 10px; }
-.totp-setup { margin: 0 0 14px 82px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.mfa-setting-row :deep(.el-button--primary.is-plain) {
+	border-color: var(--primary) !important;
+	background: #fff !important;
+	color: var(--primary) !important;
+	box-shadow: 0 2px 6px rgba(83, 111, 232, 0.12);
+}
+.mfa-setting-row :deep(.el-button--primary.is-plain:hover),
+.mfa-setting-row :deep(.el-button--primary.is-plain:focus) {
+	border-color: var(--primary) !important;
+	background: var(--primary-soft) !important;
+	color: var(--primary-strong) !important;
+	transform: none;
+}
+.totp-setup { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .totp-setup p { margin: 0 0 8px; color: var(--text-soft); font-size: 10px; }
 .totp-setup code { display: block; margin-bottom: 8px; overflow-wrap: anywhere; color: var(--primary); font-size: 11px; }
-.passkey-item { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; }
+.passkey-item { margin-top: 8px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 11px; }
 
 @media (max-width: 768px) {
+	.profile-field-grid,
+	.mfa-card-grid { grid-template-columns: minmax(0, 1fr); }
+
   .header {
     padding: 0 12px !important;
   }
