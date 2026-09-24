@@ -643,7 +643,7 @@ function toggleCollapse() {
                 <span class="passkey-actions">
                   <label class="passkey-option">二次验证<el-switch v-model="item.mfa_enabled" size="small" @change="togglePasskey(item, 'mfa_enabled')" /></label>
                   <label class="passkey-option">直接登录<el-switch v-model="item.direct_login_enabled" size="small" @change="togglePasskey(item, 'direct_login_enabled')" /></label>
-                  <el-button type="primary" text @click="editPasskeyName(item)">重命名</el-button>
+                  <el-button type="primary" @click="editPasskeyName(item)">重命名</el-button>
                   <el-button type="danger" text @click="removePasskey(item.id)">删除</el-button>
                 </span>
               </div>

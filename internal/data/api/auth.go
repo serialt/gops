@@ -88,6 +88,29 @@ type PasswordResetRequest struct {
 	NewPassword string `json:"new_password" binding:"required"`
 }
 
+type PasswordResetTOTPRequest struct {
+	Username    string `json:"username" binding:"required"`
+	CaptchaID   string `json:"captcha_id"`
+	CaptchaCode string `json:"captcha_code"`
+	Code        string `json:"code" binding:"required"`
+}
+
+type PasswordResetPasskeyBeginRequest struct {
+	Username    string `json:"username" binding:"required"`
+	CaptchaID   string `json:"captcha_id"`
+	CaptchaCode string `json:"captcha_code"`
+}
+
+type PasswordResetPasskeyBeginResponse struct {
+	ChallengeToken string `json:"challenge_token"`
+	Options        any    `json:"options"`
+}
+
+type PasswordResetPasskeyFinishRequest struct {
+	ChallengeToken string          `json:"challenge_token" binding:"required"`
+	Credential     json.RawMessage `json:"credential" binding:"required"`
+}
+
 type MFAStatusResponse struct {
 	CodeAvailable           bool                  `json:"code_available"`
 	EmailAvailable          bool                  `json:"email_available"`

@@ -8,7 +8,7 @@ import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
-import { beginDirectEmailLogin, beginDirectPasskeyLogin, beginPasskeyLogin, finishDirectEmailLogin, finishDirectPasskeyLogin, finishPasskeyLogin, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, type MFAMethod } from '@/api/auth'
+import { beginDirectEmailLogin, beginDirectPasskeyLogin, beginPasskeyLogin, beginPasswordResetPasskey, finishDirectEmailLogin, finishDirectPasskeyLogin, finishPasskeyLogin, finishPasswordResetPasskey, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, verifyPasswordResetTOTP, type MFAMethod } from '@/api/auth'
 import { credentialJSON, requestOptions } from '@/utils/webauthn'
 
 const auth = useAuthStore()
@@ -33,8 +33,10 @@ const mfaToken = ref('')
 const directEmailToken = ref('')
 const mfaMethods = ref<MFAMethod[]>([])
 const selectedMFAMethod = ref<MFAMethod>('code')
+const directLoginMethod = ref<'passkey' | 'email'>('passkey')
 const form = reactive({ username: 'admin', password: 'password', captcha_code: '', email_code: '' })
 const resetForm = reactive({ code: '', new_password: '', confirm_password: '' })
+const resetMethod = ref<'email' | 'passkey' | 'totp'>('email')
 const resetToken = ref('')
 const stepTitle = computed(() => ({ credentials: '欢迎登录', verification: '二次验证', email_login: '验证码登录', forgot: '忘记密码', reset_verify: '身份验证', reset_password: '重置密码' })[loginStep.value])
 const stepDescription = computed(() => ({
@@ -161,6 +163,10 @@ async function directEmailLogin() {
 	}
 }
 
+function startDirectMFALogin() {
+	return directLoginMethod.value === 'passkey' ? directPasskeyLogin() : directEmailLogin()
+}
+
 async function loginWithPasskey() {
 	const { data } = await beginPasskeyLogin(mfaToken.value)
 	const credential = await navigator.credentials.get(requestOptions(data.data.options)) as PublicKeyCredential | null
@@ -234,6 +240,37 @@ async function requestPasswordResetCode() {
   }
 }
 
+async function verifyPasswordResetWithTOTP() {
+	if (!resetForm.code.trim()) return ElMessage.warning('请输入 TOTP 动态码')
+	loading.value = true
+	try {
+		const { data } = await verifyPasswordResetTOTP({ username: form.username.trim(), captcha_id: captcha.id, captcha_code: form.captcha_code, code: resetForm.code.trim() })
+		resetToken.value = data.data.reset_token
+		loginStep.value = 'reset_password'
+	} finally { loading.value = false }
+}
+
+async function verifyPasswordResetWithPasskey() {
+	if (!window.PublicKeyCredential) return ElMessage.warning('当前浏览器不支持 Passkey')
+	loading.value = true
+	try {
+		const { data } = await beginPasswordResetPasskey({ username: form.username.trim(), captcha_id: captcha.id, captcha_code: form.captcha_code })
+		const credential = await navigator.credentials.get(requestOptions(data.data.options)) as PublicKeyCredential | null
+		if (!credential) return
+		const result = await finishPasswordResetPasskey({ challenge_token: data.data.challenge_token, credential: credentialJSON(credential) })
+		resetToken.value = result.data.data.reset_token
+		loginStep.value = 'reset_password'
+	} finally { loading.value = false }
+}
+
+function startPasswordResetVerification() {
+	if (!form.username.trim()) return ElMessage.warning('请输入用户名或邮箱')
+	if (security.captcha_enabled && !form.captcha_code.trim()) return ElMessage.warning('请输入图形验证码')
+	if (resetMethod.value === 'totp') return verifyPasswordResetWithTOTP()
+	if (resetMethod.value === 'passkey') return verifyPasswordResetWithPasskey()
+	return requestPasswordResetCode()
+}
+
 async function verifyPasswordReset() {
   if (verificationCountdown.value <= 0) return ElMessage.warning('验证码已过期，请重新获取')
   if (!resetForm.code.trim()) return ElMessage.warning('请输入验证码')
@@ -267,7 +304,7 @@ async function confirmPasswordReset() {
 }
 
 function handlePrimaryAction() {
-  if (loginStep.value === 'forgot') return requestPasswordResetCode()
+	if (loginStep.value === 'forgot') return startPasswordResetVerification()
   if (loginStep.value === 'reset_verify') return verifyPasswordReset()
   if (loginStep.value === 'reset_password') return confirmPasswordReset()
   return submit()
@@ -302,7 +339,7 @@ onBeforeUnmount(() => {
         </div>
         <el-form :model="form" class="login-form" @keyup.enter="handlePrimaryAction">
           <el-form-item v-if="loginStep === 'credentials' || loginStep === 'forgot'">
-            <el-input v-model="form.username" size="large" :placeholder="loginStep === 'forgot' ? '请输入用户名' : '请输入用户名或邮箱'" autocomplete="username">
+            <el-input v-model="form.username" size="large" placeholder="请输入用户名或邮箱" autocomplete="username">
               <template #prefix><el-icon>
                   <UserFilled />
                 </el-icon></template>
@@ -328,6 +365,18 @@ onBeforeUnmount(() => {
               </el-input>
               <button class="captcha-image" type="button" title="点击刷新验证码" @click="refreshCaptcha"><img :src="captcha.image" alt="图形验证码" /></button>
             </div>
+          </el-form-item>
+          <el-form-item v-if="loginStep === 'forgot'">
+            <el-segmented v-model="resetMethod" :options="[
+              { label: '邮箱验证码', value: 'email' },
+              { label: 'Passkey', value: 'passkey' },
+              { label: 'TOTP', value: 'totp' },
+            ]" class="reset-methods" />
+          </el-form-item>
+          <el-form-item v-if="loginStep === 'forgot' && resetMethod === 'totp'">
+            <el-input v-model="resetForm.code" size="large" maxlength="6" placeholder="请输入 TOTP 动态码">
+              <template #prefix><el-icon><Message /></el-icon></template>
+            </el-input>
           </el-form-item>
 			<el-form-item v-if="loginStep === 'verification'">
 				<div class="mfa-methods">
@@ -365,14 +414,15 @@ onBeforeUnmount(() => {
           
           <button v-if="loginStep === 'credentials'" type="button" class="forgot-password" @click="openForgotPassword">忘记密码？</button>
           <el-button type="primary" size="large" :loading="loading || sendingEmailCode" class="submit" @click="handlePrimaryAction">
-            {{ loginStep === 'verification' || loginStep === 'email_login' ? '验证并登录' : loginStep === 'forgot' ? '发送验证码' : loginStep === 'reset_verify' ? '验证身份' : loginStep === 'reset_password' ? '修改密码' : '登录' }}
+            {{ loginStep === 'verification' || loginStep === 'email_login' ? '验证并登录' : loginStep === 'forgot' ? (resetMethod === 'email' ? '发送验证码' : '验证身份') : loginStep === 'reset_verify' ? '验证身份' : loginStep === 'reset_password' ? '修改密码' : '登录' }}
           </el-button>
-          <el-button v-if="loginStep === 'credentials'" class="passkey-login-button" plain :disabled="loading" @click="directPasskeyLogin">
-            使用 Passkey 直接登录
-          </el-button>
-          <el-button v-if="loginStep === 'credentials'" class="passkey-login-button" plain :loading="sendingEmailCode" @click="directEmailLogin">
-            使用邮箱验证码直接登录
-          </el-button>
+          <div v-if="loginStep === 'credentials'" class="direct-mfa-login">
+            <el-select v-model="directLoginMethod" aria-label="MFA 登录方式">
+              <el-option label="Passkey 登录" value="passkey" />
+              <el-option label="邮箱验证码登录" value="email" />
+            </el-select>
+            <el-button plain :loading="loading || sendingEmailCode" @click="startDirectMFALogin">MFA 登录</el-button>
+          </div>
           <el-button v-if="loginStep !== 'credentials'" class="back-button" text @click="backToCredentials">
             返回账号登录
           </el-button>
@@ -507,6 +557,8 @@ onBeforeUnmount(() => {
 
 .mfa-methods :deep(.el-button) { margin: 0; }
 
+.reset-methods { width: 100%; }
+
 .verification-row :deep(.el-button) {
   height: 42px;
   margin: 0;
@@ -549,10 +601,20 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-.passkey-login-button {
-	width: 100%;
+.direct-mfa-login {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 104px;
+	gap: 8px;
+	margin-top: 9px;
+}
+
+.direct-mfa-login :deep(.el-select__wrapper),
+.direct-mfa-login :deep(.el-button) {
 	height: 40px;
-	margin: 9px 0 0;
+}
+
+.direct-mfa-login :deep(.el-button) {
+	margin: 0;
 	border-color: var(--primary);
 	color: var(--primary);
 }

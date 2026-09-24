@@ -158,6 +158,8 @@ func (b *AuthBiz) loadWebAuthnUser(userID uint, usage string) (*webAuthnUser, er
 		query = query.Where("enabled = ?", 1)
 	} else if usage == "direct" {
 		query = query.Where("direct_login_enabled = ?", 1)
+	} else if usage == "recovery" {
+		query = query.Where("enabled = ? OR direct_login_enabled = ?", 1, 1)
 	}
 	if err := query.Find(&rows).Error; err != nil {
 		return nil, err
@@ -374,6 +376,115 @@ func (b *AuthBiz) FinishDirectEmailLogin(req *api.DirectEmailLoginFinishRequest)
 	b.mu.Unlock()
 	b.recordLogin(int64(challenge.userID), challenge.username, challenge.ip, "success", "邮箱验证码直接登录成功")
 	return tokenResponse(tokens), nil
+}
+
+func (b *AuthBiz) createPasswordResetToken(username string) (*api.PasswordResetVerifyResponse, error) {
+	token, err := randomToken()
+	if err != nil {
+		return nil, err
+	}
+	b.mu.Lock()
+	b.resetTokens[token] = verificationValue{code: username, expiresAt: time.Now().Add(10 * time.Minute)}
+	b.mu.Unlock()
+	return &api.PasswordResetVerifyResponse{ResetToken: token}, nil
+}
+
+func (b *AuthBiz) VerifyPasswordResetTOTP(req *api.PasswordResetTOTPRequest) (*api.PasswordResetVerifyResponse, error) {
+	user, err := b.findLoginUser(req.Username)
+	if err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+		return nil, ErrInvalidCaptcha
+	}
+	var row model.UserMfaTotp
+	if err := b.db.Where("user_id = ? AND enabled = ?", user.ID, 1).First(&row).Error; err != nil {
+		return nil, errors.New("当前用户未启用 TOTP")
+	}
+	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)
+	if err != nil || !auth.ValidateTOTP(secret, req.Code, time.Now()) {
+		return nil, errors.New("TOTP 验证码错误")
+	}
+	return b.createPasswordResetToken(user.Username)
+}
+
+func (b *AuthBiz) BeginPasswordResetPasskey(req *api.PasswordResetPasskeyBeginRequest, origin string) (*api.PasswordResetPasskeyBeginResponse, error) {
+	userModel, err := b.findLoginUser(req.Username)
+	if err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+		return nil, ErrInvalidCaptcha
+	}
+	user, err := b.loadWebAuthnUser(uint(userModel.ID), "recovery")
+	if err != nil {
+		return nil, err
+	}
+	if len(user.credentials) == 0 {
+		return nil, errors.New("当前用户未配置可用的 Passkey")
+	}
+	wa, err := webAuthnForOrigin(origin, config.SystemName)
+	if err != nil {
+		return nil, err
+	}
+	options, session, err := wa.BeginLogin(user)
+	if err != nil {
+		return nil, err
+	}
+	token, err := randomToken()
+	if err != nil {
+		return nil, err
+	}
+	b.mu.Lock()
+	b.resetPasskeyLogins[token] = passkeySession{userID: uint(userModel.ID), username: userModel.Username, origin: origin, session: session, expiresAt: time.Now().Add(5 * time.Minute)}
+	b.mu.Unlock()
+	return &api.PasswordResetPasskeyBeginResponse{ChallengeToken: token, Options: options}, nil
+}
+
+func (b *AuthBiz) FinishPasswordResetPasskey(req *api.PasswordResetPasskeyFinishRequest) (*api.PasswordResetVerifyResponse, error) {
+	b.mu.Lock()
+	session, ok := b.resetPasskeyLogins[req.ChallengeToken]
+	delete(b.resetPasskeyLogins, req.ChallengeToken)
+	b.mu.Unlock()
+	if !ok || time.Now().After(session.expiresAt) {
+		return nil, errors.New("Passkey 验证会话无效或已过期")
+	}
+	user, err := b.loadWebAuthnUser(session.userID, "recovery")
+	if err != nil {
+		return nil, err
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	wa, err := webAuthnForOrigin(session.origin, config.SystemName)
+	if err != nil {
+		return nil, err
+	}
+	credential, err := wa.FinishLogin(user, *session.session, credentialRequest(session.origin, req.Credential))
+	if err != nil {
+		return nil, errors.New("Passkey 验证失败")
+	}
+	encoded, err := json.Marshal(credential)
+	if err != nil {
+		return nil, err
+	}
+	encrypted, err := cryptox.Encrypt(b.config.aesKey, string(encoded))
+	if err != nil {
+		return nil, err
+	}
+	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND credential_id = ?", session.userID, credentialID(credential.ID)).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
+		return nil, err
+	}
+	return b.createPasswordResetToken(session.username)
 }
 
 func (b *AuthBiz) BeginPasskeyLogin(req *api.PasskeyLoginBeginRequest, origin string) (*api.PasskeyLoginBeginResponse, error) {

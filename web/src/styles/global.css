@@ -317,13 +317,14 @@ select {
   transition: all 0.2s ease;
 }
 
-.el-button--primary {
+.el-button--primary:not(.is-plain):not(.is-text):not(.is-link) {
   background: linear-gradient(135deg, #536fe8, #6c5ce7) !important;
   border-color: var(--primary) !important;
+  color: #fff !important;
   box-shadow: 0 5px 12px rgba(83, 111, 232, 0.2);
 }
 
-.el-button--primary:hover {
+.el-button--primary:not(.is-plain):not(.is-text):not(.is-link):hover {
   background: var(--primary-strong) !important;
   border-color: var(--primary-strong) !important;
   transform: translateY(-1px);

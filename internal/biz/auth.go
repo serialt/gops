@@ -62,10 +62,11 @@ type AuthBiz struct {
 	passkeyLogins        map[string]passkeySession
 	directPasskeyLogins  map[string]passkeySession
 	directEmailLogins    map[string]loginMFAChallenge
+	resetPasskeyLogins   map[string]passkeySession
 }
 
 func NewAuthBiz(db *gorm.DB, jwt *auth.JWTManager, casbinService *casbinx.Service, config *SystemConfigBiz) *AuthBiz {
-	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue), pendingTOTP: make(map[uint]verificationValue), mfaChallenges: make(map[string]loginMFAChallenge), passkeyRegistrations: make(map[string]passkeySession), passkeyLogins: make(map[string]passkeySession), directPasskeyLogins: make(map[string]passkeySession), directEmailLogins: make(map[string]loginMFAChallenge)}
+	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue), pendingTOTP: make(map[uint]verificationValue), mfaChallenges: make(map[string]loginMFAChallenge), passkeyRegistrations: make(map[string]passkeySession), passkeyLogins: make(map[string]passkeySession), directPasskeyLogins: make(map[string]passkeySession), directEmailLogins: make(map[string]loginMFAChallenge), resetPasskeyLogins: make(map[string]passkeySession)}
 }
 
 func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, error) {
@@ -218,15 +219,15 @@ func (b *AuthBiz) SendEmailCode(req *api.EmailCodeRequest) (*api.EmailCodeRespon
 }
 
 func (b *AuthBiz) SendPasswordResetCode(req *api.PasswordResetCodeRequest) (*api.EmailCodeResponse, error) {
-	var user model.User
-	if err := b.db.Where("username = ? AND status = ?", strings.TrimSpace(req.Username), true).First(&user).Error; err != nil {
+	user, err := b.findLoginUser(req.Username)
+	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
 	config, err := b.config.Get()
 	if err != nil {
 		return nil, err
 	}
-	resetMethod := passwordResetVerificationMethod(config, &user)
+	resetMethod := passwordResetVerificationMethod(config, user)
 	if resetMethod == "" {
 		return nil, errors.New("验证码配置中没有适用于当前用户的发送方式")
 	}
@@ -267,7 +268,11 @@ func passwordResetVerificationMethod(config *api.SystemConfigResponse, user *mod
 }
 
 func (b *AuthBiz) VerifyPasswordResetCode(req *api.PasswordResetVerifyRequest) (*api.PasswordResetVerifyResponse, error) {
-	username := strings.TrimSpace(req.Username)
+	user, err := b.findLoginUser(req.Username)
+	if err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	username := user.Username
 	if !b.verifyResetCode(username, req.Code) {
 		return nil, ErrInvalidEmailCode
 	}

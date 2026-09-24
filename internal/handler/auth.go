@@ -174,6 +174,9 @@ func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
 	g.POST("/auth/password-reset/code/send", h.SendPasswordResetCode)
 	g.POST("/auth/password-reset/code/verify", h.VerifyPasswordResetCode)
 	g.POST("/auth/password-reset/confirm", h.ResetPassword)
+	g.POST("/auth/password-reset/totp/verify", h.VerifyPasswordResetTOTP)
+	g.POST("/auth/password-reset/passkey/begin", h.BeginPasswordResetPasskey)
+	g.POST("/auth/password-reset/passkey/finish", h.FinishPasswordResetPasskey)
 	g.POST("/auth/mfa/code/send", h.SendMFACode)
 	g.POST("/auth/mfa/verify", h.VerifyMFA)
 	g.POST("/auth/mfa/passkey/login/begin", h.BeginPasskeyLogin)
@@ -182,6 +185,51 @@ func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
 	g.POST("/auth/passkey/login/finish", h.FinishDirectPasskeyLogin)
 	g.POST("/auth/email/login/begin", h.BeginDirectEmailLogin)
 	g.POST("/auth/email/login/finish", h.FinishDirectEmailLogin)
+}
+
+// VerifyPasswordResetTOTP POST /api/v1/auth/password-reset/totp/verify 使用 TOTP 验证密码重置身份。
+func (h *AuthHandler) VerifyPasswordResetTOTP(c *gin.Context) {
+	req := new(api.PasswordResetTOTPRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入 TOTP 验证码")
+		return
+	}
+	result, err := h.biz.VerifyPasswordResetTOTP(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// BeginPasswordResetPasskey POST /api/v1/auth/password-reset/passkey/begin 创建密码重置 Passkey 挑战。
+func (h *AuthHandler) BeginPasswordResetPasskey(c *gin.Context) {
+	req := new(api.PasswordResetPasskeyBeginRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入用户名或邮箱")
+		return
+	}
+	result, err := h.biz.BeginPasswordResetPasskey(req, requestOrigin(c))
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// FinishPasswordResetPasskey POST /api/v1/auth/password-reset/passkey/finish 验证 Passkey 并签发密码重置凭证。
+func (h *AuthHandler) FinishPasswordResetPasskey(c *gin.Context) {
+	req := new(api.PasswordResetPasskeyFinishRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "Passkey 验证响应不完整")
+		return
+	}
+	result, err := h.biz.FinishPasswordResetPasskey(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 // BeginDirectEmailLogin POST /api/v1/auth/email/login/begin 发送邮箱验证码并创建直接登录会话。
