@@ -29,6 +29,7 @@ func newUserMfaTotp(db *gorm.DB, opts ...gen.DOOption) userMfaTotp {
 	_userMfaTotp.ALL = field.NewAsterisk(tableName)
 	_userMfaTotp.ID = field.NewInt64(tableName, "id")
 	_userMfaTotp.UserID = field.NewInt64(tableName, "user_id")
+	_userMfaTotp.Name = field.NewString(tableName, "name")
 	_userMfaTotp.Secret = field.NewString(tableName, "secret")
 	_userMfaTotp.Enabled = field.NewInt64(tableName, "enabled")
 	_userMfaTotp.CreatedAt = field.NewTime(tableName, "created_at")
@@ -45,6 +46,7 @@ type userMfaTotp struct {
 	ALL       field.Asterisk
 	ID        field.Int64
 	UserID    field.Int64
+	Name      field.String
 	Secret    field.String
 	Enabled   field.Int64
 	CreatedAt field.Time
@@ -67,6 +69,7 @@ func (u *userMfaTotp) updateTableName(table string) *userMfaTotp {
 	u.ALL = field.NewAsterisk(table)
 	u.ID = field.NewInt64(table, "id")
 	u.UserID = field.NewInt64(table, "user_id")
+	u.Name = field.NewString(table, "name")
 	u.Secret = field.NewString(table, "secret")
 	u.Enabled = field.NewInt64(table, "enabled")
 	u.CreatedAt = field.NewTime(table, "created_at")
@@ -97,9 +100,10 @@ func (u *userMfaTotp) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (u *userMfaTotp) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 6)
+	u.fieldMap = make(map[string]field.Expr, 7)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["user_id"] = u.UserID
+	u.fieldMap["name"] = u.Name
 	u.fieldMap["secret"] = u.Secret
 	u.fieldMap["enabled"] = u.Enabled
 	u.fieldMap["created_at"] = u.CreatedAt

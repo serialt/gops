@@ -20,6 +20,7 @@ import (
 	"gops/internal/pkg/casbinx"
 	"gops/internal/pkg/cryptox"
 
+	qrcode "github.com/skip2/go-qrcode"
 	"gorm.io/gorm"
 )
 
@@ -59,10 +60,11 @@ type AuthBiz struct {
 	mfaChallenges        map[string]loginMFAChallenge
 	passkeyRegistrations map[string]passkeySession
 	passkeyLogins        map[string]passkeySession
+	directPasskeyLogins  map[string]passkeySession
 }
 
 func NewAuthBiz(db *gorm.DB, jwt *auth.JWTManager, casbinService *casbinx.Service, config *SystemConfigBiz) *AuthBiz {
-	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue), pendingTOTP: make(map[uint]verificationValue), mfaChallenges: make(map[string]loginMFAChallenge), passkeyRegistrations: make(map[string]passkeySession), passkeyLogins: make(map[string]passkeySession)}
+	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue), pendingTOTP: make(map[uint]verificationValue), mfaChallenges: make(map[string]loginMFAChallenge), passkeyRegistrations: make(map[string]passkeySession), passkeyLogins: make(map[string]passkeySession), directPasskeyLogins: make(map[string]passkeySession)}
 }
 
 func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, error) {
@@ -115,7 +117,7 @@ func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigRespo
 	if count > 0 {
 		methods = append(methods, "totp")
 	}
-	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ?", userID).Count(&count).Error; err != nil {
+	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
 		return nil, err
 	}
 	if count > 0 {
@@ -506,16 +508,17 @@ func (b *AuthBiz) MFAStatus(userID uint) (*api.MFAStatusResponse, error) {
 		return nil, err
 	}
 	var totp model.UserMfaTotp
-	totpEnabled := b.db.Where("user_id = ? AND enabled = ?", userID, 1).First(&totp).Error == nil
+	totpConfigured := b.db.Where("user_id = ?", userID).First(&totp).Error == nil
+	totpEnabled := totpConfigured && totp.Enabled == 1
 	var passkeys []model.UserMfaPasskey
 	if err := b.db.Where("user_id = ?", userID).Order("id DESC").Find(&passkeys).Error; err != nil {
 		return nil, err
 	}
 	items := make([]*api.MFAPasskeyResponse, 0, len(passkeys))
 	for _, passkey := range passkeys {
-		items = append(items, &api.MFAPasskeyResponse{ID: passkey.ID, Name: passkey.Name})
+		items = append(items, &api.MFAPasskeyResponse{ID: passkey.ID, Name: passkey.Name, MFAEnabled: passkey.Enabled == 1, DirectLoginEnabled: passkey.DirectLoginEnabled == 1})
 	}
-	return &api.MFAStatusResponse{CodeAvailable: passwordResetVerificationMethod(config, &user) != "", TOTPEnabled: totpEnabled, Passkeys: items}, nil
+	return &api.MFAStatusResponse{CodeAvailable: passwordResetVerificationMethod(config, &user) != "", TOTPConfigured: totpConfigured, TOTPEnabled: totpEnabled, Passkeys: items}, nil
 }
 
 func (b *AuthBiz) BeginTOTPSetup(userID uint) (*api.TOTPSetupResponse, error) {
@@ -534,7 +537,12 @@ func (b *AuthBiz) BeginTOTPSetup(userID uint) (*api.TOTPSetupResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &api.TOTPSetupResponse{Secret: secret, URI: auth.TOTPURI(config.SystemName, user.Username, secret)}, nil
+	uri := auth.TOTPURI(config.SystemName, user.Username, secret)
+	image, err := qrcode.Encode(uri, qrcode.Medium, 220)
+	if err != nil {
+		return nil, err
+	}
+	return &api.TOTPSetupResponse{Secret: secret, URI: uri, QRCode: "data:image/png;base64," + base64.StdEncoding.EncodeToString(image)}, nil
 }
 
 func (b *AuthBiz) ConfirmTOTPSetup(userID uint, req *api.TOTPConfirmRequest) error {
@@ -574,7 +582,37 @@ func (b *AuthBiz) DisableTOTP(userID uint, req *api.TOTPConfirmRequest) error {
 	if !auth.ValidateTOTP(secret, req.Code, time.Now()) {
 		return errors.New("TOTP 验证码错误")
 	}
-	return b.db.Model(&row).Updates(map[string]any{"secret": "", "enabled": 0, "updated_at": time.Now()}).Error
+	return b.db.Model(&row).Updates(map[string]any{"enabled": 0, "updated_at": time.Now()}).Error
+}
+
+func (b *AuthBiz) EnableTOTP(userID uint, req *api.TOTPConfirmRequest) error {
+	var row model.UserMfaTotp
+	if err := b.db.Where("user_id = ? AND enabled = ?", userID, 0).First(&row).Error; err != nil {
+		return ErrNotFound
+	}
+	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)
+	if err != nil {
+		return err
+	}
+	if !auth.ValidateTOTP(secret, req.Code, time.Now()) {
+		return errors.New("TOTP 验证码错误")
+	}
+	return b.db.Model(&row).Updates(map[string]any{"enabled": 1, "updated_at": time.Now()}).Error
+}
+
+func (b *AuthBiz) DeleteTOTP(userID uint, req *api.TOTPConfirmRequest) error {
+	var row model.UserMfaTotp
+	if err := b.db.Where("user_id = ?", userID).First(&row).Error; err != nil {
+		return ErrNotFound
+	}
+	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)
+	if err != nil {
+		return err
+	}
+	if !auth.ValidateTOTP(secret, req.Code, time.Now()) {
+		return errors.New("TOTP 验证码错误")
+	}
+	return b.db.Delete(&row).Error
 }
 
 func (b *AuthBiz) UpdateProfile(userID uint, req *api.ProfileUpdateRequest) (*api.UserResponse, error) {

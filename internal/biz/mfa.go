@@ -33,6 +33,8 @@ func (u *webAuthnUser) WebAuthnCredentials() []webauthn.Credential { return u.cr
 
 type passkeySession struct {
 	userID    uint
+	username  string
+	ip        string
 	name      string
 	origin    string
 	session   *webauthn.SessionData
@@ -137,13 +139,19 @@ func webAuthnForOrigin(origin, displayName string) (*webauthn.WebAuthn, error) {
 	return webauthn.New(&webauthn.Config{RPID: parsed.Hostname(), RPDisplayName: displayName, RPOrigins: []string{parsed.Scheme + "://" + parsed.Host}})
 }
 
-func (b *AuthBiz) loadWebAuthnUser(userID uint) (*webAuthnUser, error) {
+func (b *AuthBiz) loadWebAuthnUser(userID uint, usage string) (*webAuthnUser, error) {
 	var user model.User
 	if err := b.db.First(&user, userID).Error; err != nil {
 		return nil, ErrNotFound
 	}
 	var rows []model.UserMfaPasskey
-	if err := b.db.Where("user_id = ?", userID).Find(&rows).Error; err != nil {
+	query := b.db.Where("user_id = ?", userID)
+	if usage == "mfa" {
+		query = query.Where("enabled = ?", 1)
+	} else if usage == "direct" {
+		query = query.Where("direct_login_enabled = ?", 1)
+	}
+	if err := query.Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	credentials := make([]webauthn.Credential, 0, len(rows))
@@ -171,7 +179,7 @@ func credentialRequest(origin string, payload []byte) *http.Request {
 }
 
 func (b *AuthBiz) BeginPasskeyRegistration(userID uint, name, origin string) (*api.PasskeyRegisterBeginResponse, error) {
-	user, err := b.loadWebAuthnUser(userID)
+	user, err := b.loadWebAuthnUser(userID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +213,7 @@ func (b *AuthBiz) FinishPasskeyRegistration(userID uint, req *api.PasskeyRegiste
 	if !ok || session.userID != userID || time.Now().After(session.expiresAt) {
 		return errors.New("Passkey 注册会话无效或已过期")
 	}
-	user, err := b.loadWebAuthnUser(userID)
+	user, err := b.loadWebAuthnUser(userID, "")
 	if err != nil {
 		return err
 	}
@@ -229,7 +237,7 @@ func (b *AuthBiz) FinishPasskeyRegistration(userID uint, req *api.PasskeyRegiste
 	if err != nil {
 		return err
 	}
-	row := &model.UserMfaPasskey{UserID: int64(userID), Name: strings.TrimSpace(req.Name), CredentialID: credentialID(credential.ID), CredentialJSON: encrypted}
+	row := &model.UserMfaPasskey{UserID: int64(userID), Name: strings.TrimSpace(req.Name), CredentialID: credentialID(credential.ID), CredentialJSON: encrypted, Enabled: 1}
 	return b.db.Create(row).Error
 }
 
@@ -244,12 +252,41 @@ func (b *AuthBiz) DeletePasskey(userID uint, req *api.PasskeyDeleteRequest) erro
 	return nil
 }
 
+func (b *AuthBiz) UpdatePasskeyStatus(userID uint, req *api.PasskeyStatusRequest) error {
+	result := b.db.Model(&model.UserMfaPasskey{}).Where("id = ? AND user_id = ?", req.ID, userID).Updates(map[string]any{"enabled": req.MFAEnabled, "direct_login_enabled": req.DirectLoginEnabled, "updated_at": time.Now()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (b *AuthBiz) RenamePasskey(userID uint, req *api.PasskeyRenameRequest) error {
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return errors.New("Passkey 名称不能为空")
+	}
+	if len([]rune(name)) > 64 {
+		return errors.New("Passkey 名称不能超过 64 个字符")
+	}
+	result := b.db.Model(&model.UserMfaPasskey{}).Where("id = ? AND user_id = ?", req.ID, userID).Updates(map[string]any{"name": name, "updated_at": time.Now()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (b *AuthBiz) BeginPasskeyLogin(req *api.PasskeyLoginBeginRequest, origin string) (*api.PasskeyLoginBeginResponse, error) {
 	challenge, ok := b.getMFAChallenge(req.MFAToken)
 	if !ok || !containsMethod(challenge.methods, "passkey") {
 		return nil, errors.New("MFA 登录会话无效或已过期")
 	}
-	user, err := b.loadWebAuthnUser(challenge.userID)
+	user, err := b.loadWebAuthnUser(challenge.userID, "mfa")
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +320,7 @@ func (b *AuthBiz) FinishPasskeyLogin(req *api.PasskeyLoginFinishRequest) (*api.L
 	if !sessionOK || time.Now().After(session.expiresAt) {
 		return nil, errors.New("Passkey 验证会话无效或已过期")
 	}
-	user, err := b.loadWebAuthnUser(challenge.userID)
+	user, err := b.loadWebAuthnUser(challenge.userID, "mfa")
 	if err != nil {
 		return nil, err
 	}
@@ -311,4 +348,85 @@ func (b *AuthBiz) FinishPasskeyLogin(req *api.PasskeyLoginFinishRequest) (*api.L
 		return nil, err
 	}
 	return b.finishMFALogin(req.MFAToken, challenge)
+}
+
+func (b *AuthBiz) BeginDirectPasskeyLogin(req *api.DirectPasskeyLoginBeginRequest, origin, ip string) (*api.DirectPasskeyLoginBeginResponse, error) {
+	userModel, err := b.findLoginUser(req.Username)
+	if err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+		return nil, ErrInvalidCaptcha
+	}
+	user, err := b.loadWebAuthnUser(uint(userModel.ID), "direct")
+	if err != nil {
+		return nil, err
+	}
+	if len(user.credentials) == 0 {
+		return nil, errors.New("当前用户没有启用可直接登录的 Passkey")
+	}
+	wa, err := webAuthnForOrigin(origin, config.SystemName)
+	if err != nil {
+		return nil, err
+	}
+	options, session, err := wa.BeginLogin(user)
+	if err != nil {
+		return nil, err
+	}
+	token, err := randomToken()
+	if err != nil {
+		return nil, err
+	}
+	b.mu.Lock()
+	b.directPasskeyLogins[token] = passkeySession{userID: uint(userModel.ID), username: userModel.Username, ip: ip, origin: origin, session: session, expiresAt: time.Now().Add(5 * time.Minute)}
+	b.mu.Unlock()
+	return &api.DirectPasskeyLoginBeginResponse{LoginToken: token, Options: options}, nil
+}
+
+func (b *AuthBiz) FinishDirectPasskeyLogin(req *api.DirectPasskeyLoginFinishRequest) (*api.LoginResponse, error) {
+	b.mu.Lock()
+	session, ok := b.directPasskeyLogins[req.LoginToken]
+	delete(b.directPasskeyLogins, req.LoginToken)
+	b.mu.Unlock()
+	if !ok || time.Now().After(session.expiresAt) {
+		return nil, errors.New("Passkey 登录会话无效或已过期")
+	}
+	user, err := b.loadWebAuthnUser(session.userID, "direct")
+	if err != nil {
+		return nil, err
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	wa, err := webAuthnForOrigin(session.origin, config.SystemName)
+	if err != nil {
+		return nil, err
+	}
+	credential, err := wa.FinishLogin(user, *session.session, credentialRequest(session.origin, req.Credential))
+	if err != nil {
+		b.recordLogin(int64(session.userID), session.username, session.ip, "failed", "Passkey 直接登录失败")
+		return nil, errors.New("Passkey 验证失败")
+	}
+	encoded, err := json.Marshal(credential)
+	if err != nil {
+		return nil, err
+	}
+	encrypted, err := cryptox.Encrypt(b.config.aesKey, string(encoded))
+	if err != nil {
+		return nil, err
+	}
+	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND credential_id = ? AND direct_login_enabled = ?", session.userID, credentialID(credential.ID), 1).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
+		return nil, err
+	}
+	tokens, err := b.jwt.GeneratePair(session.userID)
+	if err != nil {
+		return nil, ErrGenerateToken
+	}
+	b.recordLogin(int64(session.userID), session.username, session.ip, "success", "Passkey 直接登录成功")
+	return tokenResponse(tokens), nil
 }

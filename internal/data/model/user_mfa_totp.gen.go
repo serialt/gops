@@ -14,8 +14,9 @@ const TableNameUserMfaTotp = "user_mfa_totp"
 type UserMfaTotp struct {
 	ID        int64     `gorm:"column:id;primaryKey" json:"id"`
 	UserID    int64     `gorm:"column:user_id;not null" json:"user_id"`
+	Name      string    `gorm:"column:name;not null;default:'身份验证器'" json:"name"`
 	Secret    string    `gorm:"column:secret;not null;default:''" json:"secret"`
-	Enabled   int64     `gorm:"column:enabled;not null" json:"enabled"`
+	Enabled   int64     `gorm:"column:enabled;not null;default:1" json:"enabled"`
 	CreatedAt time.Time `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt time.Time `gorm:"column:updated_at;not null" json:"updated_at"`
 }

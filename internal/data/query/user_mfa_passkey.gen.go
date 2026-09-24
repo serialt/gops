@@ -34,6 +34,8 @@ func newUserMfaPasskey(db *gorm.DB, opts ...gen.DOOption) userMfaPasskey {
 	_userMfaPasskey.CredentialJSON = field.NewString(tableName, "credential_json")
 	_userMfaPasskey.CreatedAt = field.NewTime(tableName, "created_at")
 	_userMfaPasskey.UpdatedAt = field.NewTime(tableName, "updated_at")
+	_userMfaPasskey.Enabled = field.NewInt64(tableName, "enabled")
+	_userMfaPasskey.DirectLoginEnabled = field.NewInt64(tableName, "direct_login_enabled")
 
 	_userMfaPasskey.fillFieldMap()
 
@@ -43,14 +45,16 @@ func newUserMfaPasskey(db *gorm.DB, opts ...gen.DOOption) userMfaPasskey {
 type userMfaPasskey struct {
 	userMfaPasskeyDo userMfaPasskeyDo
 
-	ALL            field.Asterisk
-	ID             field.Int64
-	UserID         field.Int64
-	Name           field.String
-	CredentialID   field.String
-	CredentialJSON field.String
-	CreatedAt      field.Time
-	UpdatedAt      field.Time
+	ALL                field.Asterisk
+	ID                 field.Int64
+	UserID             field.Int64
+	Name               field.String
+	CredentialID       field.String
+	CredentialJSON     field.String
+	CreatedAt          field.Time
+	UpdatedAt          field.Time
+	Enabled            field.Int64
+	DirectLoginEnabled field.Int64
 
 	fieldMap map[string]field.Expr
 }
@@ -74,6 +78,8 @@ func (u *userMfaPasskey) updateTableName(table string) *userMfaPasskey {
 	u.CredentialJSON = field.NewString(table, "credential_json")
 	u.CreatedAt = field.NewTime(table, "created_at")
 	u.UpdatedAt = field.NewTime(table, "updated_at")
+	u.Enabled = field.NewInt64(table, "enabled")
+	u.DirectLoginEnabled = field.NewInt64(table, "direct_login_enabled")
 
 	u.fillFieldMap()
 
@@ -102,7 +108,7 @@ func (u *userMfaPasskey) GetFieldByName(fieldName string) (field.OrderExpr, bool
 }
 
 func (u *userMfaPasskey) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 7)
+	u.fieldMap = make(map[string]field.Expr, 9)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["user_id"] = u.UserID
 	u.fieldMap["name"] = u.Name
@@ -110,6 +116,8 @@ func (u *userMfaPasskey) fillFieldMap() {
 	u.fieldMap["credential_json"] = u.CredentialJSON
 	u.fieldMap["created_at"] = u.CreatedAt
 	u.fieldMap["updated_at"] = u.UpdatedAt
+	u.fieldMap["enabled"] = u.Enabled
+	u.fieldMap["direct_login_enabled"] = u.DirectLoginEnabled
 }
 
 func (u userMfaPasskey) clone(db *gorm.DB) userMfaPasskey {

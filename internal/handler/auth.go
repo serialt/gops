@@ -29,9 +29,13 @@ func (h *AuthHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/auth/mfa/totp/setup", h.SetupTOTP)
 	g.POST("/auth/mfa/totp/confirm", h.ConfirmTOTP)
 	g.POST("/auth/mfa/totp/disable", h.DisableTOTP)
+	g.POST("/auth/mfa/totp/enable", h.EnableTOTP)
+	g.POST("/auth/mfa/totp/delete", h.DeleteTOTP)
 	g.POST("/auth/mfa/passkeys/register/begin", h.BeginPasskeyRegistration)
 	g.POST("/auth/mfa/passkeys/register/finish", h.FinishPasskeyRegistration)
 	g.POST("/auth/mfa/passkeys/delete", h.DeletePasskey)
+	g.POST("/auth/mfa/passkeys/status", h.UpdatePasskeyStatus)
+	g.POST("/auth/mfa/passkeys/rename", h.RenamePasskey)
 }
 
 // MFAStatus POST /api/v1/auth/mfa/status 查询当前用户 MFA 绑定状态。
@@ -102,6 +106,44 @@ func (h *AuthHandler) DisableTOTP(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// EnableTOTP POST /api/v1/auth/mfa/totp/enable 验证并启用当前用户的 TOTP。
+func (h *AuthHandler) EnableTOTP(c *gin.Context) {
+	req := new(api.TOTPConfirmRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入 TOTP 验证码")
+		return
+	}
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	if err := h.biz.EnableTOTP(userID, req); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// DeleteTOTP POST /api/v1/auth/mfa/totp/delete 验证并删除当前用户的 TOTP。
+func (h *AuthHandler) DeleteTOTP(c *gin.Context) {
+	req := new(api.TOTPConfirmRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入 TOTP 验证码")
+		return
+	}
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	if err := h.biz.DeleteTOTP(userID, req); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
 // UpdateProfile POST /api/v1/auth/profile/update 更新当前用户的个性化资料。
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	req := new(api.ProfileUpdateRequest)
@@ -135,6 +177,38 @@ func (h *AuthHandler) RegisterRoutesNologin(g *gin.RouterGroup) {
 	g.POST("/auth/mfa/verify", h.VerifyMFA)
 	g.POST("/auth/mfa/passkey/login/begin", h.BeginPasskeyLogin)
 	g.POST("/auth/mfa/passkey/login/finish", h.FinishPasskeyLogin)
+	g.POST("/auth/passkey/login/begin", h.BeginDirectPasskeyLogin)
+	g.POST("/auth/passkey/login/finish", h.FinishDirectPasskeyLogin)
+}
+
+// BeginDirectPasskeyLogin POST /api/v1/auth/passkey/login/begin 创建无需密码的 Passkey 登录挑战。
+func (h *AuthHandler) BeginDirectPasskeyLogin(c *gin.Context) {
+	req := new(api.DirectPasskeyLoginBeginRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "请输入用户名或邮箱")
+		return
+	}
+	result, err := h.biz.BeginDirectPasskeyLogin(req, requestOrigin(c), c.ClientIP())
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// FinishDirectPasskeyLogin POST /api/v1/auth/passkey/login/finish 验证 Passkey 并直接登录。
+func (h *AuthHandler) FinishDirectPasskeyLogin(c *gin.Context) {
+	req := new(api.DirectPasskeyLoginFinishRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "Passkey 登录响应不完整")
+		return
+	}
+	result, err := h.biz.FinishDirectPasskeyLogin(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 // SendMFACode POST /api/v1/auth/mfa/code/send 发送 MFA 登录验证码。
@@ -249,6 +323,44 @@ func (h *AuthHandler) DeletePasskey(c *gin.Context) {
 		return
 	}
 	if err := h.biz.DeletePasskey(userID, req); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// UpdatePasskeyStatus POST /api/v1/auth/mfa/passkeys/status 启用或停用当前用户的 Passkey。
+func (h *AuthHandler) UpdatePasskeyStatus(c *gin.Context) {
+	req := new(api.PasskeyStatusRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "Passkey 参数不完整")
+		return
+	}
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	if err := h.biz.UpdatePasskeyStatus(userID, req); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// RenamePasskey POST /api/v1/auth/mfa/passkeys/rename 修改当前用户的 Passkey 名称。
+func (h *AuthHandler) RenamePasskey(c *gin.Context) {
+	req := new(api.PasskeyRenameRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "Passkey 名称不能为空")
+		return
+	}
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	if err := h.biz.RenamePasskey(userID, req); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}

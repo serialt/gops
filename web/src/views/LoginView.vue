@@ -8,7 +8,7 @@ import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
-import { beginPasskeyLogin, finishPasskeyLogin, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, type MFAMethod } from '@/api/auth'
+import { beginDirectPasskeyLogin, beginPasskeyLogin, finishDirectPasskeyLogin, finishPasskeyLogin, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, type MFAMethod } from '@/api/auth'
 import { credentialJSON, requestOptions } from '@/utils/webauthn'
 
 const auth = useAuthStore()
@@ -141,6 +141,26 @@ async function loginWithPasskey() {
 	const result = await finishPasskeyLogin({ mfa_token: mfaToken.value, credential: credentialJSON(credential) })
 	await auth.acceptLogin(result.data.data)
 	await router.replace((route.query.redirect as string) || '/')
+}
+
+async function directPasskeyLogin() {
+	if (!form.username.trim()) return ElMessage.warning('请输入用户名或邮箱')
+	if (security.captcha_enabled && !form.captcha_code.trim()) return ElMessage.warning('请输入图形验证码')
+	if (!window.PublicKeyCredential) return ElMessage.warning('当前浏览器不支持 Passkey')
+	loading.value = true
+	try {
+		const { data } = await beginDirectPasskeyLogin({ username: form.username.trim(), captcha_id: captcha.id, captcha_code: form.captcha_code })
+		const credential = await navigator.credentials.get(requestOptions(data.data.options)) as PublicKeyCredential | null
+		if (!credential) return
+		const result = await finishDirectPasskeyLogin({ login_token: data.data.login_token, credential: credentialJSON(credential) })
+		await auth.acceptLogin(result.data.data)
+		await router.replace((route.query.redirect as string) || '/')
+	} catch (error) {
+		await refreshCaptcha()
+		throw error
+	} finally {
+		loading.value = false
+	}
 }
 
 async function selectMFAMethod(method: MFAMethod) {
@@ -313,6 +333,9 @@ onBeforeUnmount(() => {
           <button v-if="loginStep === 'credentials'" type="button" class="forgot-password" @click="openForgotPassword">忘记密码？</button>
           <el-button type="primary" size="large" :loading="loading || sendingEmailCode" class="submit" @click="handlePrimaryAction">
             {{ loginStep === 'verification' ? '验证并登录' : loginStep === 'forgot' ? '发送验证码' : loginStep === 'reset_verify' ? '验证身份' : loginStep === 'reset_password' ? '修改密码' : '登录' }}
+          </el-button>
+          <el-button v-if="loginStep === 'credentials'" class="passkey-login-button" plain :disabled="loading" @click="directPasskeyLogin">
+            使用 Passkey 直接登录
           </el-button>
           <el-button v-if="loginStep !== 'credentials'" class="back-button" text @click="backToCredentials">
             返回账号登录
@@ -488,6 +511,14 @@ onBeforeUnmount(() => {
   margin-top: 4px;
   border-radius: 8px;
   font-weight: 600;
+}
+
+.passkey-login-button {
+	width: 100%;
+	height: 40px;
+	margin: 9px 0 0;
+	border-color: var(--primary);
+	color: var(--primary);
 }
 
 .forgot-password {

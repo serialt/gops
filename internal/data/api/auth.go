@@ -89,19 +89,23 @@ type PasswordResetRequest struct {
 }
 
 type MFAStatusResponse struct {
-	CodeAvailable bool                  `json:"code_available"`
-	TOTPEnabled   bool                  `json:"totp_enabled"`
-	Passkeys      []*MFAPasskeyResponse `json:"passkeys"`
+	CodeAvailable  bool                  `json:"code_available"`
+	TOTPConfigured bool                  `json:"totp_configured"`
+	TOTPEnabled    bool                  `json:"totp_enabled"`
+	Passkeys       []*MFAPasskeyResponse `json:"passkeys"`
 }
 
 type MFAPasskeyResponse struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID                 int64  `json:"id"`
+	Name               string `json:"name"`
+	MFAEnabled         bool   `json:"mfa_enabled"`
+	DirectLoginEnabled bool   `json:"direct_login_enabled"`
 }
 
 type TOTPSetupResponse struct {
 	Secret string `json:"secret"`
 	URI    string `json:"uri"`
+	QRCode string `json:"qr_code"`
 }
 
 type TOTPConfirmRequest struct {
@@ -125,6 +129,33 @@ type PasskeyRegisterFinishRequest struct {
 
 type PasskeyDeleteRequest struct {
 	ID int64 `json:"id" binding:"required"`
+}
+
+type PasskeyStatusRequest struct {
+	ID                 int64 `json:"id" binding:"required"`
+	MFAEnabled         bool  `json:"mfa_enabled"`
+	DirectLoginEnabled bool  `json:"direct_login_enabled"`
+}
+
+type PasskeyRenameRequest struct {
+	ID   int64  `json:"id" binding:"required"`
+	Name string `json:"name" binding:"required"`
+}
+
+type DirectPasskeyLoginBeginRequest struct {
+	Username    string `json:"username" binding:"required"`
+	CaptchaID   string `json:"captcha_id"`
+	CaptchaCode string `json:"captcha_code"`
+}
+
+type DirectPasskeyLoginBeginResponse struct {
+	LoginToken string `json:"login_token"`
+	Options    any    `json:"options"`
+}
+
+type DirectPasskeyLoginFinishRequest struct {
+	LoginToken string          `json:"login_token" binding:"required"`
+	Credential json.RawMessage `json:"credential" binding:"required"`
 }
 
 type PasskeyLoginBeginRequest struct {

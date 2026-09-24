@@ -28,8 +28,9 @@ export interface PasswordResetCodeRequest { username: string; captcha_id?: strin
 export interface PasswordResetVerifyRequest { username: string; code: string }
 export interface PasswordResetVerifyResponse { reset_token: string }
 export interface PasswordResetRequest { reset_token: string; new_password: string }
-export interface MFAStatus { code_available:boolean;totp_enabled:boolean;passkeys:{id:number;name:string}[] }
-export interface TOTPSetup { secret:string;uri:string }
+export interface MFAPasskey { id:number;name:string;mfa_enabled:boolean;direct_login_enabled:boolean }
+export interface MFAStatus { code_available:boolean;totp_configured:boolean;totp_enabled:boolean;passkeys:MFAPasskey[] }
+export interface TOTPSetup { secret:string;uri:string;qr_code:string }
 
 export const login = (data: LoginRequest) => request.post<LoginResponse>('/auth/login', data)
 export const refreshToken = (refresh_token:string) => request.post<LoginResponse>('/auth/refresh', { refresh_token })
@@ -47,8 +48,14 @@ export const getMFAStatus = () => request.post<MFAStatus>('/auth/mfa/status', {}
 export const setupTOTP = () => request.post<TOTPSetup>('/auth/mfa/totp/setup', {})
 export const confirmTOTP = (code:string) => request.post<null>('/auth/mfa/totp/confirm', { code })
 export const disableTOTP = (code:string) => request.post<null>('/auth/mfa/totp/disable', { code })
+export const enableTOTP = (code:string) => request.post<null>('/auth/mfa/totp/enable', { code })
+export const deleteTOTP = (code:string) => request.post<null>('/auth/mfa/totp/delete', { code })
 export const beginPasskeyRegistration = (name:string) => request.post<{registration_token:string;options:any}>('/auth/mfa/passkeys/register/begin', { name })
 export const finishPasskeyRegistration = (data:{registration_token:string;name:string;credential:unknown}) => request.post<null>('/auth/mfa/passkeys/register/finish', data)
 export const deletePasskey = (id:number) => request.post<null>('/auth/mfa/passkeys/delete', { id })
+export const updatePasskeyStatus = (data:{id:number;mfa_enabled:boolean;direct_login_enabled:boolean}) => request.post<null>('/auth/mfa/passkeys/status', data)
+export const renamePasskey = (id:number, name:string) => request.post<null>('/auth/mfa/passkeys/rename', { id, name })
 export const beginPasskeyLogin = (mfa_token:string) => request.post<{options:any}>('/auth/mfa/passkey/login/begin', { mfa_token })
 export const finishPasskeyLogin = (data:{mfa_token:string;credential:unknown}) => request.post<LoginResponse>('/auth/mfa/passkey/login/finish', data)
+export const beginDirectPasskeyLogin = (data:{username:string;captcha_id?:string;captcha_code?:string}) => request.post<{login_token:string;options:any}>('/auth/passkey/login/begin', data)
+export const finishDirectPasskeyLogin = (data:{login_token:string;credential:unknown}) => request.post<LoginResponse>('/auth/passkey/login/finish', data)
