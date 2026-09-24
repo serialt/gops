@@ -54,6 +54,13 @@ function redirectToError(status: 401 | 403 | 429) {
   location.assign(`${targetPath}?redirect=${encodeURIComponent(current)}`)
 }
 
+function redirectToLogin() {
+  if (isRedirecting || location.pathname === '/login') return
+  isRedirecting = true
+  const current = `${location.pathname}${location.search}${location.hash}`
+  location.assign(`/login?redirect=${encodeURIComponent(current)}`)
+}
+
 request.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
@@ -83,7 +90,7 @@ request.interceptors.response.use(
       } else {
         clearTokens()
       }
-      if (location.pathname !== '/login') redirectToError(401)
+      if (location.pathname !== '/login') redirectToLogin()
       else ElMessage.error(message)
     } else if (status === 403) {
       redirectToError(403)

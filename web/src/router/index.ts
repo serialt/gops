@@ -52,14 +52,15 @@ const router = createRouter({ history: createWebHistory(), routes })
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (to.meta.public) {
-    if (to.meta.guestOnly && auth.isLoggedIn) return '/'
+  if (to.meta.guestOnly) {
+    if (auth.isLoggedIn) return '/'
     return true
   }
   if (!auth.isLoggedIn) return { path: '/login', query: { redirect: to.fullPath } }
   if (!auth.loaded) {
-    try { await auth.fetchMe() } catch { auth.logout(); return '/login' }
+    try { await auth.fetchMe() } catch { auth.logout(); return { path: '/login', query: { redirect: to.fullPath } } }
   }
+  if (to.meta.public) return true
   const permission = to.meta.permission as string | undefined
   if (!auth.hasPermission(permission)) return '/403'
   return true
