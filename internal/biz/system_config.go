@@ -12,8 +12,10 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/mail"
 	"net/smtp"
 	"strconv"
+	"strings"
 	"time"
 
 	"gops/internal/config"
@@ -165,7 +167,7 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 }
 
 func (b *SystemConfigBiz) TestEmail(req *api.SystemConfigEmailTestRequest) error {
-	return b.sendEmail(req.Recipient, "SMTP 配置测试", "SMTP 配置测试邮件发送成功。")
+	return b.sendEmail(req.Recipient, "SMTP 配置测试", "SMTP 配置测试邮件发送成功。", false)
 }
 
 func (b *SystemConfigBiz) SendLoginVerification(config *api.SystemConfigResponse, username, email, code string) error {
@@ -214,10 +216,14 @@ func (b *SystemConfigBiz) sendVerification(config *api.SystemConfigResponse, use
 	if config.LoginVerificationMethod != "email" || !config.VerificationEmailEnabled || email == "" {
 		return ErrInvalidVerificationConfig
 	}
-	return b.sendEmail(email, subject, fmt.Sprintf("您的%s是：%s\n验证码 %d 分钟内有效，请勿泄露给他人。", subject, code, config.VerificationEmailExpireMinutes))
+	content, err := renderVerificationEmail(subject, code, config.VerificationEmailExpireMinutes)
+	if err != nil {
+		return err
+	}
+	return b.sendEmail(email, subject, content, true)
 }
 
-func (b *SystemConfigBiz) sendEmail(recipient, subject, content string) error {
+func (b *SystemConfigBiz) sendEmail(recipient, subject, content string, htmlContent bool) error {
 	config, err := b.Get()
 	if err != nil {
 		return err
@@ -247,17 +253,25 @@ func (b *SystemConfigBiz) sendEmail(recipient, subject, content string) error {
 	if err != nil {
 		return err
 	}
-	sender := config.VerificationSMTPUsername
-	if config.VerificationEmailSenderName != "" {
-		sender = mime.QEncoding.Encode("UTF-8", config.VerificationEmailSenderName) + " <" + sender + ">"
+	recipientHeader := (&mail.Address{Address: cleanEmailHeader(recipient)}).String()
+	senderHeader := (&mail.Address{Name: cleanEmailHeader(config.VerificationEmailSenderName), Address: cleanEmailHeader(config.VerificationSMTPUsername)}).String()
+	subjectHeader := mime.QEncoding.Encode("UTF-8", cleanEmailHeader(subject))
+	messageBody := strings.ReplaceAll(strings.ReplaceAll(content, "\r\n", "\n"), "\n", "\r\n")
+	contentType := "text/plain"
+	if htmlContent {
+		contentType = "text/html"
 	}
-	_, writeErr := fmt.Fprint(body, "To: "+recipient+"\r\nFrom: "+sender+"\r\nSubject: "+mime.QEncoding.Encode("UTF-8", subject)+"\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n"+content+"\r\n")
+	_, writeErr := fmt.Fprintf(body, "To: %s\r\nFrom: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: %s; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n", recipientHeader, senderHeader, subjectHeader, contentType, messageBody)
 	closeErr := body.Close()
 	if writeErr != nil {
 		return writeErr
 	}
 
 	return closeErr
+}
+
+func cleanEmailHeader(value string) string {
+	return strings.TrimSpace(strings.NewReplacer("\r", "", "\n", "").Replace(value))
 }
 
 func newSMTPClient(address, host string, tlsEnabled bool, port int) (*smtp.Client, error) {
