@@ -2,7 +2,7 @@ import type { User } from '@/types'
 import request from '@/utils/request'
 
 export interface LoginRequest { username: string; password: string; captcha_id?: string; captcha_code?: string; email_code?: string }
-export type MFAMethod = 'code' | 'totp' | 'passkey'
+export type MFAMethod = 'email' | 'webhook' | 'totp' | 'passkey'
 export interface LoginResponse { token:string;access_token:string;refresh_token:string;expires_in:number;refresh_expires_in:number;mfa_required:boolean;mfa_token:string;mfa_methods:MFAMethod[] }
 export interface CurrentUserResponse { user: User; permissions: string[] }
 export interface ProfileUpdateRequest {
@@ -15,7 +15,7 @@ export interface ProfileUpdateRequest {
 export interface LoginSecurityConfig {
   captcha_enabled: boolean
   login_verification_enabled: boolean
-  login_verification_method: '' | 'email' | 'webhook' | 'passkey' | 'totp'
+  login_verification_methods: Array<'email' | 'webhook' | 'passkey' | 'totp'>
   verification_email_enabled: boolean
   verification_passkey_enabled: boolean
   verification_totp_enabled: boolean
@@ -51,8 +51,8 @@ export const resetPassword = (data: PasswordResetRequest) => request.post<null>(
 export const verifyPasswordResetTOTP = (data:{username:string;captcha_id?:string;captcha_code?:string;code:string}) => request.post<PasswordResetVerifyResponse>('/auth/password-reset/totp/verify', data)
 export const beginPasswordResetPasskey = (data:{username:string;captcha_id?:string;captcha_code?:string}) => request.post<{challenge_token:string;options:any}>('/auth/password-reset/passkey/begin', data)
 export const finishPasswordResetPasskey = (data:{challenge_token:string;credential:unknown}) => request.post<PasswordResetVerifyResponse>('/auth/password-reset/passkey/finish', data)
-export const sendMFACode = (mfa_token:string) => request.post<EmailCodeResponse>('/auth/mfa/code/send', { mfa_token })
-export const verifyMFA = (data:{mfa_token:string;method:'code'|'totp';code:string}) => request.post<LoginResponse>('/auth/mfa/verify', data)
+export const sendMFACode = (mfa_token:string, method:'email' | 'webhook') => request.post<EmailCodeResponse>('/auth/mfa/code/send', { mfa_token, method })
+export const verifyMFA = (data:{mfa_token:string;method:Exclude<MFAMethod, 'passkey'>;code:string}) => request.post<LoginResponse>('/auth/mfa/verify', data)
 export const getMFAStatus = () => request.post<MFAStatus>('/auth/mfa/status', {})
 export const setupTOTP = () => request.post<TOTPSetup>('/auth/mfa/totp/setup', {})
 export const confirmTOTP = (code:string) => request.post<null>('/auth/mfa/totp/confirm', { code })

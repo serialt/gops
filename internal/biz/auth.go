@@ -111,45 +111,44 @@ func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigRespo
 	if !config.LoginVerificationEnabled {
 		return []string{}, nil
 	}
-	switch config.LoginVerificationMethod {
-	case "email":
-		var row model.UserMfaEmail
-		if !config.VerificationEmailEnabled || strings.TrimSpace(user.Email) == "" || b.db.Where("user_id = ? AND mfa_enabled = ?", userID, 1).First(&row).Error != nil {
-			return nil, errors.New("当前用户未开启邮件二次验证")
+	methods := make([]string, 0, len(config.LoginVerificationMethods))
+	for _, method := range config.LoginVerificationMethods {
+		switch method {
+		case "email":
+			var row model.UserMfaEmail
+			if config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != "" && b.db.Where("user_id = ? AND mfa_enabled = ?", userID, 1).First(&row).Error == nil {
+				methods = append(methods, "email")
+			}
+		case "webhook":
+			if config.VerificationWebhookEnabled && strings.TrimSpace(config.VerificationWebhookURL) != "" {
+				methods = append(methods, "webhook")
+			}
+		case "passkey":
+			var count int64
+			if config.VerificationPasskeyEnabled {
+				if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
+					return nil, err
+				}
+				if count > 0 {
+					methods = append(methods, "passkey")
+				}
+			}
+		case "totp":
+			var count int64
+			if config.VerificationTOTPEnabled {
+				if err := b.db.Model(&model.UserMfaTotp{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
+					return nil, err
+				}
+				if count > 0 {
+					methods = append(methods, "totp")
+				}
+			}
 		}
-		return []string{"code"}, nil
-	case "webhook":
-		if !config.VerificationWebhookEnabled || strings.TrimSpace(config.VerificationWebhookURL) == "" {
-			return nil, errors.New("系统未开启 Webhook 二次验证")
-		}
-		return []string{"code"}, nil
-	case "passkey":
-		var count int64
-		if !config.VerificationPasskeyEnabled {
-			return nil, errors.New("系统未开启 Passkey 验证")
-		}
-		if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
-			return nil, err
-		}
-		if count == 0 {
-			return nil, errors.New("当前用户未开启 Passkey 二次验证")
-		}
-		return []string{"passkey"}, nil
-	case "totp":
-		var count int64
-		if !config.VerificationTOTPEnabled {
-			return nil, errors.New("系统未开启 TOTP 验证")
-		}
-		if err := b.db.Model(&model.UserMfaTotp{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
-			return nil, err
-		}
-		if count == 0 {
-			return nil, errors.New("当前用户未开启 TOTP 二次验证")
-		}
-		return []string{"totp"}, nil
-	default:
-		return nil, errors.New("登录二次验证方式未配置")
 	}
+	if len(methods) == 0 {
+		return nil, errors.New("当前用户未启用系统要求的二次验证方式")
+	}
+	return methods, nil
 }
 
 func (b *AuthBiz) RefreshToken(req *api.RefreshTokenRequest) (*api.LoginResponse, error) {
@@ -179,7 +178,7 @@ func (b *AuthBiz) SecurityConfig() (*api.LoginSecurityConfigResponse, error) {
 	}
 	return &api.LoginSecurityConfigResponse{
 		CaptchaEnabled: config.CaptchaEnabled, LoginVerificationEnabled: config.LoginVerificationEnabled,
-		LoginVerificationMethod:          config.LoginVerificationMethod,
+		LoginVerificationMethods:         config.LoginVerificationMethods,
 		VerificationEmailEnabled:         config.VerificationEmailEnabled,
 		VerificationPasskeyEnabled:       config.VerificationPasskeyEnabled,
 		VerificationTOTPEnabled:          config.VerificationTOTPEnabled,

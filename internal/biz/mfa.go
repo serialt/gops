@@ -64,7 +64,7 @@ func containsMethod(methods []string, method string) bool {
 
 func (b *AuthBiz) SendMFACode(req *api.MFACodeSendRequest) (*api.EmailCodeResponse, error) {
 	challenge, ok := b.getMFAChallenge(req.MFAToken)
-	if !ok || !containsMethod(challenge.methods, "code") {
+	if !ok || !containsMethod(challenge.methods, req.Method) {
 		return nil, errors.New("MFA 登录会话无效或已过期")
 	}
 	var user model.User
@@ -76,25 +76,25 @@ func (b *AuthBiz) SendMFACode(req *api.MFACodeSendRequest) (*api.EmailCodeRespon
 		return nil, err
 	}
 	expiresIn := 5 * time.Minute
-	if config.LoginVerificationMethod == "email" {
+	if req.Method == "email" {
 		expiresIn = time.Duration(config.VerificationEmailExpireMinutes) * time.Minute
 	}
 	code, err := randomDigits(6)
 	if err != nil {
 		return nil, err
 	}
-	key := "mfa:" + req.MFAToken
+	key := "mfa:" + req.MFAToken + ":" + req.Method
 	if retryAfter, expiresAfter := b.reserveEmailCode(key, code, expiresIn); retryAfter > 0 {
 		return &api.EmailCodeResponse{Required: true, Sent: false, RetryAfterSeconds: retryAfter, ExpiresInSeconds: expiresAfter}, nil
 	}
 	go func() {
-		var emailMFA model.UserMfaEmail
-		useEmail := config.VerificationEmailEnabled && user.Email != "" && b.db.Where("user_id = ? AND mfa_enabled = ?", user.ID, 1).First(&emailMFA).Error == nil
 		var sendErr error
-		if useEmail {
+		if req.Method == "email" {
 			sendErr = b.config.SendEmailLoginCode(config, user.Email, code)
 		} else {
-			sendErr = b.config.SendLoginVerification(config, user.Username, user.Email, code)
+			sendConfig := *config
+			sendConfig.LoginVerificationMethod = "webhook"
+			sendErr = b.config.SendLoginVerification(&sendConfig, user.Username, user.Email, code)
 		}
 		if sendErr != nil {
 			b.discardEmailCode(key, code)
@@ -110,8 +110,8 @@ func (b *AuthBiz) VerifyMFA(req *api.MFAVerifyRequest) (*api.LoginResponse, erro
 	}
 	valid := false
 	switch req.Method {
-	case "code":
-		valid = b.verifyEmailCode("mfa:"+req.MFAToken, req.Code)
+	case "email", "webhook":
+		valid = b.verifyEmailCode("mfa:"+req.MFAToken+":"+req.Method, req.Code)
 	case "totp":
 		config, err := b.config.Get()
 		if err != nil {

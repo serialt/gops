@@ -29,6 +29,7 @@ type MFAVerifyRequest struct {
 
 type MFACodeSendRequest struct {
 	MFAToken string `json:"mfa_token" binding:"required"`
+	Method   string `json:"method" binding:"required,oneof=email webhook"`
 }
 
 type RefreshTokenRequest struct {
@@ -44,15 +45,15 @@ type ProfileUpdateRequest struct {
 }
 
 type LoginSecurityConfigResponse struct {
-	CaptchaEnabled                   bool   `json:"captcha_enabled"`
-	LoginVerificationEnabled         bool   `json:"login_verification_enabled"`
-	LoginVerificationMethod          string `json:"login_verification_method"`
-	VerificationEmailEnabled         bool   `json:"verification_email_enabled"`
-	VerificationPasskeyEnabled       bool   `json:"verification_passkey_enabled"`
-	VerificationTOTPEnabled          bool   `json:"verification_totp_enabled"`
-	DirectVerificationEmailEnabled   bool   `json:"direct_verification_email_enabled"`
-	DirectVerificationPasskeyEnabled bool   `json:"direct_verification_passkey_enabled"`
-	DirectVerificationTOTPEnabled    bool   `json:"direct_verification_totp_enabled"`
+	CaptchaEnabled                   bool     `json:"captcha_enabled"`
+	LoginVerificationEnabled         bool     `json:"login_verification_enabled"`
+	LoginVerificationMethods         []string `json:"login_verification_methods"`
+	VerificationEmailEnabled         bool     `json:"verification_email_enabled"`
+	VerificationPasskeyEnabled       bool     `json:"verification_passkey_enabled"`
+	VerificationTOTPEnabled          bool     `json:"verification_totp_enabled"`
+	DirectVerificationEmailEnabled   bool     `json:"direct_verification_email_enabled"`
+	DirectVerificationPasskeyEnabled bool     `json:"direct_verification_passkey_enabled"`
+	DirectVerificationTOTPEnabled    bool     `json:"direct_verification_totp_enabled"`
 }
 
 type CaptchaResponse struct {

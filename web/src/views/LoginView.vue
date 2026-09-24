@@ -25,7 +25,7 @@ const loginStep = ref<'credentials' | 'verification' | 'email_login' | 'forgot' 
 const security = reactive({
   captcha_enabled: false,
   login_verification_enabled: false,
-  login_verification_method: '' as '' | 'email' | 'webhook' | 'passkey' | 'totp',
+  login_verification_methods: [] as Array<'email' | 'webhook' | 'passkey' | 'totp'>,
   verification_email_enabled: false,
   verification_passkey_enabled: false,
   verification_totp_enabled: false,
@@ -38,7 +38,7 @@ const emailCodeRequired = ref(false)
 const mfaToken = ref('')
 const directEmailToken = ref('')
 const mfaMethods = ref<MFAMethod[]>([])
-const selectedMFAMethod = ref<MFAMethod>('code')
+const selectedMFAMethod = ref<MFAMethod>('email')
 type DirectLoginMethod = 'passkey' | 'email' | 'totp'
 const directLoginMethod = ref<DirectLoginMethod>('passkey')
 const form = reactive({ username: 'admin', password: 'password', captcha_code: '', email_code: '' })
@@ -113,12 +113,13 @@ async function requestEmailCode() {
 	if (!mfaToken.value) return false
 	sendingEmailCode.value = true
 	try {
-		const { data } = await sendMFACode(mfaToken.value)
+		if (selectedMFAMethod.value !== 'email' && selectedMFAMethod.value !== 'webhook') return false
+		const { data } = await sendMFACode(mfaToken.value, selectedMFAMethod.value)
     emailCodeRequired.value = data.data.required
     if (data.data.required) loginStep.value = 'verification'
     startResendCountdown(data.data.retry_after_seconds)
     startVerificationCountdown(data.data.expires_in_seconds)
-    if (data.data.sent) ElMessage.success(security.login_verification_method === 'webhook' ? '验证码已通过 Webhook 发送' : '验证码已发送至用户邮箱')
+    if (data.data.sent) ElMessage.success(selectedMFAMethod.value === 'webhook' ? '验证码已通过 Webhook 发送' : '验证码已发送至用户邮箱')
     else if (data.data.required && data.data.retry_after_seconds > 0) ElMessage.info('验证码已发送，请勿重复获取')
     return data.data.required
 	} finally {
@@ -137,7 +138,7 @@ async function submit() {
 				mfaMethods.value = result.mfa_methods
 				selectedMFAMethod.value = result.mfa_methods[0]
 				loginStep.value = 'verification'
-				if (selectedMFAMethod.value === 'code') await requestEmailCode()
+				if (selectedMFAMethod.value === 'email' || selectedMFAMethod.value === 'webhook') await requestEmailCode()
 				return
 			}
 		} else if (loginStep.value === 'email_login') {
@@ -149,7 +150,7 @@ async function submit() {
 			await loginWithPasskey()
 			return
 		} else {
-			if (selectedMFAMethod.value === 'code' && verificationCountdown.value <= 0) return ElMessage.warning('验证码已过期，请重新获取')
+			if ((selectedMFAMethod.value === 'email' || selectedMFAMethod.value === 'webhook') && verificationCountdown.value <= 0) return ElMessage.warning('验证码已过期，请重新获取')
 			if (!form.email_code.trim()) return ElMessage.warning('请输入验证码')
 			const { data } = await verifyMFA({ mfa_token: mfaToken.value, method: selectedMFAMethod.value, code: form.email_code.trim() })
 			await auth.acceptLogin(data.data)
@@ -239,7 +240,7 @@ async function directPasskeyLogin() {
 async function selectMFAMethod(method: MFAMethod) {
 	selectedMFAMethod.value = method
 	form.email_code = ''
-	if (method === 'code' && verificationCountdown.value <= 0) await requestEmailCode()
+	if (method === 'email' || method === 'webhook') await requestEmailCode()
 }
 
 function backToCredentials() {
@@ -416,19 +417,19 @@ onBeforeUnmount(() => {
               <template #prefix><el-icon><Message /></el-icon></template>
             </el-input>
           </el-form-item>
-			<el-form-item v-if="loginStep === 'verification'">
+			<el-form-item v-if="loginStep === 'verification' && mfaMethods.length > 1">
 				<div class="mfa-methods">
 					<el-button v-for="method in mfaMethods" :key="method" :type="selectedMFAMethod === method ? 'primary' : 'default'" plain @click="selectMFAMethod(method)">
-						{{ method === 'code' ? '验证码' : method === 'totp' ? 'TOTP' : 'Passkey' }}
+						{{ method === 'email' ? '邮件' : method === 'webhook' ? 'Webhook' : method === 'totp' ? 'TOTP' : 'Passkey' }}
 					</el-button>
 				</div>
 			</el-form-item>
 			<el-form-item v-if="loginStep === 'verification' && selectedMFAMethod !== 'passkey'">
-				<div :class="selectedMFAMethod === 'code' ? 'verification-row' : 'totp-row'">
+				<div :class="selectedMFAMethod === 'email' || selectedMFAMethod === 'webhook' ? 'verification-row' : 'totp-row'">
 					<el-input v-model="form.email_code" size="large" maxlength="6" :placeholder="selectedMFAMethod === 'totp' ? '请输入身份验证器动态码' : '请输入登录验证码'">
 						<template #prefix><el-icon><Message /></el-icon></template>
 					</el-input>
-					<el-button v-if="selectedMFAMethod === 'code'" :loading="sendingEmailCode" :disabled="resendCountdown > 0" @click="requestEmailCode">
+					<el-button v-if="selectedMFAMethod === 'email' || selectedMFAMethod === 'webhook'" :loading="sendingEmailCode" :disabled="resendCountdown > 0" @click="requestEmailCode">
                 重新发送
               </el-button>
             </div>
@@ -446,7 +447,7 @@ onBeforeUnmount(() => {
             <el-input v-model="resetForm.confirm_password" type="password" show-password size="large" placeholder="请再次输入新密码"
               autocomplete="new-password"><template #prefix><el-icon><Lock /></el-icon></template></el-input>
           </el-form-item>
-			<p v-if="(loginStep === 'verification' && selectedMFAMethod === 'code') || loginStep === 'email_login' || loginStep === 'reset_verify'" class="verification-expiry" :class="{ expired: verificationCountdown <= 0 }">
+			<p v-if="(loginStep === 'verification' && (selectedMFAMethod === 'email' || selectedMFAMethod === 'webhook')) || loginStep === 'email_login' || loginStep === 'reset_verify'" class="verification-expiry" :class="{ expired: verificationCountdown <= 0 }">
             {{ verificationCountdown > 0 ? `验证码有效期剩余 ${formatCountdown(verificationCountdown)}` : '验证码已过期，请重新获取' }}
           </p>
           

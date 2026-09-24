@@ -13,7 +13,7 @@ export interface SystemConfigResponse {
   captcha_enabled: boolean
   captcha_expire_minutes: number
   login_verification_enabled: boolean
-  login_verification_method: '' | 'email' | 'webhook' | 'passkey' | 'totp'
+  login_verification_methods: Array<'email' | 'webhook' | 'passkey' | 'totp'>
   max_login_failures: number
   account_lock_minutes: number
   verification_email_enabled: boolean

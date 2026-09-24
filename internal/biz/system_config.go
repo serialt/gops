@@ -82,6 +82,11 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 		}
 		values[key] = decrypted
 	}
+	loginVerificationMethods := parseVerificationMethods(values["login_verification_method"])
+	loginVerificationMethod := ""
+	if len(loginVerificationMethods) > 0 {
+		loginVerificationMethod = loginVerificationMethods[0]
+	}
 	return &api.SystemConfigResponse{
 		SystemName: values["system_name"], SystemDescription: values["system_description"],
 		PasswordMinLength:                parseConfigInt(values["password_min_length"], 8),
@@ -94,7 +99,8 @@ func (b *SystemConfigBiz) Get() (*api.SystemConfigResponse, error) {
 		CaptchaEnabled:                   parseConfigBool(values["captcha_enabled"]),
 		CaptchaExpireMinutes:             parseConfigInt(values["captcha_expire_minutes"], 1),
 		LoginVerificationEnabled:         parseConfigBool(values["login_verification_enabled"]),
-		LoginVerificationMethod:          values["login_verification_method"],
+		LoginVerificationMethods:         loginVerificationMethods,
+		LoginVerificationMethod:          loginVerificationMethod,
 		MaxLoginFailures:                 parseConfigInt(values["max_login_failures"], 5),
 		AccountLockMinutes:               parseConfigInt(values["account_lock_minutes"], 30),
 		VerificationEmailEnabled:         parseConfigBool(values["verification_email_enabled"]),
@@ -121,20 +127,16 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 		return nil, ErrInvalidVerificationConfig
 	}
 	if req.LoginVerificationEnabled {
-		if req.LoginVerificationMethod == "" {
+		if len(req.LoginVerificationMethods) == 0 {
 			return nil, ErrInvalidVerificationConfig
 		}
-		if req.LoginVerificationMethod == "email" && !req.VerificationEmailEnabled {
-			return nil, ErrInvalidVerificationConfig
-		}
-		if req.LoginVerificationMethod == "webhook" && (!req.VerificationWebhookEnabled || req.VerificationWebhookURL == "") {
-			return nil, ErrInvalidVerificationConfig
-		}
-		if req.LoginVerificationMethod == "passkey" && !req.VerificationPasskeyEnabled {
-			return nil, ErrInvalidVerificationConfig
-		}
-		if req.LoginVerificationMethod == "totp" && !req.VerificationTOTPEnabled {
-			return nil, ErrInvalidVerificationConfig
+		for _, method := range req.LoginVerificationMethods {
+			if method == "email" && !req.VerificationEmailEnabled ||
+				method == "webhook" && (!req.VerificationWebhookEnabled || req.VerificationWebhookURL == "") ||
+				method == "passkey" && !req.VerificationPasskeyEnabled ||
+				method == "totp" && !req.VerificationTOTPEnabled {
+				return nil, ErrInvalidVerificationConfig
+			}
 		}
 	}
 	if !req.VerificationPasskeyEnabled {
@@ -167,7 +169,7 @@ func (b *SystemConfigBiz) Update(req *api.SystemConfigRequest) (*api.SystemConfi
 		{ConfigKey: "captcha_enabled", ConfigValue: strconv.FormatBool(req.CaptchaEnabled)},
 		{ConfigKey: "captcha_expire_minutes", ConfigValue: strconv.Itoa(req.CaptchaExpireMinutes)},
 		{ConfigKey: "login_verification_enabled", ConfigValue: strconv.FormatBool(req.LoginVerificationEnabled)},
-		{ConfigKey: "login_verification_method", ConfigValue: req.LoginVerificationMethod},
+		{ConfigKey: "login_verification_method", ConfigValue: strings.Join(req.LoginVerificationMethods, ",")},
 		{ConfigKey: "max_login_failures", ConfigValue: strconv.Itoa(req.MaxLoginFailures)},
 		{ConfigKey: "account_lock_minutes", ConfigValue: strconv.Itoa(req.AccountLockMinutes)},
 		{ConfigKey: "verification_email_enabled", ConfigValue: strconv.FormatBool(req.VerificationEmailEnabled)},
@@ -351,4 +353,21 @@ func parseConfigInt(value string, fallback int) int {
 func parseConfigBool(value string) bool {
 	parsed, _ := strconv.ParseBool(value)
 	return parsed
+}
+
+func parseVerificationMethods(value string) []string {
+	methods := make([]string, 0, 4)
+	seen := make(map[string]struct{}, 4)
+	for _, method := range strings.Split(value, ",") {
+		method = strings.TrimSpace(method)
+		if method == "" {
+			continue
+		}
+		if _, ok := seen[method]; ok {
+			continue
+		}
+		seen[method] = struct{}{}
+		methods = append(methods, method)
+	}
+	return methods
 }
