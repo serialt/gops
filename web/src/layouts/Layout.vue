@@ -6,7 +6,8 @@ import { DataAnalysis, User, Key, Setting, OfficeBuilding, SwitchButton, ArrowDo
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
 import gopsLogoUrl from '@/assets/gops.svg'
-import { updateProfile } from '@/api/auth'
+import { beginPasskeyRegistration, confirmTOTP, deletePasskey, disableTOTP, finishPasskeyRegistration, getMFAStatus, setupTOTP, updateProfile, type MFAStatus, type TOTPSetup } from '@/api/auth'
+import { creationOptions, credentialJSON } from '@/utils/webauthn'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +18,9 @@ const userRoleLabel = computed(() => auth.user?.roles?.map((role) => role.name).
 const profileVisible = ref(false)
 const profileSaving = ref(false)
 const profileForm = reactive({ username: '', nickname: '', email: '', current_password: '', new_password: '', confirm_password: '' })
+const mfaStatus = ref<MFAStatus>({ code_available: false, totp_enabled: false, passkeys: [] })
+const totpSetup = ref<TOTPSetup | null>(null)
+const mfaBusy = ref(false)
 
 const sidebarWidth = ref(180)
 const isCollapsed = ref(false)
@@ -155,14 +159,58 @@ function logout() {
   router.push('/login')
 }
 
-function openProfile() {
+async function openProfile() {
   profileForm.username = auth.user?.username || ''
   profileForm.nickname = auth.user?.nickname || ''
   profileForm.email = auth.user?.email || ''
   profileForm.current_password = ''
   profileForm.new_password = ''
   profileForm.confirm_password = ''
-  profileVisible.value = true
+	profileVisible.value = true
+	totpSetup.value = null
+	const { data } = await getMFAStatus()
+	mfaStatus.value = data.data
+}
+
+async function startTOTPSetup() {
+	const { data } = await setupTOTP()
+	totpSetup.value = data.data
+}
+
+async function enableTOTP() {
+	const { value } = await ElMessageBox.prompt('请输入身份验证器当前显示的 6 位动态码', '启用 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字' })
+	await confirmTOTP(value)
+	totpSetup.value = null
+	mfaStatus.value.totp_enabled = true
+	ElMessage.success('TOTP 已启用')
+}
+
+async function turnOffTOTP() {
+	const { value } = await ElMessageBox.prompt('请输入当前 TOTP 动态码', '停用 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字' })
+	await disableTOTP(value)
+	mfaStatus.value.totp_enabled = false
+	ElMessage.success('TOTP 已停用')
+}
+
+async function addPasskey() {
+	if (!window.PublicKeyCredential) return ElMessage.warning('当前浏览器不支持 Passkey')
+	const { value: name } = await ElMessageBox.prompt('例如：MacBook Touch ID', '添加 Passkey', { inputValidator: value => Boolean(value.trim()) || '请输入名称' })
+	mfaBusy.value = true
+	try {
+		const { data } = await beginPasskeyRegistration(name.trim())
+		const credential = await navigator.credentials.create(creationOptions(data.data.options)) as PublicKeyCredential | null
+		if (!credential) return
+		await finishPasskeyRegistration({ registration_token: data.data.registration_token, name: name.trim(), credential: credentialJSON(credential) })
+		const status = await getMFAStatus()
+		mfaStatus.value = status.data.data
+		ElMessage.success('Passkey 已添加')
+	} finally { mfaBusy.value = false }
+}
+
+async function removePasskey(id:number) {
+	await ElMessageBox.confirm('确定删除这个 Passkey 吗？', '删除 Passkey', { type: 'warning' })
+	await deletePasskey(id)
+	mfaStatus.value.passkeys = mfaStatus.value.passkeys.filter(item => item.id !== id)
 }
 
 async function saveProfile() {
@@ -464,10 +512,28 @@ function toggleCollapse() {
       <el-form-item label="新密码">
         <el-input v-model="profileForm.new_password" type="password" show-password autocomplete="new-password" />
       </el-form-item>
-      <el-form-item label="确认密码">
-        <el-input v-model="profileForm.confirm_password" type="password" show-password autocomplete="new-password" />
-      </el-form-item>
-    </el-form>
+		<el-form-item label="确认密码">
+			<el-input v-model="profileForm.confirm_password" type="password" show-password autocomplete="new-password" />
+		</el-form-item>
+		<div class="profile-password-title">多因素认证</div>
+		<div class="mfa-setting-row">
+			<div><strong>TOTP 动态码</strong><small>{{ mfaStatus.totp_enabled ? '已启用' : '未启用' }}</small></div>
+			<el-button v-if="mfaStatus.totp_enabled" type="danger" plain @click="turnOffTOTP">停用</el-button>
+			<el-button v-else type="primary" plain @click="startTOTPSetup">配置</el-button>
+		</div>
+		<div v-if="totpSetup" class="totp-setup">
+			<p>在身份验证器中添加以下密钥，然后输入动态码确认：</p>
+			<code>{{ totpSetup.secret }}</code>
+			<el-button type="primary" @click="enableTOTP">验证并启用</el-button>
+		</div>
+		<div class="mfa-setting-row">
+			<div><strong>Passkey</strong><small>已添加 {{ mfaStatus.passkeys.length }} 个</small></div>
+			<el-button type="primary" plain :loading="mfaBusy" @click="addPasskey">添加</el-button>
+		</div>
+		<div v-for="item in mfaStatus.passkeys" :key="item.id" class="passkey-item">
+			<span>{{ item.name }}</span><el-button type="danger" text @click="removePasskey(item.id)">删除</el-button>
+		</div>
+	</el-form>
     <template #footer>
       <el-button @click="profileVisible = false">取消</el-button>
       <el-button type="primary" :loading="profileSaving" @click="saveProfile">保存</el-button>
@@ -1019,6 +1085,22 @@ function toggleCollapse() {
   color: var(--text-soft);
   font-size: 11px;
 }
+
+.mfa-setting-row,
+.passkey-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 0 0 10px 82px;
+}
+
+.mfa-setting-row strong { display: block; font-size: 12px; }
+.mfa-setting-row small { display: block; margin-top: 2px; color: var(--text-soft); font-size: 10px; }
+.totp-setup { margin: 0 0 14px 82px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.totp-setup p { margin: 0 0 8px; color: var(--text-soft); font-size: 10px; }
+.totp-setup code { display: block; margin-bottom: 8px; overflow-wrap: anywhere; color: var(--primary); font-size: 11px; }
+.passkey-item { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; }
 
 @media (max-width: 768px) {
   .header {

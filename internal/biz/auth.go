@@ -18,6 +18,7 @@ import (
 	"gops/internal/data/model"
 	"gops/internal/pkg/auth"
 	"gops/internal/pkg/casbinx"
+	"gops/internal/pkg/cryptox"
 
 	"gorm.io/gorm"
 )
@@ -36,20 +37,32 @@ type verificationValue struct {
 	attempts           int
 }
 
+type loginMFAChallenge struct {
+	userID    uint
+	username  string
+	ip        string
+	methods   []string
+	expiresAt time.Time
+}
+
 type AuthBiz struct {
-	db          *gorm.DB
-	jwt         *auth.JWTManager
-	casbin      *casbinx.Service
-	config      *SystemConfigBiz
-	mu          sync.Mutex
-	captchas    map[string]verificationValue
-	emailCodes  map[string]verificationValue
-	resetCodes  map[string]verificationValue
-	resetTokens map[string]verificationValue
+	db                   *gorm.DB
+	jwt                  *auth.JWTManager
+	casbin               *casbinx.Service
+	config               *SystemConfigBiz
+	mu                   sync.Mutex
+	captchas             map[string]verificationValue
+	emailCodes           map[string]verificationValue
+	resetCodes           map[string]verificationValue
+	resetTokens          map[string]verificationValue
+	pendingTOTP          map[uint]verificationValue
+	mfaChallenges        map[string]loginMFAChallenge
+	passkeyRegistrations map[string]passkeySession
+	passkeyLogins        map[string]passkeySession
 }
 
 func NewAuthBiz(db *gorm.DB, jwt *auth.JWTManager, casbinService *casbinx.Service, config *SystemConfigBiz) *AuthBiz {
-	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue)}
+	return &AuthBiz{db: db, jwt: jwt, casbin: casbinService, config: config, captchas: make(map[string]verificationValue), emailCodes: make(map[string]verificationValue), resetCodes: make(map[string]verificationValue), resetTokens: make(map[string]verificationValue), pendingTOTP: make(map[uint]verificationValue), mfaChallenges: make(map[string]loginMFAChallenge), passkeyRegistrations: make(map[string]passkeySession), passkeyLogins: make(map[string]passkeySession)}
 }
 
 func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, error) {
@@ -62,14 +75,23 @@ func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, e
 	if err != nil {
 		return nil, err
 	}
-	verificationRequired := b.loginVerificationRequired(config, user)
-	if config.CaptchaEnabled && !verificationRequired && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
+	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
 		b.recordLogin(user.ID, user.Username, ip, "failed", "图形验证码错误或已过期")
 		return nil, ErrInvalidCaptcha
 	}
-	if verificationRequired && !b.verifyEmailCode(user.Username, req.EmailCode) {
-		b.recordLogin(user.ID, user.Username, ip, "failed", "登录验证码错误或已过期")
-		return nil, ErrInvalidEmailCode
+	methods, err := b.availableMFAMethods(uint(user.ID), config, user)
+	if err != nil {
+		return nil, err
+	}
+	if len(methods) > 0 {
+		token, tokenErr := randomToken()
+		if tokenErr != nil {
+			return nil, tokenErr
+		}
+		b.mu.Lock()
+		b.mfaChallenges[token] = loginMFAChallenge{userID: uint(user.ID), username: user.Username, ip: ip, methods: methods, expiresAt: time.Now().Add(5 * time.Minute)}
+		b.mu.Unlock()
+		return &api.LoginResponse{MFARequired: true, MFAToken: token, MFAMethods: methods}, nil
 	}
 
 	tokens, err := b.jwt.GeneratePair(uint(user.ID))
@@ -79,6 +101,27 @@ func (b *AuthBiz) Login(req *api.LoginRequest, ip string) (*api.LoginResponse, e
 	}
 	b.recordLogin(user.ID, user.Username, ip, "success", "登录成功")
 	return tokenResponse(tokens), nil
+}
+
+func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigResponse, user *model.User) ([]string, error) {
+	methods := make([]string, 0, 3)
+	if b.loginVerificationRequired(config, user) {
+		methods = append(methods, "code")
+	}
+	var count int64
+	if err := b.db.Model(&model.UserMfaTotp{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		methods = append(methods, "totp")
+	}
+	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ?", userID).Count(&count).Error; err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		methods = append(methods, "passkey")
+	}
+	return methods, nil
 }
 
 func (b *AuthBiz) RefreshToken(req *api.RefreshTokenRequest) (*api.LoginResponse, error) {
@@ -269,15 +312,23 @@ func (b *AuthBiz) loginVerificationRequired(config *api.SystemConfigResponse, us
 }
 
 func (b *AuthBiz) authenticate(username, password string) (*model.User, error) {
+	user, err := b.findLoginUser(username)
+	if err != nil || !auth.CheckPassword(user.PasswordHash, password) {
+		return nil, ErrInvalidCredentials
+	}
+	return user, nil
+}
+
+func (b *AuthBiz) findLoginUser(identifier string) (*model.User, error) {
 	var user model.User
-	identifier := strings.TrimSpace(username)
+	identifier = strings.TrimSpace(identifier)
 	var err error
 	if strings.Contains(identifier, "@") {
 		err = b.db.Where("email <> '' AND LOWER(email) = ?", strings.ToLower(identifier)).First(&user).Error
 	} else {
 		err = b.db.Where("username = ?", identifier).First(&user).Error
 	}
-	if err != nil || !user.Status || !auth.CheckPassword(user.PasswordHash, password) {
+	if err != nil || !user.Status {
 		return nil, ErrInvalidCredentials
 	}
 	return &user, nil
@@ -443,6 +494,87 @@ func (b *AuthBiz) Me(userID uint) (*api.CurrentUserResponse, error) {
 		return nil, ErrNotFound
 	}
 	return &api.CurrentUserResponse{User: toUserResponse(user), Permissions: b.casbin.AllowedPermissionKeys(userID)}, nil
+}
+
+func (b *AuthBiz) MFAStatus(userID uint) (*api.MFAStatusResponse, error) {
+	var user model.User
+	if err := b.db.Select("id", "email").First(&user, userID).Error; err != nil {
+		return nil, ErrNotFound
+	}
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	var totp model.UserMfaTotp
+	totpEnabled := b.db.Where("user_id = ? AND enabled = ?", userID, 1).First(&totp).Error == nil
+	var passkeys []model.UserMfaPasskey
+	if err := b.db.Where("user_id = ?", userID).Order("id DESC").Find(&passkeys).Error; err != nil {
+		return nil, err
+	}
+	items := make([]*api.MFAPasskeyResponse, 0, len(passkeys))
+	for _, passkey := range passkeys {
+		items = append(items, &api.MFAPasskeyResponse{ID: passkey.ID, Name: passkey.Name})
+	}
+	return &api.MFAStatusResponse{CodeAvailable: passwordResetVerificationMethod(config, &user) != "", TOTPEnabled: totpEnabled, Passkeys: items}, nil
+}
+
+func (b *AuthBiz) BeginTOTPSetup(userID uint) (*api.TOTPSetupResponse, error) {
+	var user model.User
+	if err := b.db.Select("id", "username").First(&user, userID).Error; err != nil {
+		return nil, ErrNotFound
+	}
+	secret, err := auth.GenerateTOTPSecret()
+	if err != nil {
+		return nil, err
+	}
+	b.mu.Lock()
+	b.pendingTOTP[userID] = verificationValue{code: secret, expiresAt: time.Now().Add(10 * time.Minute)}
+	b.mu.Unlock()
+	config, err := b.config.Get()
+	if err != nil {
+		return nil, err
+	}
+	return &api.TOTPSetupResponse{Secret: secret, URI: auth.TOTPURI(config.SystemName, user.Username, secret)}, nil
+}
+
+func (b *AuthBiz) ConfirmTOTPSetup(userID uint, req *api.TOTPConfirmRequest) error {
+	b.mu.Lock()
+	pending, ok := b.pendingTOTP[userID]
+	if ok && time.Now().After(pending.expiresAt) {
+		delete(b.pendingTOTP, userID)
+		ok = false
+	}
+	b.mu.Unlock()
+	if !ok || !auth.ValidateTOTP(pending.code, req.Code, time.Now()) {
+		return errors.New("TOTP 验证码错误或设置已过期")
+	}
+	encrypted, err := cryptox.Encrypt(b.config.aesKey, pending.code)
+	if err != nil {
+		return err
+	}
+	row := &model.UserMfaTotp{UserID: int64(userID), Secret: encrypted, Enabled: 1}
+	if err := b.db.Where("user_id = ?", userID).Assign(map[string]any{"secret": encrypted, "enabled": 1, "updated_at": time.Now()}).FirstOrCreate(row).Error; err != nil {
+		return err
+	}
+	b.mu.Lock()
+	delete(b.pendingTOTP, userID)
+	b.mu.Unlock()
+	return nil
+}
+
+func (b *AuthBiz) DisableTOTP(userID uint, req *api.TOTPConfirmRequest) error {
+	var row model.UserMfaTotp
+	if err := b.db.Where("user_id = ? AND enabled = ?", userID, 1).First(&row).Error; err != nil {
+		return ErrNotFound
+	}
+	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)
+	if err != nil {
+		return err
+	}
+	if !auth.ValidateTOTP(secret, req.Code, time.Now()) {
+		return errors.New("TOTP 验证码错误")
+	}
+	return b.db.Model(&row).Updates(map[string]any{"secret": "", "enabled": 0, "updated_at": time.Now()}).Error
 }
 
 func (b *AuthBiz) UpdateProfile(userID uint, req *api.ProfileUpdateRequest) (*api.UserResponse, error) {

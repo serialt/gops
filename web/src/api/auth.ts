@@ -2,7 +2,8 @@ import type { User } from '@/types'
 import request from '@/utils/request'
 
 export interface LoginRequest { username: string; password: string; captcha_id?: string; captcha_code?: string; email_code?: string }
-export interface LoginResponse { token:string;access_token:string;refresh_token:string;expires_in:number;refresh_expires_in:number }
+export type MFAMethod = 'code' | 'totp' | 'passkey'
+export interface LoginResponse { token:string;access_token:string;refresh_token:string;expires_in:number;refresh_expires_in:number;mfa_required:boolean;mfa_token:string;mfa_methods:MFAMethod[] }
 export interface CurrentUserResponse { user: User; permissions: string[] }
 export interface ProfileUpdateRequest {
   username: string
@@ -27,6 +28,8 @@ export interface PasswordResetCodeRequest { username: string; captcha_id?: strin
 export interface PasswordResetVerifyRequest { username: string; code: string }
 export interface PasswordResetVerifyResponse { reset_token: string }
 export interface PasswordResetRequest { reset_token: string; new_password: string }
+export interface MFAStatus { code_available:boolean;totp_enabled:boolean;passkeys:{id:number;name:string}[] }
+export interface TOTPSetup { secret:string;uri:string }
 
 export const login = (data: LoginRequest) => request.post<LoginResponse>('/auth/login', data)
 export const refreshToken = (refresh_token:string) => request.post<LoginResponse>('/auth/refresh', { refresh_token })
@@ -38,3 +41,14 @@ export const sendLoginEmailCode = (data: Omit<LoginRequest, 'email_code'>) => re
 export const sendPasswordResetCode = (data: PasswordResetCodeRequest) => request.post<EmailCodeResponse>('/auth/password-reset/code/send', data)
 export const verifyPasswordResetCode = (data: PasswordResetVerifyRequest) => request.post<PasswordResetVerifyResponse>('/auth/password-reset/code/verify', data)
 export const resetPassword = (data: PasswordResetRequest) => request.post<null>('/auth/password-reset/confirm', data)
+export const sendMFACode = (mfa_token:string) => request.post<EmailCodeResponse>('/auth/mfa/code/send', { mfa_token })
+export const verifyMFA = (data:{mfa_token:string;method:'code'|'totp';code:string}) => request.post<LoginResponse>('/auth/mfa/verify', data)
+export const getMFAStatus = () => request.post<MFAStatus>('/auth/mfa/status', {})
+export const setupTOTP = () => request.post<TOTPSetup>('/auth/mfa/totp/setup', {})
+export const confirmTOTP = (code:string) => request.post<null>('/auth/mfa/totp/confirm', { code })
+export const disableTOTP = (code:string) => request.post<null>('/auth/mfa/totp/disable', { code })
+export const beginPasskeyRegistration = (name:string) => request.post<{registration_token:string;options:any}>('/auth/mfa/passkeys/register/begin', { name })
+export const finishPasskeyRegistration = (data:{registration_token:string;name:string;credential:unknown}) => request.post<null>('/auth/mfa/passkeys/register/finish', data)
+export const deletePasskey = (id:number) => request.post<null>('/auth/mfa/passkeys/delete', { id })
+export const beginPasskeyLogin = (mfa_token:string) => request.post<{options:any}>('/auth/mfa/passkey/login/begin', { mfa_token })
+export const finishPasskeyLogin = (data:{mfa_token:string;credential:unknown}) => request.post<LoginResponse>('/auth/mfa/passkey/login/finish', data)

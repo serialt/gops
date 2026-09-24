@@ -8,7 +8,8 @@ import backgroundUrl from '@/assets/login/bg.png'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/system-config'
-import { getCaptcha, getLoginSecurityConfig, resetPassword, sendLoginEmailCode, sendPasswordResetCode, verifyPasswordResetCode } from '@/api/auth'
+import { beginPasskeyLogin, finishPasskeyLogin, getCaptcha, getLoginSecurityConfig, resetPassword, sendMFACode, sendPasswordResetCode, verifyMFA, verifyPasswordResetCode, type MFAMethod } from '@/api/auth'
+import { credentialJSON, requestOptions } from '@/utils/webauthn'
 
 const auth = useAuthStore()
 const systemConfig = useSystemConfigStore()
@@ -28,6 +29,9 @@ const security = reactive({
 })
 const captcha = reactive({ id: '', image: '' })
 const emailCodeRequired = ref(false)
+const mfaToken = ref('')
+const mfaMethods = ref<MFAMethod[]>([])
+const selectedMFAMethod = ref<MFAMethod>('code')
 const form = reactive({ username: 'admin', password: 'password', captcha_code: '', email_code: '' })
 const resetForm = reactive({ code: '', new_password: '', confirm_password: '' })
 const resetToken = ref('')
@@ -81,13 +85,10 @@ async function refreshCaptcha() {
 }
 
 async function requestEmailCode() {
-  if (security.captcha_enabled && !form.captcha_code.trim()) {
-    ElMessage.warning('请输入图形验证码')
-    return false
-  }
-  sendingEmailCode.value = true
-  try {
-    const { data } = await sendLoginEmailCode({ username: form.username, password: form.password, captcha_id: captcha.id, captcha_code: form.captcha_code })
+	if (!mfaToken.value) return false
+	sendingEmailCode.value = true
+	try {
+		const { data } = await sendMFACode(mfaToken.value)
     emailCodeRequired.value = data.data.required
     if (data.data.required) loginStep.value = 'verification'
     startResendCountdown(data.data.retry_after_seconds)
@@ -95,27 +96,35 @@ async function requestEmailCode() {
     if (data.data.sent) ElMessage.success(security.login_verification_method === 'webhook' ? '验证码已通过 Webhook 发送' : '验证码已发送至用户邮箱')
     else if (data.data.required && data.data.retry_after_seconds > 0) ElMessage.info('验证码已发送，请勿重复获取')
     return data.data.required
-  } catch (error) {
-    await refreshCaptcha()
-    loginStep.value = 'credentials'
-    throw error
-  } finally {
+	} finally {
     sendingEmailCode.value = false
   }
 }
 
 async function submit() {
   if (loginStep.value === 'credentials' && security.captcha_enabled && !form.captcha_code.trim()) return ElMessage.warning('请输入图形验证码')
-  loading.value = true
-  try {
-    if (loginStep.value === 'credentials' && security.login_verification_enabled && !emailCodeRequired.value) {
-      const required = await requestEmailCode()
-      if (required) return
-    }
-    if (emailCodeRequired.value && verificationCountdown.value <= 0) return ElMessage.warning('邮件验证码已过期，请重新获取')
-    if (emailCodeRequired.value && !form.email_code.trim()) return ElMessage.warning('请输入登录验证码')
-    await auth.login({ username: form.username, password: form.password, captcha_id: captcha.id, captcha_code: form.captcha_code, email_code: form.email_code })
-    await router.replace((route.query.redirect as string) || '/')
+	loading.value = true
+	try {
+		if (loginStep.value === 'credentials') {
+			const result = await auth.login({ username: form.username, password: form.password, captcha_id: captcha.id, captcha_code: form.captcha_code })
+			if (result.mfa_required) {
+				mfaToken.value = result.mfa_token
+				mfaMethods.value = result.mfa_methods
+				selectedMFAMethod.value = result.mfa_methods[0]
+				loginStep.value = 'verification'
+				if (selectedMFAMethod.value === 'code') await requestEmailCode()
+				return
+			}
+		} else if (selectedMFAMethod.value === 'passkey') {
+			await loginWithPasskey()
+			return
+		} else {
+			if (selectedMFAMethod.value === 'code' && verificationCountdown.value <= 0) return ElMessage.warning('验证码已过期，请重新获取')
+			if (!form.email_code.trim()) return ElMessage.warning('请输入验证码')
+			const { data } = await verifyMFA({ mfa_token: mfaToken.value, method: selectedMFAMethod.value, code: form.email_code.trim() })
+			await auth.acceptLogin(data.data)
+		}
+		await router.replace((route.query.redirect as string) || '/')
   } catch (error) {
     if (loginStep.value === 'credentials') await refreshCaptcha()
     else form.email_code = ''
@@ -125,9 +134,26 @@ async function submit() {
   }
 }
 
+async function loginWithPasskey() {
+	const { data } = await beginPasskeyLogin(mfaToken.value)
+	const credential = await navigator.credentials.get(requestOptions(data.data.options)) as PublicKeyCredential | null
+	if (!credential) throw new Error('Passkey 验证已取消')
+	const result = await finishPasskeyLogin({ mfa_token: mfaToken.value, credential: credentialJSON(credential) })
+	await auth.acceptLogin(result.data.data)
+	await router.replace((route.query.redirect as string) || '/')
+}
+
+async function selectMFAMethod(method: MFAMethod) {
+	selectedMFAMethod.value = method
+	form.email_code = ''
+	if (method === 'code' && verificationCountdown.value <= 0) await requestEmailCode()
+}
+
 function backToCredentials() {
   loginStep.value = 'credentials'
-  emailCodeRequired.value = false
+	emailCodeRequired.value = false
+	mfaToken.value = ''
+	mfaMethods.value = []
   form.email_code = ''
   resetToken.value = ''
   startResendCountdown(0)
@@ -250,12 +276,19 @@ onBeforeUnmount(() => {
               <button class="captcha-image" type="button" title="点击刷新验证码" @click="refreshCaptcha"><img :src="captcha.image" alt="图形验证码" /></button>
             </div>
           </el-form-item>
-          <el-form-item v-if="loginStep === 'verification'">
-            <div class="verification-row">
-              <el-input v-model="form.email_code" size="large" maxlength="6" placeholder="请输入登录验证码">
-                <template #prefix><el-icon><Message /></el-icon></template>
-              </el-input>
-              <el-button :loading="sendingEmailCode" :disabled="resendCountdown > 0" @click="requestEmailCode">
+			<el-form-item v-if="loginStep === 'verification'">
+				<div class="mfa-methods">
+					<el-button v-for="method in mfaMethods" :key="method" :type="selectedMFAMethod === method ? 'primary' : 'default'" plain @click="selectMFAMethod(method)">
+						{{ method === 'code' ? '验证码' : method === 'totp' ? 'TOTP' : 'Passkey' }}
+					</el-button>
+				</div>
+			</el-form-item>
+			<el-form-item v-if="loginStep === 'verification' && selectedMFAMethod !== 'passkey'">
+				<div :class="selectedMFAMethod === 'code' ? 'verification-row' : 'totp-row'">
+					<el-input v-model="form.email_code" size="large" maxlength="6" :placeholder="selectedMFAMethod === 'totp' ? '请输入身份验证器动态码' : '请输入登录验证码'">
+						<template #prefix><el-icon><Message /></el-icon></template>
+					</el-input>
+					<el-button v-if="selectedMFAMethod === 'code'" :loading="sendingEmailCode" :disabled="resendCountdown > 0" @click="requestEmailCode">
                 重新发送
               </el-button>
             </div>
@@ -273,7 +306,7 @@ onBeforeUnmount(() => {
             <el-input v-model="resetForm.confirm_password" type="password" show-password size="large" placeholder="请再次输入新密码"
               autocomplete="new-password"><template #prefix><el-icon><Lock /></el-icon></template></el-input>
           </el-form-item>
-          <p v-if="loginStep === 'verification' || loginStep === 'reset_verify'" class="verification-expiry" :class="{ expired: verificationCountdown <= 0 }">
+			<p v-if="(loginStep === 'verification' && selectedMFAMethod === 'code') || loginStep === 'reset_verify'" class="verification-expiry" :class="{ expired: verificationCountdown <= 0 }">
             {{ verificationCountdown > 0 ? `验证码有效期剩余 ${formatCountdown(verificationCountdown)}` : '验证码已过期，请重新获取' }}
           </p>
           
@@ -403,6 +436,17 @@ onBeforeUnmount(() => {
   gap: 8px;
   width: 100%;
 }
+
+.totp-row { width: 100%; }
+
+.mfa-methods {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 8px;
+	width: 100%;
+}
+
+.mfa-methods :deep(.el-button) { margin: 0; }
 
 .verification-row :deep(.el-button) {
   height: 42px;

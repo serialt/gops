@@ -12,11 +12,17 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => Boolean(token.value))
 
   async function login(request: LoginRequest) {
-    const { data } = await loginApi(request)
-    token.value = data.data.access_token || data.data.token
-    localStorage.setItem('token', token.value)
-    localStorage.setItem('refresh_token', data.data.refresh_token)
-    await fetchMe()
+	const { data } = await loginApi(request)
+	if (data.data.mfa_required) return data.data
+	await acceptLogin(data.data)
+	return data.data
+  }
+
+  async function acceptLogin(result: {access_token:string;token:string;refresh_token:string}) {
+	token.value = result.access_token || result.token
+	localStorage.setItem('token', token.value)
+	localStorage.setItem('refresh_token', result.refresh_token)
+	await fetchMe()
   }
 
   async function fetchMe() {
@@ -39,5 +45,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('refresh_token')
   }
 
-  return { token, user, permissions, loaded, isLoggedIn, login, fetchMe, hasPermission, logout }
+	return { token, user, permissions, loaded, isLoggedIn, login, acceptLogin, fetchMe, hasPermission, logout }
 })
