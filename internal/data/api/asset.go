@@ -221,6 +221,16 @@ type DbInstanceResponse struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+type AssetTreeNodeResponse struct {
+	ID       string                   `json:"id"`
+	Label    string                   `json:"label"`
+	Type     string                   `json:"type"`
+	Count    int64                    `json:"count,omitempty"`
+	Host     *HostResponse            `json:"host,omitempty"`
+	Database *DbInstanceResponse      `json:"database,omitempty"`
+	Children []*AssetTreeNodeResponse `json:"children,omitempty"`
+}
+
 type TerminalSessionListRequest struct {
 	PageRequest
 	Keyword     string `json:"keyword"`

@@ -94,6 +94,69 @@ func (b *AssetBiz) ListGroups(ctx context.Context, req *api.AssetGroupListReques
 	return &api.PageResponse[*api.AssetGroupResponse]{List: result, Total: total}, nil
 }
 
+func (b *AssetBiz) AssetTree(ctx context.Context) ([]*api.AssetTreeNodeResponse, error) {
+	groups, _, err := b.repo.ListGroups(ctx, b.db, &define.AssetGroupListCond{Page: 1, Limit: api.MaxLimit})
+	if err != nil {
+		return nil, err
+	}
+	hosts, _, err := b.repo.ListHosts(ctx, b.db, &define.HostListCond{Page: 1, Limit: api.MaxLimit})
+	if err != nil {
+		return nil, err
+	}
+	databases, _, err := b.repo.ListDBInstances(ctx, b.db, &define.DBInstanceListCond{Page: 1, Limit: api.MaxLimit})
+	if err != nil {
+		return nil, err
+	}
+
+	nodes := make(map[int64]*api.AssetTreeNodeResponse, len(groups))
+	roots := make([]*api.AssetTreeNodeResponse, 0, len(groups)+1)
+	for _, group := range groups {
+		nodes[group.ID] = &api.AssetTreeNodeResponse{ID: fmt.Sprintf("group-%d", group.ID), Label: group.Name, Type: "group", Children: make([]*api.AssetTreeNodeResponse, 0)}
+	}
+	for _, group := range groups {
+		node := nodes[group.ID]
+		if parent := nodes[group.ParentID]; parent != nil {
+			parent.Children = append(parent.Children, node)
+		} else {
+			roots = append(roots, node)
+		}
+	}
+	ungrouped := &api.AssetTreeNodeResponse{ID: "group-0", Label: "未分组", Type: "group", Children: make([]*api.AssetTreeNodeResponse, 0)}
+	for _, host := range hosts {
+		parent := nodes[host.GroupID]
+		if parent == nil {
+			parent = ungrouped
+		}
+		parent.Children = append(parent.Children, &api.AssetTreeNodeResponse{ID: fmt.Sprintf("host-%d", host.ID), Label: host.Name, Type: "host", Host: hostResponse(*host)})
+		parent.Count++
+	}
+	for _, database := range databases {
+		parent := nodes[database.GroupID]
+		if parent == nil {
+			parent = ungrouped
+		}
+		parent.Children = append(parent.Children, &api.AssetTreeNodeResponse{ID: fmt.Sprintf("database-%d", database.ID), Label: database.Name, Type: "database", Database: dbInstanceResponse(*database)})
+		parent.Count++
+	}
+	var accumulate func(*api.AssetTreeNodeResponse) int64
+	accumulate = func(node *api.AssetTreeNodeResponse) int64 {
+		for _, child := range node.Children {
+			if child.Type == "group" {
+				node.Count += accumulate(child)
+			}
+		}
+		return node.Count
+	}
+	for _, root := range roots {
+		accumulate(root)
+	}
+	if len(ungrouped.Children) > 0 {
+		accumulate(ungrouped)
+		roots = append(roots, ungrouped)
+	}
+	return roots, nil
+}
+
 func (b *AssetBiz) CreateGroup(req *api.AssetGroupRequest) (*api.AssetGroupResponse, error) {
 	if req.ParentID > 0 {
 		var parent model.AssetGroup

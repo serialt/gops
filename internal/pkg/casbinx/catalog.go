@@ -28,6 +28,7 @@ func Catalog() []Permission {
 		{Group: "资产管理", Name: "修改云账号", Path: "/api/v1/assets/cloud-accounts/update", Method: "POST"},
 		{Group: "资产管理", Name: "删除云账号", Path: "/api/v1/assets/cloud-accounts/delete", Method: "POST"},
 		{Group: "资产管理", Name: "查看主机", Path: "/api/v1/assets/hosts/list", Method: "POST"},
+		{Group: "资产管理", Name: "查看终端资产树", Path: "/api/v1/assets/terminal/tree", Method: "POST"},
 		{Group: "资产管理", Name: "新增主机", Path: "/api/v1/assets/hosts/create", Method: "POST"},
 		{Group: "资产管理", Name: "修改主机", Path: "/api/v1/assets/hosts/update", Method: "POST"},
 		{Group: "资产管理", Name: "测试主机连接", Path: "/api/v1/assets/hosts/test", Method: "POST"},

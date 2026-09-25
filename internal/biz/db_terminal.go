@@ -109,8 +109,10 @@ func (c *DatabaseTerminalConnection) Prompt() string {
 		return "MariaDB> "
 	case "sqlserver":
 		return "sqlserver> "
-	default:
+	case "mysql":
 		return "mysql> "
+	default:
+		return "sql> "
 	}
 }
 

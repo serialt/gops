@@ -6,17 +6,16 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import gopsLogoUrl from '@/assets/gops.svg'
-import { downloadSftp, listAssetGroups, listDBInstances, listHosts, listSftp, uploadSftp, type AssetGroup, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
+import { downloadSftp, getTerminalAssetTree, listSftp, uploadSftp, type AssetTreeNode, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
 import { useSystemConfigStore } from '@/stores/system-config'
 
-interface TreeNode { id: string; label: string; type: 'group' | 'host' | 'database'; assetType?: string; count?: number; host?: Host; database?: DbInstance; children?: TreeNode[] }
+type TreeNode = AssetTreeNode
 interface Session { key: string; kind: 'host' | 'database'; label: string; host?: Host; database?: DbInstance }
 interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout> }
 
 const systemConfig = useSystemConfigStore()
-const hosts = ref<Host[]>([])
-const databases = ref<DbInstance[]>([])
-const groups = ref<AssetGroup[]>([])
+const treeData = ref<TreeNode[]>([])
+const assetCount = computed(() => treeData.value.reduce((total, node) => total + (node.count || 0), 0))
 const keyword = ref('')
 const treeRef = ref<InstanceType<typeof ElTree>>()
 const sessions = ref<Session[]>([])
@@ -52,45 +51,14 @@ const filteredSftpEntries = computed(() => {
 })
 const activeSession = computed(() => sessions.value.find(session => session.key === activeKey.value))
 
-const treeData = computed<TreeNode[]>(() => {
-  const nodes = new Map<number, TreeNode>()
-  const roots: TreeNode[] = []
-  groups.value.forEach(group => nodes.set(group.id, { id: `group-${group.id}`, label: group.name, type: 'group', count: 0, children: [] }))
-  groups.value.forEach(group => {
-    const node = nodes.get(group.id)
-    if (!node) return
-    const parent = nodes.get(group.parent_id)
-    if (parent) parent.children?.push(node)
-    else roots.push(node)
-  })
-  const ungrouped: TreeNode = { id: 'group-0', label: '未分组', type: 'group', count: 0, children: [] }
-  hosts.value.forEach(host => {
-    const parent = nodes.get(host.group_id) || ungrouped
-    parent.children?.push({ id: `host-${host.id}`, label: host.name, type: 'host', assetType: '主机', host })
-    parent.count = (parent.count || 0) + 1
-  })
-  databases.value.forEach(database => {
-    const parent = nodes.get(database.group_id) || ungrouped
-    parent.children?.push({ id: `database-${database.id}`, label: database.name, type: 'database', assetType: databaseTypeLabel(database.db_type), database })
-    parent.count = (parent.count || 0) + 1
-  })
-  const sum = (node: TreeNode): number => {
-    const children = (node.children || []).filter(child => child.type === 'group').reduce((total, child) => total + sum(child), 0)
-    node.count = (node.count || 0) + children
-    return node.count
-  }
-  roots.forEach(sum)
-  if (ungrouped.children?.length) roots.push(ungrouped)
-  return roots
-})
-
 function setTerminalElement(key: string, element: unknown) {
   if (element instanceof HTMLElement) terminalElements.set(key, element)
   else terminalElements.delete(key)
 }
 function filterTree(value: string, data: TreeNode) {
   if (!value.trim()) return true
-  return `${data.label} ${data.assetType || ''} ${data.host?.ip || ''} ${data.database?.host || ''} ${data.database?.db_type || ''}`.toLowerCase().includes(value.trim().toLowerCase())
+  const assetType = data.type === 'host' ? '主机' : data.database ? databaseTypeLabel(data.database.db_type) : ''
+  return `${data.label} ${assetType} ${data.host?.ip || ''} ${data.database?.host || ''} ${data.database?.db_type || ''}`.toLowerCase().includes(value.trim().toLowerCase())
 }
 function databaseTypeLabel(type: string) {
   const normalized = type.trim().toLowerCase().replace(/[\s_-]+/g, '')
@@ -352,10 +320,8 @@ function closeSession(key: string) {
   if (activeKey.value === key) activeKey.value = sessions.value[Math.min(index, sessions.value.length - 1)]?.key ?? null
 }
 async function load() {
-  const [hostResult, databaseResult, groupResult] = await Promise.all([listHosts('', 0, 1, 1000), listDBInstances('', 0, 1, 1000), listAssetGroups('', 1, 1000)])
-  hosts.value = hostResult.data.data.list
-  databases.value = databaseResult.data.data.list
-  groups.value = groupResult.data.data.list
+  const result = await getTerminalAssetTree()
+  treeData.value = result.data.data
 }
 watch(keyword, value => treeRef.value?.filter(value))
 onMounted(() => { void systemConfig.fetchConfig(); void load().catch(() => ElMessage.error('读取资产失败')) })
@@ -375,25 +341,28 @@ onBeforeUnmount(() => {
       <aside class="asset-panel">
         <div class="asset-title"><span><el-icon>
               <CollectionTag />
-            </el-icon>资产分组</span><small>({{ hosts.length + databases.length }})</small></div>
+            </el-icon>资产分组</span><small>({{ assetCount }})</small></div>
         <el-input v-model="keyword" class="asset-search" placeholder="搜索" clearable :prefix-icon="Search" />
         <el-tree ref="treeRef" class="asset-tree" :data="treeData" node-key="id" default-expand-all
           :filter-node-method="filterTree" :expand-on-click-node="true">
-          <template #default="{ data }"><span class="tree-node" :class="`is-${data.type}`"
+          <template #default="{ data }"><span class="tree-node"
+              :class="[`is-${data.type}`, { 'asset-tree-leaf': data.type !== 'group' }]"
               @dblclick.stop="data.type === 'host' ? openTerminal(data.host) : data.type === 'database' && openDatabaseTerminal(data.database)"><el-icon
                 v-if="data.type === 'group'">
                 <ArrowRight />
-              </el-icon><el-icon v-else-if="data.type === 'host'" class="host-asset-icon" :title="data.assetType"
-                :aria-label="data.assetType">
+              </el-icon><el-icon v-else-if="data.type === 'host'" class="host-asset-icon" title="主机" aria-label="主机">
                 <Platform />
-              </el-icon><el-icon v-else class="database-asset-icon" :title="data.assetType"
-                :aria-label="data.assetType">
+              </el-icon><el-icon v-else class="database-asset-icon"
+                :title="databaseTypeLabel(data.database?.db_type || '')"
+                :aria-label="databaseTypeLabel(data.database?.db_type || '')">
                 <Coin />
               </el-icon><span class="tree-label">{{ data.label }}</span><small v-if="data.type === 'database'"
-                class="database-type-badge">{{ data.assetType }}</small><small v-else-if="data.type === 'host'"
-                class="database-type-badge">Host</small><small v-if="data.type === 'group'">({{
+                class="database-type-badge">{{ databaseTypeLabel(data.database?.db_type || '') }}</small><small
+                v-else-if="data.type === 'host'" class="database-type-badge">Host</small><small
+                v-if="data.type === 'group'">({{
                   data.count }})</small><i v-else-if="data.type === 'host'"
-                :class="{ online: data.host?.status === 1 }" /></span></template>
+                :class="{ online: data.host?.status === 1 }" /><i v-else-if="data.type === 'database'"
+                :class="{ online: data.database?.status }" /></span></template>
         </el-tree>
       </aside>
       <div class="asset-divider" :class="{ dragging: assetPaneDragging }" role="separator" aria-label="调整资产分组宽度"
@@ -695,8 +664,13 @@ onBeforeUnmount(() => {
 }
 
 .asset-tree :deep(.el-tree-node__content) {
+  justify-content: flex-start;
   height: 34px;
   border-radius: 5px
+}
+
+.asset-tree :deep(.el-tree-node__content:has(.asset-tree-leaf)) {
+  padding-left: 36px !important
 }
 
 .asset-tree :deep(.el-tree-node__expand-icon) {
@@ -708,12 +682,14 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 7px;
   padding-right: 7px;
   user-select: none
 }
 
 .tree-node.is-host {
+  justify-content: flex-start;
   padding-left: 4px;
   cursor: default
 }
@@ -793,7 +769,7 @@ onBeforeUnmount(() => {
 }
 
 .tree-node.is-host i {
-  margin-left: auto
+  margin-left: 0
 }
 
 .tree-node i.online,

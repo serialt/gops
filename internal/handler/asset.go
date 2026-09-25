@@ -50,6 +50,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/cloud-accounts/delete", h.DeleteCloudAccount)
 
 	g.POST("/assets/hosts/list", h.ListHosts)
+	g.POST("/assets/terminal/tree", h.AssetTree)
 	g.POST("/assets/hosts/create", h.CreateHost)
 	g.POST("/assets/hosts/update", h.UpdateHost)
 	g.POST("/assets/hosts/test", h.TestHostConnection)
@@ -70,6 +71,16 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
 	g.POST("/assets/terminal-sessions/recording", h.GetTerminalSessionRecording)
 	g.POST("/assets/terminal-sessions/delete", h.DeleteTerminalSession)
+}
+
+// AssetTree POST /api/v1/assets/terminal/tree returns groups and their host/database nodes.
+func (h *AssetHandler) AssetTree(c *gin.Context) {
+	result, err := h.biz.AssetTree(c.Request.Context())
+	if err != nil {
+		response.Error(c, 500, "query asset tree failed")
+		return
+	}
+	response.OK(c, result)
 }
 
 // ListSFTP POST /api/v1/assets/terminal/sftp/list 查询主机远程目录。
@@ -275,7 +286,7 @@ func (h *AssetHandler) ConnectDatabaseTerminal(c *gin.Context) {
 				}
 			case 0x03:
 				line = line[:0]
-				if write("^C\r\n" + connection.Prompt()) != nil {
+				if write("^C\r\n"+connection.Prompt()) != nil {
 					return
 				}
 			default:

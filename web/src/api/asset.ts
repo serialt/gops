@@ -68,6 +68,8 @@ export const downloadSftp = (host_id: number, path: string, names: string[]) =>
   request.post<Blob>('/assets/terminal/sftp/download', { host_id, path, names }, { responseType: 'blob' })
 
 export interface DbInstance { id: number; group_id: number; name: string; db_type: string; host: string; port: number; version: string; credential_id: number; tags: string; description: string; status: boolean; created_at: string; updated_at: string }
+export interface AssetTreeNode { id: string; label: string; type: 'group' | 'host' | 'database'; count?: number; host?: Host; database?: DbInstance; children?: AssetTreeNode[] }
+export const getTerminalAssetTree = () => request.post<AssetTreeNode[]>('/assets/terminal/tree', {})
 export interface DatabaseTypeOption { value: string; label: string; default_port: number }
 export interface DbInstanceRequest { id?: number; group_id: number; name: string; db_type: string; host: string; port: number; version: string; credential_id: number; tags: string; description: string; status: boolean }
 export interface DbInstanceTestRequest { db_type: string; host: string; port: number; credential_id: number }
