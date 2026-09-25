@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, type ElTree } from 'element-plus'
-import { ArrowLeft, ArrowRight, Close, CollectionTag, Monitor, Search } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Close, CollectionTag, Delete, FolderOpened, Monitor, Refresh, Search } from '@element-plus/icons-vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
@@ -132,6 +132,27 @@ function activateSession(key: number) {
   activeKey.value = key
   void nextTick(() => { runtimes.get(key)?.fitAddon.fit(); runtimes.get(key)?.terminal.focus() })
 }
+function clearTerminal() {
+  const runtime = activeKey.value === null ? undefined : runtimes.get(activeKey.value)
+  runtime?.terminal.clear()
+  runtime?.terminal.focus()
+}
+function openSftp() {
+  if (activeKey.value === null) return
+  ElMessage.info('SFTP 文件管理功能即将开放')
+}
+async function reconnectSession() {
+  if (activeKey.value === null) return
+  const session = sessions.value.find(item => item.key === activeKey.value)
+  const runtime = runtimes.get(activeKey.value)
+  if (!session || !runtime) return
+  clearTimeout(runtime.connectTimer)
+  runtime.resizeObserver.disconnect()
+  runtime.socket.close()
+  runtime.terminal.dispose()
+  runtimes.delete(activeKey.value)
+  await initializeSession(session)
+}
 function disposeSession(key: number) {
   const runtime = runtimes.get(key)
   if (runtime) clearTimeout(runtime.connectTimer)
@@ -202,6 +223,20 @@ onBeforeUnmount(() => {
               class="close" @click.stop="closeSession(session.key)">
               <Close />
             </el-icon></button>
+          <div class="terminal-actions">
+            <button type="button" class="terminal-action" :disabled="activeKey === null" aria-label="SFTP文件管理"
+              title="SFTP文件管理" @click="openSftp"><el-icon>
+                <FolderOpened />
+              </el-icon></button>
+            <button type="button" class="terminal-action" :disabled="activeKey === null" aria-label="重新连接" title="重新连接"
+              @click="void reconnectSession()"><el-icon>
+                <Refresh />
+              </el-icon></button>
+            <button type="button" class="terminal-action" :disabled="activeKey === null" aria-label="清空终端" title="清空终端"
+              @click="clearTerminal"><el-icon>
+                <Delete />
+              </el-icon></button>
+          </div>
         </nav>
         <div class="session-content">
           <div v-if="!sessions.length" class="terminal-empty"><el-icon>
@@ -492,6 +527,41 @@ onBeforeUnmount(() => {
 
 .session-tab.placeholder {
   cursor: default
+}
+
+.terminal-actions {
+  height: 100%;
+  margin-left: auto;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none
+}
+
+.terminal-action {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  color: #aeb2ba;
+  background: transparent;
+  cursor: pointer
+}
+
+.terminal-action:hover:not(:disabled) {
+  color: #fff;
+  background: #4c4d52
+}
+
+.terminal-action:disabled {
+  color: #666970;
+  cursor: not-allowed;
+  opacity: .55
 }
 
 .session-tab.placeholder>span {
