@@ -1,11 +1,15 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"gops/internal/biz"
 	"gops/internal/data/api"
@@ -187,6 +191,157 @@ func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
 		default:
 		}
 	}
+}
+
+// ConnectDatabaseTerminal GET /api/v1/assets/terminal/database/connect/:id opens a SQL console WebSocket.
+func (h *AssetHandler) ConnectDatabaseTerminal(c *gin.Context) {
+	databaseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || databaseID <= 0 {
+		response.Error(c, 400, "invalid database id")
+		return
+	}
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	connection, err := h.biz.StartDatabaseTerminal(databaseID, int64(userID))
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	ws, err := terminalUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		h.biz.CloseDatabaseTerminal(connection)
+		return
+	}
+	defer ws.Close()
+	defer h.biz.CloseDatabaseTerminal(connection)
+
+	write := func(text string) error {
+		connection.Record([]byte(text))
+		return ws.WriteMessage(websocket.TextMessage, []byte(text))
+	}
+	if err = write("Connected to database SQL console. Type \\q to close.\r\n" + connection.Prompt()); err != nil {
+		return
+	}
+	line := make([]rune, 0, 256)
+	lastWasCarriageReturn := false
+	for {
+		messageType, payload, readErr := ws.ReadMessage()
+		if readErr != nil {
+			return
+		}
+		if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
+			continue
+		}
+		var control struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(payload, &control) == nil && control.Type == "resize" {
+			continue
+		}
+		for _, char := range string(payload) {
+			switch char {
+			case '\r', '\n':
+				if char == '\n' && lastWasCarriageReturn {
+					lastWasCarriageReturn = false
+					continue
+				}
+				lastWasCarriageReturn = char == '\r'
+				if write("\r\n") != nil {
+					return
+				}
+				statement := strings.TrimSpace(string(line))
+				line = line[:0]
+				if statement == "\\q" || strings.EqualFold(statement, "quit") || strings.EqualFold(statement, "exit") {
+					_ = write("Database session closed.\r\n")
+					return
+				}
+				if statement != "" {
+					if writeDatabaseQuery(connection, write, statement) != nil {
+						return
+					}
+				}
+				if write(connection.Prompt()) != nil {
+					return
+				}
+			case '\b', 0x7f:
+				if len(line) > 0 {
+					line = line[:len(line)-1]
+					if write("\b \b") != nil {
+						return
+					}
+				}
+			case 0x03:
+				line = line[:0]
+				if write("^C\r\n" + connection.Prompt()) != nil {
+					return
+				}
+			default:
+				lastWasCarriageReturn = false
+				line = append(line, char)
+				if write(string(char)) != nil {
+					return
+				}
+			}
+		}
+	}
+}
+
+func writeDatabaseQuery(connection *biz.DatabaseTerminalConnection, write func(string) error, statement string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	rows, err := connection.Query(ctx, statement)
+	if err != nil {
+		return write(fmt.Sprintf("ERROR: %v\r\n", err))
+	}
+	defer rows.Close()
+	columns, err := rows.Columns()
+	if err != nil {
+		return write(fmt.Sprintf("ERROR: %v\r\n", err))
+	}
+	if len(columns) == 0 {
+		return write("Query completed.\r\n")
+	}
+	if err = write(strings.Join(columns, " | ") + "\r\n"); err != nil {
+		return err
+	}
+	values := make([]any, len(columns))
+	destinations := make([]any, len(columns))
+	for index := range values {
+		destinations[index] = &values[index]
+	}
+	rowCount := 0
+	for rows.Next() {
+		if err = rows.Scan(destinations...); err != nil {
+			return write(fmt.Sprintf("ERROR: %v\r\n", err))
+		}
+		cells := make([]string, len(values))
+		for index, value := range values {
+			if bytes, ok := value.([]byte); ok {
+				cells[index] = string(bytes)
+			} else if value == nil {
+				cells[index] = "NULL"
+			} else {
+				cells[index] = fmt.Sprint(value)
+			}
+		}
+		if err = write(strings.Join(cells, " | ") + "\r\n"); err != nil {
+			return err
+		}
+		rowCount++
+		if rowCount == 200 {
+			if err = write("... output limited to 200 rows ...\r\n"); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return write(fmt.Sprintf("ERROR: %v\r\n", err))
+	}
+	return write(fmt.Sprintf("(%d rows)\r\n", rowCount))
 }
 
 // ListGroups POST /api/v1/assets/groups/list 查询资产分组。

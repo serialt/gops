@@ -10,7 +10,7 @@ import { downloadSftp, listAssetGroups, listDBInstances, listHosts, listSftp, up
 import { useSystemConfigStore } from '@/stores/system-config'
 
 interface TreeNode { id: string; label: string; type: 'group' | 'host' | 'database'; assetType?: string; count?: number; host?: Host; database?: DbInstance; children?: TreeNode[] }
-interface Session { key: number; host: Host }
+interface Session { key: string; kind: 'host' | 'database'; label: string; host?: Host; database?: DbInstance }
 interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout> }
 
 const systemConfig = useSystemConfigStore()
@@ -20,13 +20,13 @@ const groups = ref<AssetGroup[]>([])
 const keyword = ref('')
 const treeRef = ref<InstanceType<typeof ElTree>>()
 const sessions = ref<Session[]>([])
-const activeKey = ref<number | null>(null)
+const activeKey = ref<string | null>(null)
 const assetPaneWidth = ref(180)
 const assetPaneDragging = ref(false)
 const assetPaneStartX = ref(0)
 const assetPaneStartWidth = ref(180)
-const terminalElements = new Map<number, HTMLElement>()
-const runtimes = new Map<number, Runtime>()
+const terminalElements = new Map<string, HTMLElement>()
+const runtimes = new Map<string, Runtime>()
 const sftpVisible = ref(false)
 const sftpOriginKey = ref<number | null>(null)
 const sftpPath = ref('/root')
@@ -50,6 +50,7 @@ const filteredSftpEntries = computed(() => {
   const value = sftpKeyword.value.trim().toLowerCase()
   return value ? sftpEntries.value.filter(entry => entry.name.toLowerCase().includes(value)) : sftpEntries.value
 })
+const activeSession = computed(() => sessions.value.find(session => session.key === activeKey.value))
 
 const treeData = computed<TreeNode[]>(() => {
   const nodes = new Map<number, TreeNode>()
@@ -83,7 +84,7 @@ const treeData = computed<TreeNode[]>(() => {
   return roots
 })
 
-function setTerminalElement(key: number, element: unknown) {
+function setTerminalElement(key: string, element: unknown) {
   if (element instanceof HTMLElement) terminalElements.set(key, element)
   else terminalElements.delete(key)
 }
@@ -125,10 +126,13 @@ function stopAssetPaneDrag() {
   window.getSelection()?.removeAllRanges()
 }
 function toggleAssetPane() { assetPaneWidth.value = assetPaneWidth.value === 0 ? 260 : 0 }
-function socketURL(host: Host, terminal: Terminal) {
+function socketURL(session: Session, terminal: Terminal) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const token = localStorage.getItem('token') || ''
-  return `${protocol}//${window.location.host}/api/v1/assets/terminal/connect/${host.id}?token=${encodeURIComponent(token)}&cols=${terminal.cols}&rows=${terminal.rows}`
+  const endpoint = session.kind === 'host'
+    ? `/api/v1/assets/terminal/connect/${session.host?.id}`
+    : `/api/v1/assets/terminal/database/connect/${session.database?.id}`
+  return `${protocol}//${window.location.host}${endpoint}?token=${encodeURIComponent(token)}&cols=${terminal.cols}&rows=${terminal.rows}`
 }
 function sendResize(runtime: Runtime) {
   if (runtime.socket.readyState === WebSocket.OPEN) runtime.socket.send(JSON.stringify({ type: 'resize', cols: runtime.terminal.cols, rows: runtime.terminal.rows }))
@@ -142,8 +146,11 @@ async function initializeSession(session: Session) {
   terminal.loadAddon(fitAddon)
   terminal.open(element)
   fitAddon.fit()
-  terminal.writeln(`正在连接 ${session.host.name}（${session.host.ip}:${session.host.port}）...`)
-  const socket = new WebSocket(socketURL(session.host, terminal))
+  const target = session.host
+    ? `${session.host.name}（${session.host.ip}:${session.host.port}）`
+    : `${session.database?.name}（${session.database?.host}:${session.database?.port}）`
+  terminal.writeln(`正在连接 ${target}...`)
+  const socket = new WebSocket(socketURL(session, terminal))
   socket.binaryType = 'arraybuffer'
   const resizeObserver = new ResizeObserver(() => { fitAddon.fit(); const runtime = runtimes.get(session.key); if (runtime) sendResize(runtime) })
   const connectTimer = setTimeout(() => {
@@ -163,14 +170,25 @@ async function initializeSession(session: Session) {
 }
 async function openTerminal(host?: Host) {
   if (!host) return
-  const existing = sessions.value.find(session => session.key === host.id)
+  const key = `host:${host.id}`
+  const existing = sessions.value.find(session => session.key === key)
   if (existing) { activateSession(existing.key); return }
-  const session = { key: host.id, host }
+  const session: Session = { key, kind: 'host', label: host.name, host }
   sessions.value.push(session)
   activeKey.value = session.key
   await initializeSession(session)
 }
-function activateSession(key: number) {
+async function openDatabaseTerminal(database?: DbInstance) {
+  if (!database) return
+  const key = `database:${database.id}`
+  const existing = sessions.value.find(session => session.key === key)
+  if (existing) { activateSession(existing.key); return }
+  const session: Session = { key, kind: 'database', label: database.name, database }
+  sessions.value.push(session)
+  activeKey.value = session.key
+  await initializeSession(session)
+}
+function activateSession(key: string) {
   activeKey.value = key
   void nextTick(() => { runtimes.get(key)?.fitAddon.fit(); runtimes.get(key)?.terminal.focus() })
 }
@@ -180,8 +198,9 @@ function clearTerminal() {
   runtime?.terminal.focus()
 }
 function openSftp() {
-  if (activeKey.value === null) return
-  sftpOriginKey.value = activeKey.value
+  const session = activeSession.value
+  if (session?.kind !== 'host' || !session.host) return
+  sftpOriginKey.value = session.host.id
   sftpVisible.value = true
   sftpSearchVisible.value = false
   sftpUploadMenuVisible.value = false
@@ -198,9 +217,10 @@ function closeSftp() {
   sftpSearchVisible.value = false
   sftpUploadMenuVisible.value = false
   sftpSelected.value = []
-  if (originKey !== null && sessions.value.some(session => session.key === originKey)) {
-    activeKey.value = originKey
-    void nextTick(() => { runtimes.get(originKey)?.fitAddon.fit(); runtimes.get(originKey)?.terminal.focus() })
+  const sessionKey = originKey === null ? null : `host:${originKey}`
+  if (sessionKey !== null && sessions.value.some(session => session.key === sessionKey)) {
+    activeKey.value = sessionKey
+    void nextTick(() => { runtimes.get(sessionKey)?.fitAddon.fit(); runtimes.get(sessionKey)?.terminal.focus() })
   }
 }
 function goSftpParent() {
@@ -315,7 +335,7 @@ async function reconnectSession() {
   runtimes.delete(activeKey.value)
   await initializeSession(session)
 }
-function disposeSession(key: number) {
+function disposeSession(key: string) {
   const runtime = runtimes.get(key)
   if (runtime) clearTimeout(runtime.connectTimer)
   runtime?.resizeObserver.disconnect()
@@ -324,7 +344,7 @@ function disposeSession(key: number) {
   runtimes.delete(key)
   terminalElements.delete(key)
 }
-function closeSession(key: number) {
+function closeSession(key: string) {
   const index = sessions.value.findIndex(session => session.key === key)
   if (index < 0) return
   disposeSession(key)
@@ -360,7 +380,8 @@ onBeforeUnmount(() => {
         <el-tree ref="treeRef" class="asset-tree" :data="treeData" node-key="id" default-expand-all
           :filter-node-method="filterTree" :expand-on-click-node="true">
           <template #default="{ data }"><span class="tree-node" :class="`is-${data.type}`"
-              @dblclick.stop="data.type === 'host' && openTerminal(data.host)"><el-icon v-if="data.type === 'group'">
+              @dblclick.stop="data.type === 'host' ? openTerminal(data.host) : data.type === 'database' && openDatabaseTerminal(data.database)"><el-icon
+                v-if="data.type === 'group'">
                 <ArrowRight />
               </el-icon><el-icon v-else-if="data.type === 'host'" class="host-asset-icon" :title="data.assetType"
                 :aria-label="data.assetType">
@@ -389,14 +410,15 @@ onBeforeUnmount(() => {
             </el-icon>新建终端<span /></div>
           <button v-for="session in sessions" :key="session.key" type="button" class="session-tab"
             :class="{ active: activeKey === session.key }" @click="activateSession(session.key)"><el-icon>
-              <Monitor />
-            </el-icon><span>{{ session.host.name }}</span><i :class="{ online: session.host.status === 1 }" /><el-icon
-              class="close" @click.stop="closeSession(session.key)">
+              <component :is="session.kind === 'host' ? Platform : Coin" />
+            </el-icon><span>{{ session.label }}</span><i v-if="session.host"
+              :class="{ online: session.host.status === 1 }" /><el-icon class="close"
+              @click.stop="closeSession(session.key)">
               <Close />
             </el-icon></button>
           <div class="terminal-actions">
-            <button type="button" class="terminal-action" :disabled="activeKey === null" aria-label="SFTP文件管理"
-              title="SFTP文件管理" @click="openSftp"><el-icon>
+            <button type="button" class="terminal-action" :disabled="activeSession?.kind !== 'host'"
+              aria-label="SFTP文件管理" title="SFTP文件管理" @click="openSftp"><el-icon>
                 <Folder />
               </el-icon></button>
             <button type="button" class="terminal-action" :disabled="activeKey === null" aria-label="重新连接" title="重新连接"
@@ -412,7 +434,7 @@ onBeforeUnmount(() => {
         <div v-show="!sftpVisible" class="session-content">
           <div v-if="!sessions.length" class="terminal-empty"><el-icon>
               <Monitor />
-            </el-icon><strong>双击主机打开终端</strong><span>在左侧资产分组中选择主机</span></div>
+            </el-icon><strong>双击资产打开连接</strong><span>在左侧资产分组中选择主机或数据库</span></div>
           <div v-for="session in sessions" v-show="activeKey === session.key" :key="session.key"
             :ref="element => setTerminalElement(session.key, element)" class="terminal-body" />
         </div>
