@@ -190,7 +190,8 @@ onBeforeUnmount(stopPlayback)
           @input="load" /><el-select v-model="sessionType" placeholder="会话类型" clearable @change="load"><el-option
             label="SSH" value="ssh" /><el-option label="数据库" value="database" /></el-select></div>
       <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
-    </div><el-dialog v-model="recordingVisible" title="会话录制" width="760px" @closed="closePlayback">
+    </div><el-dialog v-model="recordingVisible" class="recording-dialog" title="会话录制" width="80%" align-center
+      @closed="closePlayback">
       <div v-if="castHeader" class="recording-player">
         <div ref="playbackElement" class="recording-terminal" />
         <div class="playback-controls">
@@ -341,13 +342,31 @@ onBeforeUnmount(stopPlayback)
 .recording-player {
   display: flex;
   flex-direction: column;
-  gap: 10px
+  max-height: calc(100vh - 96px);
+  gap: 6px
+}
+
+:deep(.recording-dialog.el-dialog) {
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+  border-radius: 8px
+}
+
+:deep(.recording-dialog .el-dialog__header) {
+  margin-right: 0;
+  padding: 4px 10px 5px
+}
+
+:deep(.recording-dialog .el-dialog__body) {
+  max-height: calc(100vh - 82px);
+  padding: 0 4px 4px;
+  overflow: auto
 }
 
 .recording-terminal {
-  height: min(52vh, 420px);
-  min-height: 220px;
-  padding: 10px;
+  height: min(62vh, 500px);
+  min-height: 200px;
+  padding: 4px;
   overflow: auto;
   border: 1px solid #30343a;
   border-radius: 6px;
