@@ -82,7 +82,7 @@ export const testDBInstanceConnection = (data: DbInstanceTestRequest) => request
 export const collectDBInstanceInfo = (id: number) => request.post<DbInstance>('/assets/db-instances/collect', { id })
 export const deleteDBInstance = (id: number) => request.post<null>('/assets/db-instances/delete', { id })
 
-export interface TerminalSession { id: number; user_id: number; host_id: number; db_instance_id: number; session_type: string; started_at: string; ended_at: string; duration_seconds: number; command_count: number }
+export interface TerminalSession { id: number; user_id: number; username: string; host_id: number; host_name: string; host_address: string; db_instance_id: number; database_name: string; database_address: string; session_type: string; started_at: string; ended_at: string; duration_seconds: number; command_count: number; recording_size: number; completed: boolean }
 export interface TerminalSessionRecording { id: number; recording: string }
 export const listTerminalSessions = (keyword = '', session_type = '') => request.post<TerminalSession[]>('/assets/terminal-sessions/list', { keyword, session_type })
 export const getTerminalSessionRecording = (id: number) => request.post<TerminalSessionRecording>('/assets/terminal-sessions/recording', { id })

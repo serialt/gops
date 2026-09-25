@@ -242,13 +242,20 @@ type TerminalSessionIDRequest struct {
 type TerminalSessionResponse struct {
 	ID              int64     `json:"id"`
 	UserID          int64     `json:"user_id"`
+	Username        string    `json:"username"`
 	HostID          int64     `json:"host_id"`
+	HostName        string    `json:"host_name"`
+	HostAddress     string    `json:"host_address"`
 	DbInstanceID    int64     `json:"db_instance_id"`
+	DatabaseName    string    `json:"database_name"`
+	DatabaseAddress string    `json:"database_address"`
 	SessionType     string    `json:"session_type"`
 	StartedAt       time.Time `json:"started_at"`
 	EndedAt         time.Time `json:"ended_at"`
 	DurationSeconds int64     `json:"duration_seconds"`
 	CommandCount    int64     `json:"command_count"`
+	RecordingSize   int       `json:"recording_size"`
+	Completed       bool      `json:"completed"`
 }
 type TerminalSessionRecordingResponse struct {
 	ID        int64  `json:"id"`

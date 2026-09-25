@@ -739,9 +739,62 @@ func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) ([]
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
+	userIDs := make([]int64, 0, len(rows))
+	hostIDs := make([]int64, 0, len(rows))
+	databaseIDs := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		userIDs = append(userIDs, row.UserID)
+		if row.HostID > 0 {
+			hostIDs = append(hostIDs, row.HostID)
+		}
+		if row.DbInstanceID > 0 {
+			databaseIDs = append(databaseIDs, row.DbInstanceID)
+		}
+	}
+	usersByID := make(map[int64]model.User)
+	hostsByID := make(map[int64]model.Host)
+	databasesByID := make(map[int64]model.DbInstance)
+	if len(userIDs) > 0 {
+		var users []model.User
+		if err := b.db.Where("id IN ?", userIDs).Find(&users).Error; err != nil {
+			return nil, err
+		}
+		for _, user := range users {
+			usersByID[user.ID] = user
+		}
+	}
+	if len(hostIDs) > 0 {
+		var hosts []model.Host
+		if err := b.db.Where("id IN ?", hostIDs).Find(&hosts).Error; err != nil {
+			return nil, err
+		}
+		for _, host := range hosts {
+			hostsByID[host.ID] = host
+		}
+	}
+	if len(databaseIDs) > 0 {
+		var databases []model.DbInstance
+		if err := b.db.Where("id IN ?", databaseIDs).Find(&databases).Error; err != nil {
+			return nil, err
+		}
+		for _, database := range databases {
+			databasesByID[database.ID] = database
+		}
+	}
 	result := make([]*api.TerminalSessionResponse, 0, len(rows))
 	for _, r := range rows {
-		result = append(result, terminalSessionResponse(r))
+		item := terminalSessionResponse(r)
+		if user, ok := usersByID[r.UserID]; ok {
+			item.Username = user.Username
+		}
+		if host, ok := hostsByID[r.HostID]; ok {
+			item.HostName, item.HostAddress = host.Name, host.IP
+		}
+		if database, ok := databasesByID[r.DbInstanceID]; ok {
+			item.DatabaseName = database.Name
+			item.DatabaseAddress = net.JoinHostPort(database.Host, fmt.Sprint(database.Port))
+		}
+		result = append(result, item)
 	}
 	return result, nil
 }
@@ -766,5 +819,5 @@ func (b *AssetBiz) DeleteTerminalSession(req *api.TerminalSessionIDRequest) erro
 	return nil
 }
 func terminalSessionResponse(r model.TerminalSession) *api.TerminalSessionResponse {
-	return &api.TerminalSessionResponse{ID: r.ID, UserID: r.UserID, HostID: r.HostID, DbInstanceID: r.DbInstanceID, SessionType: r.SessionType, StartedAt: r.StartedAt, EndedAt: r.EndedAt, DurationSeconds: r.DurationSeconds, CommandCount: r.CommandCount}
+	return &api.TerminalSessionResponse{ID: r.ID, UserID: r.UserID, HostID: r.HostID, DbInstanceID: r.DbInstanceID, SessionType: r.SessionType, StartedAt: r.StartedAt, EndedAt: r.EndedAt, DurationSeconds: r.DurationSeconds, CommandCount: r.CommandCount, RecordingSize: len(r.Recording), Completed: !r.EndedAt.IsZero()}
 }

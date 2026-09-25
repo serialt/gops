@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -26,7 +25,7 @@ type DatabaseTerminalConnection struct {
 	databaseType string
 	startedAt    time.Time
 	commands     int64
-	recording    strings.Builder
+	recording    string
 	mu           sync.Mutex
 }
 
@@ -61,9 +60,10 @@ func (b *AssetBiz) StartDatabaseTerminal(databaseID, userID int64) (*DatabaseTer
 		_ = database.Close()
 		return nil, fmt.Errorf("连接数据库失败: %w", err)
 	}
+	startedAt := time.Now()
 	return &DatabaseTerminalConnection{
 		db: database, databaseID: instance.ID, userID: userID,
-		databaseType: instance.DbType, startedAt: time.Now(),
+		databaseType: instance.DbType, startedAt: startedAt, recording: newAsciinemaRecording(startedAt, 120, 32),
 	}, nil
 }
 
@@ -119,13 +119,7 @@ func (c *DatabaseTerminalConnection) Prompt() string {
 func (c *DatabaseTerminalConnection) Record(data []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.recording.Len() < maxTerminalRecordingBytes {
-		remaining := maxTerminalRecordingBytes - c.recording.Len()
-		if len(data) > remaining {
-			data = data[:remaining]
-		}
-		_, _ = c.recording.Write(data)
-	}
+	appendAsciinemaEvent(&c.recording, c.startedAt, "o", data)
 }
 
 // CloseDatabaseTerminal closes the SQL connection and persists its audit record.
@@ -135,7 +129,7 @@ func (b *AssetBiz) CloseDatabaseTerminal(connection *DatabaseTerminalConnection)
 	}
 	_ = connection.db.Close()
 	connection.mu.Lock()
-	recording, commands := connection.recording.String(), connection.commands
+	recording, commands := connection.recording, connection.commands
 	connection.mu.Unlock()
 	now := time.Now()
 	_ = b.db.Create(&model.TerminalSession{

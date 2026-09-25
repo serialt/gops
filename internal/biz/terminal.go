@@ -31,7 +31,7 @@ type SSHConnection struct {
 	session      *ssh.Session
 	input        io.WriteCloser
 	output       io.Reader
-	recording    strings.Builder
+	recording    string
 	commandCount int64
 	mu           sync.Mutex
 }
@@ -200,7 +200,8 @@ func (b *AssetBiz) StartSSH(hostID, userID int64, cols, rows int) (*SSHConnectio
 		client.Close()
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
-	return &SSHConnection{hostID: host.ID, userID: userID, startedAt: time.Now(), client: client, session: session, input: input, output: output}, nil
+	startedAt := time.Now()
+	return &SSHConnection{hostID: host.ID, userID: userID, startedAt: startedAt, client: client, session: session, input: input, output: output, recording: newAsciinemaRecording(startedAt, cols, rows)}, nil
 }
 
 func (b *AssetBiz) dialHostSSH(hostID int64) (*model.Host, *ssh.Client, error) {
@@ -280,9 +281,7 @@ func (c *SSHConnection) Output() io.Reader { return c.output }
 func (c *SSHConnection) Write(data []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.recording.Len() < maxTerminalRecordingBytes {
-		_, _ = c.recording.Write(data)
-	}
+	appendAsciinemaEvent(&c.recording, c.startedAt, "i", data)
 	c.commandCount += int64(strings.Count(string(data), "\n"))
 	_, err := c.input.Write(data)
 	return err
@@ -291,9 +290,7 @@ func (c *SSHConnection) Write(data []byte) error {
 func (c *SSHConnection) RecordOutput(data []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.recording.Len() < maxTerminalRecordingBytes {
-		_, _ = c.recording.Write(data)
-	}
+	appendAsciinemaEvent(&c.recording, c.startedAt, "o", data)
 }
 
 func (c *SSHConnection) Resize(cols, rows int) error {
@@ -312,7 +309,7 @@ func (b *AssetBiz) CloseSSH(c *SSHConnection) {
 	_ = c.session.Close()
 	_ = c.client.Close()
 	c.mu.Lock()
-	recording, commands := c.recording.String(), c.commandCount
+	recording, commands := c.recording, c.commandCount
 	c.mu.Unlock()
 	now := time.Now()
 	_ = b.db.Create(&model.TerminalSession{UserID: c.userID, HostID: c.hostID, SessionType: "ssh", StartedAt: c.startedAt, EndedAt: now, DurationSeconds: int64(now.Sub(c.startedAt).Seconds()), CommandCount: commands, Recording: recording}).Error
