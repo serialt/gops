@@ -6,20 +6,23 @@ import (
 
 	"gops/internal/data/api"
 	"gops/internal/data/repo"
+
+	"gorm.io/gorm"
 )
 
 type DashboardBiz struct {
+	db   *gorm.DB
 	repo *repo.DashboardRepo
 }
 
-func NewDashboardBiz(dashboardRepo *repo.DashboardRepo) *DashboardBiz {
-	return &DashboardBiz{repo: dashboardRepo}
+func NewDashboardBiz(db *gorm.DB, dashboardRepo *repo.DashboardRepo) *DashboardBiz {
+	return &DashboardBiz{db: db, repo: dashboardRepo}
 }
 
 func (b *DashboardBiz) Stats(ctx context.Context) (*api.DashboardStatsResponse, error) {
 	now := time.Now()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	stats, err := b.repo.Stats(ctx, todayStart)
+	stats, err := b.repo.Stats(ctx, b.db, todayStart)
 	if err != nil {
 		return nil, err
 	}

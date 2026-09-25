@@ -69,7 +69,8 @@
 
 - 所有业务数据库读写必须封装在 `internal/data/repo/` 中；`internal/data/query/` 生成的类型安全 Query API 只能由 Repo 层直接使用，handler、biz 及其他业务代码禁止直接引用生成的 Query。
 - Repo 必须使用 GORM Gen Query API 完成查询和写入，禁止使用 `db.Where`、`db.First`、`db.Find`、`db.Raw` 等方式拼写业务查询。新增字段或 Query 能力不足时，应先完成 SQL 迁移并重新生成代码。
-- 需要事务时，由 Biz 发起业务事务编排，并将事务上下文传递给 Repo；Repo 在事务中使用对应的 GORM Gen query 对象。仅数据库初始化、Goose 迁移、GORM Gen 代码生成等基础设施代码可以直接操作底层 `*gorm.DB`。
+- Repo 方法必须显式接收 `*gorm.DB` 参数，并通过 `query.Use(db)` 创建 GORM Gen Query；Repo 结构体不得长期持有数据库连接。Biz 在普通调用时传入自身数据库连接，在事务中传入当前 `tx`，以保证同一 Repo 方法同时支持普通查询和事务查询。
+- 需要事务时，由 Biz 发起业务事务编排，并将事务 `*gorm.DB` 传递给 Repo；Repo 不得自行开启或提交业务事务。仅数据库初始化、Goose 迁移、GORM Gen 代码生成等基础设施代码可以直接操作底层 `*gorm.DB`。
 - 数据模型位于 `internal/data/model/`，使用 SQLite model 格式：包含 `TableName<模型名>` 常量、`// <模型> mapped from table <表名>` 注释，以及指针接收器的 `TableName()` 方法。
 - model 字段统一使用 `gorm:"column:<name>;..." json:"<name>"` 格式；字段业务说明通过同一行末尾注释维护。
 - 字段业务说明必须写在字段定义的同一行末尾 `//` 注释中，不单独占行，并与 PostgreSQL 表/字段注释保持一致。例如：`Name string \`gorm:"column:name;not null;comment:组织名称" json:"name"\` // 组织名称`。

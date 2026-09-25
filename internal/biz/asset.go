@@ -568,7 +568,7 @@ func (b *AssetBiz) DeleteDBInstance(req *api.DbInstanceIDRequest) error {
 }
 
 func (b *AssetBiz) CollectDBInstanceInfo(ctx context.Context, req *api.DbInstanceIDRequest) (*api.DbInstanceResponse, error) {
-	instance, credential, err := b.repo.GetDBInstanceAndCredential(ctx, req.ID)
+	instance, credential, err := b.repo.GetDBInstanceAndCredential(ctx, b.db, req.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -584,10 +584,10 @@ func (b *AssetBiz) CollectDBInstanceInfo(ctx context.Context, req *api.DbInstanc
 	defer cancel()
 	version, err := collectDatabaseVersion(collectCtx, instance, username, password)
 	if err != nil {
-		_, _ = b.repo.UpdateDBInstanceCollectedInfo(ctx, instance.ID, false, "")
+		_, _ = b.repo.UpdateDBInstanceCollectedInfo(ctx, b.db, instance.ID, false, "")
 		return nil, err
 	}
-	updated, err := b.repo.UpdateDBInstanceCollectedInfo(ctx, instance.ID, true, version)
+	updated, err := b.repo.UpdateDBInstanceCollectedInfo(ctx, b.db, instance.ID, true, version)
 	if err != nil {
 		return nil, err
 	}
@@ -595,7 +595,7 @@ func (b *AssetBiz) CollectDBInstanceInfo(ctx context.Context, req *api.DbInstanc
 }
 
 func (b *AssetBiz) TestDBInstanceConnection(ctx context.Context, req *api.DbInstanceTestRequest) (*api.DbInstanceTestResponse, error) {
-	credential, err := b.repo.GetCredential(ctx, req.CredentialID)
+	credential, err := b.repo.GetCredential(ctx, b.db, req.CredentialID)
 	if err != nil {
 		return nil, fmt.Errorf("读取数据库凭据失败: %w", err)
 	}

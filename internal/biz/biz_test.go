@@ -36,7 +36,7 @@ func init() {
 		cleanup()
 		panic(err)
 	}
-	repo := rbac.NewRbacRepo(db)
+	repo := rbac.NewRbacRepo()
 	userBiz = NewUserBiz(db, service, repo)
 
 }

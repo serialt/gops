@@ -81,7 +81,7 @@ const columnDefsWithTimestamps = computed<ColDef[]>(() => {
     timestamps.push({ field: 'created_at', headerName: '创建时间', minWidth: 150, valueFormatter: (params) => formatTimestamp(params.value) })
   }
   if (hasTimestampField('updated_at') && !fields.has('updated_at')) {
-    timestamps.push({ field: 'updated_at', headerName: '编辑时间', minWidth: 150, valueFormatter: (params) => formatTimestamp(params.value) })
+    timestamps.push({ field: 'updated_at', headerName: '更新时间', minWidth: 150, valueFormatter: (params) => formatTimestamp(params.value) })
   }
   const actionIndex = columns.findIndex((column) => column.headerName === '操作')
   columns.splice(actionIndex < 0 ? columns.length : actionIndex, 0, ...timestamps)

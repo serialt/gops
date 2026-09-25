@@ -9,17 +9,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type AssetRepo struct{ db *gorm.DB }
+type AssetRepo struct{}
 
-func NewAssetRepo(db *gorm.DB) *AssetRepo { return &AssetRepo{db: db} }
+func NewAssetRepo() *AssetRepo { return &AssetRepo{} }
 
-func (r *AssetRepo) GetCredential(ctx context.Context, id int64) (*model.Credential, error) {
-	q := query.Use(r.db)
+func (r *AssetRepo) GetCredential(ctx context.Context, db *gorm.DB, id int64) (*model.Credential, error) {
+	q := query.Use(db)
 	return q.Credential.WithContext(ctx).Where(q.Credential.ID.Eq(id)).First()
 }
 
-func (r *AssetRepo) GetDBInstanceAndCredential(ctx context.Context, id int64) (*model.DbInstance, *model.Credential, error) {
-	q := query.Use(r.db)
+func (r *AssetRepo) GetDBInstanceAndCredential(ctx context.Context, db *gorm.DB, id int64) (*model.DbInstance, *model.Credential, error) {
+	q := query.Use(db)
 	instance, err := q.DbInstance.WithContext(ctx).Where(q.DbInstance.ID.Eq(id)).First()
 	if err != nil {
 		return nil, nil, err
@@ -31,8 +31,8 @@ func (r *AssetRepo) GetDBInstanceAndCredential(ctx context.Context, id int64) (*
 	return instance, credential, nil
 }
 
-func (r *AssetRepo) UpdateDBInstanceCollectedInfo(ctx context.Context, id int64, status bool, version string) (*model.DbInstance, error) {
-	q := query.Use(r.db)
+func (r *AssetRepo) UpdateDBInstanceCollectedInfo(ctx context.Context, db *gorm.DB, id int64, status bool, version string) (*model.DbInstance, error) {
+	q := query.Use(db)
 	updates := map[string]any{"status": status}
 	if version != "" {
 		updates["version"] = version

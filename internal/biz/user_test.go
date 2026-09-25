@@ -8,7 +8,7 @@ import (
 )
 
 func TestUserList(t *testing.T) {
-	resp, err := userBiz.repo.GetUserListByCond(ctxbiz, &define.UserListCond{})
+	resp, err := userBiz.repo.GetUserListByCond(ctxbiz, userBiz.db, &define.UserListCond{})
 	if err != nil {
 		t.Errorf("Failed to get user list: %v", err)
 	}

@@ -9,16 +9,12 @@ import (
 	"gorm.io/gorm"
 )
 
-type RbacRepo struct {
-	db *gorm.DB
-}
+type RbacRepo struct{}
 
-func NewRbacRepo(db *gorm.DB) *RbacRepo {
-	return &RbacRepo{db: db}
-}
+func NewRbacRepo() *RbacRepo { return &RbacRepo{} }
 
-func (r *RbacRepo) GetUserListByCond(ctx context.Context, cond *define.UserListCond) (items []*model.User, err error) {
-	mm := query.Use(r.db).User
+func (r *RbacRepo) GetUserListByCond(ctx context.Context, db *gorm.DB, cond *define.UserListCond) (items []*model.User, err error) {
+	mm := query.Use(db).User
 
 	do := mm.WithContext(ctx)
 

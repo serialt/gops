@@ -19,12 +19,12 @@ type DashboardStats struct {
 	ActiveAlerts    int64
 }
 
-type DashboardRepo struct{ db *gorm.DB }
+type DashboardRepo struct{}
 
-func NewDashboardRepo(db *gorm.DB) *DashboardRepo { return &DashboardRepo{db: db} }
+func NewDashboardRepo() *DashboardRepo { return &DashboardRepo{} }
 
-func (r *DashboardRepo) Stats(ctx context.Context, todayStart time.Time) (*DashboardStats, error) {
-	q := query.Use(r.db)
+func (r *DashboardRepo) Stats(ctx context.Context, db *gorm.DB, todayStart time.Time) (*DashboardStats, error) {
+	q := query.Use(db)
 	result := new(DashboardStats)
 	var err error
 	if result.HostsTotal, err = q.Host.WithContext(ctx).Count(); err != nil {
