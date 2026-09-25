@@ -11,7 +11,7 @@ import { useSystemConfigStore } from '@/stores/system-config'
 
 interface TreeNode { id: string; label: string; type: 'group' | 'host'; count?: number; host?: Host; children?: TreeNode[] }
 interface Session { key: number; host: Host }
-interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver }
+interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout> }
 
 const systemConfig = useSystemConfigStore()
 const hosts = ref<Host[]>([])
@@ -104,10 +104,16 @@ async function initializeSession(session: Session) {
   const socket = new WebSocket(socketURL(session.host, terminal))
   socket.binaryType = 'arraybuffer'
   const resizeObserver = new ResizeObserver(() => { fitAddon.fit(); const runtime = runtimes.get(session.key); if (runtime) sendResize(runtime) })
-  const runtime = { terminal, fitAddon, socket, resizeObserver }
+  const connectTimer = setTimeout(() => {
+    if (socket.readyState !== WebSocket.OPEN) {
+      terminal.writeln('\r\n连接超时，请检查后端服务、代理和网络。')
+      socket.close()
+    }
+  }, 15000)
+  const runtime = { terminal, fitAddon, socket, resizeObserver, connectTimer }
   runtimes.set(session.key, runtime)
   terminal.onData(data => socket.readyState === WebSocket.OPEN && socket.send(data))
-  socket.onopen = () => { fitAddon.fit(); sendResize(runtime); terminal.focus() }
+  socket.onopen = () => { clearTimeout(connectTimer); fitAddon.fit(); sendResize(runtime); terminal.focus() }
   socket.onmessage = event => terminal.write(event.data instanceof ArrayBuffer ? new Uint8Array(event.data) : String(event.data))
   socket.onerror = () => terminal.writeln('\r\n连接失败，请检查主机、凭证和网络。')
   socket.onclose = () => terminal.writeln('\r\n连接已关闭。')
@@ -128,6 +134,7 @@ function activateSession(key: number) {
 }
 function disposeSession(key: number) {
   const runtime = runtimes.get(key)
+  if (runtime) clearTimeout(runtime.connectTimer)
   runtime?.resizeObserver.disconnect()
   runtime?.socket.close()
   runtime?.terminal.dispose()
@@ -265,7 +272,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   color: #c8cbd1;
-  background: #252628
+  background: #252628;
+  border-radius: 8px
 }
 
 .asset-title {
@@ -435,7 +443,8 @@ onBeforeUnmount(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #1d1e20
+  background: #1d1e20;
+  border-radius: 8px
 }
 
 .session-tabs {
@@ -459,7 +468,7 @@ onBeforeUnmount(() => {
   gap: 7px;
   border: 0;
   border-right: 1px solid #3c3d41;
-  border-radius: 5px 5px 0 0;
+  border-radius: 6px;
   color: #bfc2c8;
   background: #292a2d;
   cursor: pointer;
