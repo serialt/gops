@@ -37,11 +37,12 @@ const systemMenus = computed(() => [
   { path: '/system-config', title: '系统配置', icon: Setting, permission: 'POST /api/v1/system-config/get' },
 ].filter((item) => auth.hasPermission(item.permission)))
 const assetMenus = computed(() => [
-  { path: '/assets/groups', title: '资产分组', icon: FolderOpened, permission: 'POST /api/v1/assets/groups/list' },
-  { path: '/assets/credentials', title: '凭证管理', icon: Key, permission: 'POST /api/v1/assets/credentials/list' },
-  { path: '/assets/cloud-accounts', title: '云账号', icon: OfficeBuilding, permission: 'POST /api/v1/assets/cloud-accounts/list' },
   { path: '/assets/hosts', title: '主机管理', icon: OfficeBuilding, permission: 'POST /api/v1/assets/hosts/list' },
   { path: '/assets/db-instances', title: '数据库管理', icon: OfficeBuilding, permission: 'POST /api/v1/assets/db-instances/list' },
+  { path: '/assets/credentials', title: '凭证管理', icon: Key, permission: 'POST /api/v1/assets/credentials/list' },
+  { path: '/assets/groups', title: '资产分组', icon: FolderOpened, permission: 'POST /api/v1/assets/groups/list' },
+
+  { path: '/assets/cloud-accounts', title: '云账号', icon: OfficeBuilding, permission: 'POST /api/v1/assets/cloud-accounts/list' },
   { path: '/assets/terminal-audit', title: '终端审计', icon: OfficeBuilding, permission: 'POST /api/v1/assets/terminal-sessions/list' },
 ].filter((item) => auth.hasPermission(item.permission)))
 const monitorMenus = computed(() => [
@@ -128,7 +129,7 @@ async function clearTabs() {
 }
 
 function refreshCurrentPage() {
-	pageRefreshKey.value += 1
+  pageRefreshKey.value += 1
 }
 
 function handleTabDragStart(event: DragEvent, path: string) {
@@ -170,104 +171,104 @@ async function openProfile() {
   profileForm.current_password = ''
   profileForm.new_password = ''
   profileForm.confirm_password = ''
-	profileVisible.value = true
-	totpSetup.value = null
-	const { data } = await getMFAStatus()
-	mfaStatus.value = data.data
+  profileVisible.value = true
+  totpSetup.value = null
+  const { data } = await getMFAStatus()
+  mfaStatus.value = data.data
 }
 
 async function startTOTPSetup() {
-	const { data } = await setupTOTP()
-	totpSetup.value = data.data
+  const { data } = await setupTOTP()
+  totpSetup.value = data.data
 }
 
 async function enableTOTP() {
-	const { value } = await ElMessageBox.prompt('请输入身份验证器当前显示的 6 位动态码', '启用 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字' })
-	await confirmTOTP(value)
-	totpSetup.value = null
-	mfaStatus.value.totp_configured = true
-	mfaStatus.value.totp_enabled = true
-	ElMessage.success('TOTP 已启用')
+  const { value } = await ElMessageBox.prompt('请输入身份验证器当前显示的 6 位动态码', '启用 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字' })
+  await confirmTOTP(value)
+  totpSetup.value = null
+  mfaStatus.value.totp_configured = true
+  mfaStatus.value.totp_enabled = true
+  ElMessage.success('TOTP 已启用')
 }
 
 async function turnOffTOTP() {
-	const { value } = await ElMessageBox.prompt('请输入当前 TOTP 动态码', '停用 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字' })
-	await disableTOTP(value)
-	mfaStatus.value.totp_enabled = false
-	ElMessage.success('TOTP 已停用')
+  const { value } = await ElMessageBox.prompt('请输入当前 TOTP 动态码', '停用 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字' })
+  await disableTOTP(value)
+  mfaStatus.value.totp_enabled = false
+  ElMessage.success('TOTP 已停用')
 }
 
 async function turnOnTOTP() {
-	const { value } = await ElMessageBox.prompt('请输入当前 TOTP 动态码', '启用 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字' })
-	await enableTOTPApi(value)
-	mfaStatus.value.totp_enabled = true
-	ElMessage.success('TOTP 已启用')
+  const { value } = await ElMessageBox.prompt('请输入当前 TOTP 动态码', '启用 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字' })
+  await enableTOTPApi(value)
+  mfaStatus.value.totp_enabled = true
+  ElMessage.success('TOTP 已启用')
 }
 
 async function removeTOTP() {
-	const { value } = await ElMessageBox.prompt('删除后需要重新绑定。请输入当前 TOTP 动态码确认', '删除 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字', confirmButtonText: '删除', type: 'warning' })
-	await deleteTOTP(value)
-	totpSetup.value = null
-	mfaStatus.value.totp_configured = false
-	mfaStatus.value.totp_enabled = false
-	ElMessage.success('TOTP 已删除')
+  const { value } = await ElMessageBox.prompt('删除后需要重新绑定。请输入当前 TOTP 动态码确认', '删除 TOTP', { inputPattern: /^\d{6}$/, inputErrorMessage: '请输入 6 位数字', confirmButtonText: '删除', type: 'warning' })
+  await deleteTOTP(value)
+  totpSetup.value = null
+  mfaStatus.value.totp_configured = false
+  mfaStatus.value.totp_enabled = false
+  ElMessage.success('TOTP 已删除')
 }
 
 async function addPasskey() {
-	if (!window.PublicKeyCredential) return ElMessage.warning('当前浏览器不支持 Passkey')
-	const { value: name } = await ElMessageBox.prompt('例如：MacBook Touch ID', '添加 Passkey', { inputValidator: value => Boolean(value.trim()) || '请输入名称' })
-	mfaBusy.value = true
-	try {
-		const { data } = await beginPasskeyRegistration(name.trim())
-		const credential = await navigator.credentials.create(creationOptions(data.data.options)) as PublicKeyCredential | null
-		if (!credential) return
-		await finishPasskeyRegistration({ registration_token: data.data.registration_token, name: name.trim(), credential: credentialJSON(credential) })
-		const status = await getMFAStatus()
-		mfaStatus.value = status.data.data
-		ElMessage.success('Passkey 已添加')
-	} finally { mfaBusy.value = false }
+  if (!window.PublicKeyCredential) return ElMessage.warning('当前浏览器不支持 Passkey')
+  const { value: name } = await ElMessageBox.prompt('例如：MacBook Touch ID', '添加 Passkey', { inputValidator: value => Boolean(value.trim()) || '请输入名称' })
+  mfaBusy.value = true
+  try {
+    const { data } = await beginPasskeyRegistration(name.trim())
+    const credential = await navigator.credentials.create(creationOptions(data.data.options)) as PublicKeyCredential | null
+    if (!credential) return
+    await finishPasskeyRegistration({ registration_token: data.data.registration_token, name: name.trim(), credential: credentialJSON(credential) })
+    const status = await getMFAStatus()
+    mfaStatus.value = status.data.data
+    ElMessage.success('Passkey 已添加')
+  } finally { mfaBusy.value = false }
 }
 
-async function removePasskey(id:number) {
-	await ElMessageBox.confirm('确定删除这个 Passkey 吗？', '删除 Passkey', { type: 'warning' })
-	await deletePasskey(id)
-	mfaStatus.value.passkeys = mfaStatus.value.passkeys.filter(item => item.id !== id)
+async function removePasskey(id: number) {
+  await ElMessageBox.confirm('确定删除这个 Passkey 吗？', '删除 Passkey', { type: 'warning' })
+  await deletePasskey(id)
+  mfaStatus.value.passkeys = mfaStatus.value.passkeys.filter(item => item.id !== id)
 }
 
 async function editPasskeyName(item: MFAPasskey) {
-	const { value } = await ElMessageBox.prompt('请输入新的 Passkey 名称', '重命名 Passkey', {
-		inputValue: item.name,
-		inputValidator: value => {
-			const name = value.trim()
-			if (!name) return '请输入名称'
-			if ([...name].length > 64) return '名称不能超过 64 个字符'
-			return true
-		},
-	})
-	const name = value.trim()
-	await renamePasskey(item.id, name)
-	item.name = name
-	ElMessage.success('Passkey 名称已更新')
+  const { value } = await ElMessageBox.prompt('请输入新的 Passkey 名称', '重命名 Passkey', {
+    inputValue: item.name,
+    inputValidator: value => {
+      const name = value.trim()
+      if (!name) return '请输入名称'
+      if ([...name].length > 64) return '名称不能超过 64 个字符'
+      return true
+    },
+  })
+  const name = value.trim()
+  await renamePasskey(item.id, name)
+  item.name = name
+  ElMessage.success('Passkey 名称已更新')
 }
 
 async function togglePasskey(item: MFAPasskey, field: 'mfa_enabled' | 'direct_login_enabled') {
-	try {
-		await updatePasskeyStatus({ id: item.id, mfa_enabled: item.mfa_enabled, direct_login_enabled: item.direct_login_enabled })
-		ElMessage.success(item[field] ? '已启用' : '已停用')
-	} catch (error) {
-		item[field] = !item[field]
-		throw error
-	}
+  try {
+    await updatePasskeyStatus({ id: item.id, mfa_enabled: item.mfa_enabled, direct_login_enabled: item.direct_login_enabled })
+    ElMessage.success(item[field] ? '已启用' : '已停用')
+  } catch (error) {
+    item[field] = !item[field]
+    throw error
+  }
 }
 
 async function toggleEmailMFA(field: 'email_mfa_enabled' | 'email_direct_login_enabled') {
-	try {
-		await updateEmailMFAStatus({ mfa_enabled: mfaStatus.value.email_mfa_enabled, direct_login_enabled: mfaStatus.value.email_direct_login_enabled })
-		ElMessage.success(mfaStatus.value[field] ? '已启用' : '已停用')
-	} catch (error) {
-		mfaStatus.value[field] = !mfaStatus.value[field]
-		throw error
-	}
+  try {
+    await updateEmailMFAStatus({ mfa_enabled: mfaStatus.value.email_mfa_enabled, direct_login_enabled: mfaStatus.value.email_direct_login_enabled })
+    ElMessage.success(mfaStatus.value[field] ? '已启用' : '已停用')
+  } catch (error) {
+    mfaStatus.value[field] = !mfaStatus.value[field]
+    throw error
+  }
 }
 
 async function saveProfile() {
@@ -577,13 +578,15 @@ function toggleCollapse() {
         <div class="profile-section-heading"><strong>修改密码</strong><span>不修改密码时保持为空</span></div>
         <div class="profile-field-grid">
           <el-form-item label="当前密码">
-            <el-input v-model="profileForm.current_password" type="password" show-password autocomplete="current-password" />
+            <el-input v-model="profileForm.current_password" type="password" show-password
+              autocomplete="current-password" />
           </el-form-item>
           <el-form-item label="新密码">
             <el-input v-model="profileForm.new_password" type="password" show-password autocomplete="new-password" />
           </el-form-item>
           <el-form-item label="确认密码">
-            <el-input v-model="profileForm.confirm_password" type="password" show-password autocomplete="new-password" />
+            <el-input v-model="profileForm.confirm_password" type="password" show-password
+              autocomplete="new-password" />
           </el-form-item>
         </div>
       </section>
@@ -593,28 +596,36 @@ function toggleCollapse() {
         <el-tabs tab-position="left" class="mfa-tabs">
           <el-tab-pane name="email">
             <template #label>
-              <span class="mfa-tab-label"><strong>邮箱验证码</strong><small><i :class="{ enabled: mfaStatus.email_mfa_enabled || mfaStatus.email_direct_login_enabled }" />{{ mfaStatus.email_available ? '可用' : '不可用' }}</small></span>
+              <span class="mfa-tab-label"><strong>邮箱验证码</strong><small><i
+                    :class="{ enabled: mfaStatus.email_mfa_enabled || mfaStatus.email_direct_login_enabled }" />{{
+                      mfaStatus.email_available ? '可用' : '不可用' }}</small></span>
             </template>
             <div class="mfa-pane">
               <div class="mfa-setting-row">
                 <div><strong>邮箱验证码</strong><small>{{ mfaStatus.email || '当前用户未配置邮箱' }}</small></div>
               </div>
               <div v-if="mfaStatus.email_available" class="email-mfa-options">
-                <label><span><strong>二次验证</strong><small>密码验证后发送邮箱验证码</small></span><el-switch v-model="mfaStatus.email_mfa_enabled" @change="toggleEmailMFA('email_mfa_enabled')" /></label>
-                <label><span><strong>验证码直接登录</strong><small>无需密码，通过邮箱验证码登录</small></span><el-switch v-model="mfaStatus.email_direct_login_enabled" @change="toggleEmailMFA('email_direct_login_enabled')" /></label>
+                <label><span><strong>二次验证</strong><small>密码验证后发送邮箱验证码</small></span><el-switch
+                    v-model="mfaStatus.email_mfa_enabled" @change="toggleEmailMFA('email_mfa_enabled')" /></label>
+                <label><span><strong>验证码直接登录</strong><small>无需密码，通过邮箱验证码登录</small></span><el-switch
+                    v-model="mfaStatus.email_direct_login_enabled"
+                    @change="toggleEmailMFA('email_direct_login_enabled')" /></label>
               </div>
               <div v-else class="mfa-unavailable">请先配置用户邮箱，并在系统配置的验证配置中开启邮件验证码。</div>
             </div>
           </el-tab-pane>
           <el-tab-pane name="totp">
             <template #label>
-              <span class="mfa-tab-label"><strong>TOTP 动态码</strong><small><i :class="{ enabled: mfaStatus.totp_enabled }" />{{ mfaStatus.totp_enabled ? '已启用' : mfaStatus.totp_configured ? '已停用' : '未配置' }}</small></span>
+              <span class="mfa-tab-label"><strong>TOTP 动态码</strong><small><i
+                    :class="{ enabled: mfaStatus.totp_enabled }" />{{ mfaStatus.totp_enabled ? '已启用' :
+                      mfaStatus.totp_configured ? '已停用' : '未配置' }}</small></span>
             </template>
             <div class="mfa-pane">
               <div class="mfa-setting-row">
                 <div><strong>TOTP 动态码</strong><small>使用身份验证器生成动态验证码</small></div>
                 <span class="totp-actions">
-                  <el-button v-if="!mfaStatus.totp_configured" type="primary" plain @click="startTOTPSetup">新增</el-button>
+                  <el-button v-if="!mfaStatus.totp_configured" type="primary" plain
+                    @click="startTOTPSetup">新增</el-button>
                   <el-button v-else-if="mfaStatus.totp_enabled" type="warning" plain @click="turnOffTOTP">停用</el-button>
                   <el-button v-else type="primary" plain @click="turnOnTOTP">启用</el-button>
                   <el-button v-if="mfaStatus.totp_configured" type="danger" text @click="removeTOTP">删除</el-button>
@@ -630,7 +641,9 @@ function toggleCollapse() {
           </el-tab-pane>
           <el-tab-pane name="passkey">
             <template #label>
-              <span class="mfa-tab-label"><strong>Passkey</strong><small><i :class="{ enabled: mfaStatus.passkeys.some(item => item.mfa_enabled || item.direct_login_enabled) }" />已配置 {{ mfaStatus.passkeys.length }} 个</small></span>
+              <span class="mfa-tab-label"><strong>Passkey</strong><small><i
+                    :class="{ enabled: mfaStatus.passkeys.some(item => item.mfa_enabled || item.direct_login_enabled) }" />已配置
+                  {{ mfaStatus.passkeys.length }} 个</small></span>
             </template>
             <div class="mfa-pane">
               <div class="mfa-setting-row">
@@ -638,10 +651,13 @@ function toggleCollapse() {
                 <el-button type="primary" plain :loading="mfaBusy" @click="addPasskey">添加</el-button>
               </div>
               <div v-for="item in mfaStatus.passkeys" :key="item.id" class="passkey-item">
-                <span class="passkey-name"><strong>{{ item.name }}</strong><small>{{ item.mfa_enabled || item.direct_login_enabled ? '已启用' : '已停用' }}</small></span>
+                <span class="passkey-name"><strong>{{ item.name }}</strong><small>{{ item.mfa_enabled ||
+                  item.direct_login_enabled ? '已启用' : '已停用' }}</small></span>
                 <span class="passkey-actions">
-                  <label class="passkey-option">二次验证<el-switch v-model="item.mfa_enabled" size="small" @change="togglePasskey(item, 'mfa_enabled')" /></label>
-                  <label class="passkey-option">直接登录<el-switch v-model="item.direct_login_enabled" size="small" @change="togglePasskey(item, 'direct_login_enabled')" /></label>
+                  <label class="passkey-option">二次验证<el-switch v-model="item.mfa_enabled" size="small"
+                      @change="togglePasskey(item, 'mfa_enabled')" /></label>
+                  <label class="passkey-option">直接登录<el-switch v-model="item.direct_login_enabled" size="small"
+                      @change="togglePasskey(item, 'direct_login_enabled')" /></label>
                   <el-button type="primary" @click="editPasskeyName(item)">重命名</el-button>
                   <el-button type="danger" text @click="removePasskey(item.id)">删除</el-button>
                 </span>
@@ -1189,140 +1205,345 @@ function toggleCollapse() {
 }
 
 .profile-form {
-	display: grid;
-	gap: 14px;
-	padding: 2px 2px 0;
+  display: grid;
+  gap: 14px;
+  padding: 2px 2px 0;
 }
 
 .profile-form :deep(.el-form-item) {
-	margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .profile-form :deep(.el-form-item__label) {
-	margin-bottom: 5px;
-	font-size: 11px;
-	line-height: 1.2;
+  margin-bottom: 5px;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .profile-section {
-	padding: 14px;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	background: #fff;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
 }
 
 .profile-section-heading {
-	display: flex;
-	align-items: baseline;
-	flex-wrap: wrap;
-	gap: 9px;
-	margin-bottom: 13px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 13px;
 }
 
-.profile-section-heading strong { color: var(--text); font-size: 13px; }
-.profile-section-heading span { color: var(--text-soft); font-size: 10px; }
+.profile-section-heading strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.profile-section-heading span {
+  color: var(--text-soft);
+  font-size: 10px;
+}
 
 .profile-field-grid {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 12px 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 14px;
 }
 
-:deep(.profile-dialog) { max-width: calc(100vw - 24px); }
+:deep(.profile-dialog) {
+  max-width: calc(100vw - 24px);
+}
 
 .mfa-tabs {
-	min-width: 0;
+  min-width: 0;
 }
 
-.mfa-tabs :deep(.el-tabs__header) { width: 148px; margin-right: 14px; }
-.mfa-tabs :deep(.el-tabs__nav-wrap) { padding: 4px; border-radius: 9px; background: var(--bg); }
-.mfa-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
-.mfa-tabs :deep(.el-tabs__item) {
-	display: flex;
-	justify-content: flex-start;
-	height: 54px;
-	margin: 2px 0;
-	padding: 0 12px !important;
-	border-radius: 7px;
-	text-align: left;
+.mfa-tabs :deep(.el-tabs__header) {
+  width: 148px;
+  margin-right: 14px;
 }
-.mfa-tabs :deep(.el-tabs__item.is-active) { background: var(--primary-soft); }
-.mfa-tabs :deep(.el-tabs__active-bar) { right: auto; left: 0; width: 2px; border-radius: 2px; }
-.mfa-tabs :deep(.el-tabs__content) { min-height: 124px; }
+
+.mfa-tabs :deep(.el-tabs__nav-wrap) {
+  padding: 4px;
+  border-radius: 9px;
+  background: var(--bg);
+}
+
+.mfa-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.mfa-tabs :deep(.el-tabs__item) {
+  display: flex;
+  justify-content: flex-start;
+  height: 54px;
+  margin: 2px 0;
+  padding: 0 12px !important;
+  border-radius: 7px;
+  text-align: left;
+}
+
+.mfa-tabs :deep(.el-tabs__item.is-active) {
+  background: var(--primary-soft);
+}
+
+.mfa-tabs :deep(.el-tabs__active-bar) {
+  right: auto;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+}
+
+.mfa-tabs :deep(.el-tabs__content) {
+  min-height: 124px;
+}
 
 .mfa-tab-label {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	justify-content: center;
-	line-height: 1.25;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1.25;
 }
 
-.mfa-tab-label strong { color: inherit; font-size: 11px; }
-.mfa-tab-label small { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: var(--text-soft); font-size: 9px; }
-.mfa-tab-label small i { width: 5px; height: 5px; border-radius: 50%; background: var(--text-soft); }
-.mfa-tab-label small i.enabled { background: var(--success); }
+.mfa-tab-label strong {
+  color: inherit;
+  font-size: 11px;
+}
+
+.mfa-tab-label small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 9px;
+}
+
+.mfa-tab-label small i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-soft);
+}
+
+.mfa-tab-label small i.enabled {
+  background: var(--success);
+}
 
 .mfa-pane {
-	min-width: 0;
-	padding: 12px;
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: var(--bg);
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
 }
 
 .mfa-setting-row,
 .passkey-item {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
 }
 
-.mfa-setting-row strong { display: block; font-size: 12px; }
-.mfa-setting-row small { display: block; margin-top: 2px; color: var(--text-soft); font-size: 10px; }
-.totp-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
-.totp-actions :deep(.el-button) { margin: 0; }
-.mfa-setting-row :deep(.el-button--primary.is-plain) {
-	border-color: var(--primary) !important;
-	background: #fff !important;
-	color: var(--primary) !important;
-	box-shadow: 0 2px 6px rgba(83, 111, 232, 0.12);
+.mfa-setting-row strong {
+  display: block;
+  font-size: 12px;
 }
+
+.mfa-setting-row small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-soft);
+  font-size: 10px;
+}
+
+.totp-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.totp-actions :deep(.el-button) {
+  margin: 0;
+}
+
+.mfa-setting-row :deep(.el-button--primary.is-plain) {
+  border-color: var(--primary) !important;
+  background: #fff !important;
+  color: var(--primary) !important;
+  box-shadow: 0 2px 6px rgba(83, 111, 232, 0.12);
+}
+
 .mfa-setting-row :deep(.el-button--primary.is-plain:hover),
 .mfa-setting-row :deep(.el-button--primary.is-plain:focus) {
-	border-color: var(--primary) !important;
-	background: var(--primary-soft) !important;
-	color: var(--primary-strong) !important;
-	transform: none;
+  border-color: var(--primary) !important;
+  background: var(--primary-soft) !important;
+  color: var(--primary-strong) !important;
+  transform: none;
 }
-.totp-setup { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-.totp-setup p { margin: 0 0 8px; color: var(--text-soft); font-size: 10px; text-align: center; }
-.totp-qrcode { display: block; width: 150px; height: 150px; margin: 0 auto 9px; border: 5px solid #fff; border-radius: 8px; }
-.totp-secret { margin-bottom: 9px; text-align: center; }
-.totp-secret span { display: block; margin-bottom: 3px; color: var(--text-soft); font-size: 9px; }
-.totp-secret code { display: block; overflow-wrap: anywhere; color: var(--primary); font-size: 11px; user-select: all; }
-.totp-setup > :deep(.el-button) { display: block; margin: 0 auto; }
-.passkey-item { margin-top: 8px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 11px; }
-.passkey-name { display: flex; min-width: 0; flex-direction: column; }
-.passkey-name strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.passkey-name small { margin-top: 2px; color: var(--text-soft); font-size: 9px; }
-.passkey-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
-.passkey-actions :deep(.el-button) { margin: 0; }
-.passkey-option { display: inline-flex; align-items: center; gap: 5px; color: var(--text-soft); font-size: 9px; white-space: nowrap; }
-.mfa-empty { padding: 24px 0 12px; color: var(--text-soft); font-size: 10px; text-align: center; }
-.email-mfa-options { display: grid; gap: 8px; margin-top: 10px; }
-.email-mfa-options > label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
-.email-mfa-options span { display: flex; min-width: 0; flex-direction: column; }
-.email-mfa-options strong { font-size: 10px; }
-.email-mfa-options small { margin-top: 2px; color: var(--text-soft); font-size: 9px; }
-.mfa-unavailable { margin-top: 10px; padding: 10px; border-radius: 7px; color: var(--text-soft); background: #fff8e8; font-size: 10px; }
+
+.totp-setup {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.totp-setup p {
+  margin: 0 0 8px;
+  color: var(--text-soft);
+  font-size: 10px;
+  text-align: center;
+}
+
+.totp-qrcode {
+  display: block;
+  width: 150px;
+  height: 150px;
+  margin: 0 auto 9px;
+  border: 5px solid #fff;
+  border-radius: 8px;
+}
+
+.totp-secret {
+  margin-bottom: 9px;
+  text-align: center;
+}
+
+.totp-secret span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-soft);
+  font-size: 9px;
+}
+
+.totp-secret code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--primary);
+  font-size: 11px;
+  user-select: all;
+}
+
+.totp-setup> :deep(.el-button) {
+  display: block;
+  margin: 0 auto;
+}
+
+.passkey-item {
+  margin-top: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+}
+
+.passkey-name {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.passkey-name strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.passkey-name small {
+  margin-top: 2px;
+  color: var(--text-soft);
+  font-size: 9px;
+}
+
+.passkey-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.passkey-actions :deep(.el-button) {
+  margin: 0;
+}
+
+.passkey-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-soft);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.mfa-empty {
+  padding: 24px 0 12px;
+  color: var(--text-soft);
+  font-size: 10px;
+  text-align: center;
+}
+
+.email-mfa-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.email-mfa-options>label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.email-mfa-options span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.email-mfa-options strong {
+  font-size: 10px;
+}
+
+.email-mfa-options small {
+  margin-top: 2px;
+  color: var(--text-soft);
+  font-size: 9px;
+}
+
+.mfa-unavailable {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 7px;
+  color: var(--text-soft);
+  background: #fff8e8;
+  font-size: 10px;
+}
 
 @media (max-width: 768px) {
-	.profile-field-grid { grid-template-columns: minmax(0, 1fr); }
-	.mfa-tabs :deep(.el-tabs__header) { width: 110px; margin-right: 8px; }
-	.mfa-tabs :deep(.el-tabs__item) { padding: 0 8px !important; }
+  .profile-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mfa-tabs :deep(.el-tabs__header) {
+    width: 110px;
+    margin-right: 8px;
+  }
+
+  .mfa-tabs :deep(.el-tabs__item) {
+    padding: 0 8px !important;
+  }
 
   .header {
     padding: 0 12px !important;
