@@ -19,8 +19,6 @@ type DbInstance struct {
 	DbType       string         `gorm:"column:db_type;not null" json:"db_type"`
 	Host         string         `gorm:"column:host;not null" json:"host"`
 	Port         int64          `gorm:"column:port;not null" json:"port"`
-	Username     string         `gorm:"column:username;not null;default:''" json:"username"`
-	Password     string         `gorm:"column:password;not null;default:''" json:"password"`
 	Version      string         `gorm:"column:version;not null;default:''" json:"version"`
 	CredentialID int64          `gorm:"column:credential_id" json:"credential_id"`
 	Tags         string         `gorm:"column:tags;not null;default:''" json:"tags"`

@@ -54,9 +54,9 @@ export const updateHost = (data:Required<Pick<HostRequest,'id'>>&HostRequest) =>
 export const collectHostInfo = (id:number) => request.post<Host>('/assets/hosts/collect',{id})
 export const deleteHost = (id:number) => request.post<null>('/assets/hosts/delete',{id})
 
-export interface DbInstance { id:number; group_id:number; name:string; db_type:string; host:string; port:number; username:string; version:string; credential_id:number; tags:string; description:string; status:boolean; created_at:string; updated_at:string }
+export interface DbInstance { id:number; group_id:number; name:string; db_type:string; host:string; port:number; version:string; credential_id:number; tags:string; description:string; status:boolean; created_at:string; updated_at:string }
 export interface DatabaseTypeOption { value: string; label: string; default_port: number }
-export interface DbInstanceRequest { id?:number; group_id:number; name:string; db_type:string; host:string; port:number; username:string; password:string; version:string; credential_id:number; tags:string; description:string; status:boolean }
+export interface DbInstanceRequest { id?:number; group_id:number; name:string; db_type:string; host:string; port:number; version:string; credential_id:number; tags:string; description:string; status:boolean }
 export const listDBInstances = (keyword='', group_id=0) => request.post<DbInstance[]>('/assets/db-instances/list',{keyword,group_id})
 export const getDatabaseTypeOptions = () => request.post<DatabaseTypeOption[]>('/assets/db-instances/options', {})
 export const createDBInstance = (data:DbInstanceRequest) => request.post<DbInstance>('/assets/db-instances/create',data)

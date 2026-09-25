@@ -162,8 +162,6 @@ type DbInstanceRequest struct {
 	DbType       string `json:"db_type" binding:"required"`
 	Host         string `json:"host" binding:"required"`
 	Port         int64  `json:"port" binding:"min=1,max=65535"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
 	Version      string `json:"version"`
 	CredentialID int64  `json:"credential_id"`
 	Tags         string `json:"tags"`
@@ -180,7 +178,6 @@ type DbInstanceResponse struct {
 	DbType       string    `json:"db_type"`
 	Host         string    `json:"host"`
 	Port         int64     `json:"port"`
-	Username     string    `json:"username"`
 	Version      string    `json:"version"`
 	CredentialID int64     `json:"credential_id"`
 	Tags         string    `json:"tags"`

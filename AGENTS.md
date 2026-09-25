@@ -53,7 +53,7 @@
 ## 后端分层规范
 
 - `internal/handler/` 只负责 Gin 请求绑定、读取 middleware 上下文、调用 `internal/biz/` 和将结果转换为 HTTP 响应；禁止在 handler 中直接访问数据库、Casbin、密码或 JWT 业务逻辑。
-- 每个业务域由 `internal/biz/` 提供对应的 Biz 类型和方法，数据库查询、事务、业务校验、model 转换及外部服务调用均放在 Biz 中。
+- 每个业务域由 `internal/biz/` 提供对应的 Biz 类型和方法；Biz 负责编排事务边界、业务校验、model 转换及外部服务调用，数据库读写通过 `internal/data/repo/` 提供的 Repo 完成，禁止 Biz 直接访问数据库或生成的 Query。
 - 请求和响应 DTO 统一定义在 `internal/data/api/`，按业务域拆分文件；handler 和 biz 共同使用这些 DTO，禁止在接口响应中直接返回 `internal/data/model/` 生成模型。
 - API 请求 DTO 在 handler 中使用 `new(api.XxxRequest)` 创建并以指针传递，Biz 方法接收请求 DTO 指针；API 响应 DTO 和列表元素使用指针返回，嵌套响应对象同样使用指针。
 - API 响应结构必须显式定义需要公开的字段，敏感字段（例如密码哈希）不得通过 model 序列化暴露；关联对象也必须使用 API DTO。
@@ -67,6 +67,9 @@
 
 ## 数据模型与查询代码
 
+- 所有业务数据库读写必须封装在 `internal/data/repo/` 中；`internal/data/query/` 生成的类型安全 Query API 只能由 Repo 层直接使用，handler、biz 及其他业务代码禁止直接引用生成的 Query。
+- Repo 必须使用 GORM Gen Query API 完成查询和写入，禁止使用 `db.Where`、`db.First`、`db.Find`、`db.Raw` 等方式拼写业务查询。新增字段或 Query 能力不足时，应先完成 SQL 迁移并重新生成代码。
+- 需要事务时，由 Biz 发起业务事务编排，并将事务上下文传递给 Repo；Repo 在事务中使用对应的 GORM Gen query 对象。仅数据库初始化、Goose 迁移、GORM Gen 代码生成等基础设施代码可以直接操作底层 `*gorm.DB`。
 - 数据模型位于 `internal/data/model/`，使用 SQLite model 格式：包含 `TableName<模型名>` 常量、`// <模型> mapped from table <表名>` 注释，以及指针接收器的 `TableName()` 方法。
 - model 字段统一使用 `gorm:"column:<name>;..." json:"<name>"` 格式；字段业务说明通过同一行末尾注释维护。
 - 字段业务说明必须写在字段定义的同一行末尾 `//` 注释中，不单独占行，并与 PostgreSQL 表/字段注释保持一致。例如：`Name string \`gorm:"column:name;not null;comment:组织名称" json:"name"\` // 组织名称`。

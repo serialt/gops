@@ -32,8 +32,6 @@ func newDbInstance(db *gorm.DB, opts ...gen.DOOption) dbInstance {
 	_dbInstance.DbType = field.NewString(tableName, "db_type")
 	_dbInstance.Host = field.NewString(tableName, "host")
 	_dbInstance.Port = field.NewInt64(tableName, "port")
-	_dbInstance.Username = field.NewString(tableName, "username")
-	_dbInstance.Password = field.NewString(tableName, "password")
 	_dbInstance.Version = field.NewString(tableName, "version")
 	_dbInstance.CredentialID = field.NewInt64(tableName, "credential_id")
 	_dbInstance.Tags = field.NewString(tableName, "tags")
@@ -58,8 +56,6 @@ type dbInstance struct {
 	DbType       field.String
 	Host         field.String
 	Port         field.Int64
-	Username     field.String
-	Password     field.String
 	Version      field.String
 	CredentialID field.Int64
 	Tags         field.String
@@ -90,8 +86,6 @@ func (d *dbInstance) updateTableName(table string) *dbInstance {
 	d.DbType = field.NewString(table, "db_type")
 	d.Host = field.NewString(table, "host")
 	d.Port = field.NewInt64(table, "port")
-	d.Username = field.NewString(table, "username")
-	d.Password = field.NewString(table, "password")
 	d.Version = field.NewString(table, "version")
 	d.CredentialID = field.NewInt64(table, "credential_id")
 	d.Tags = field.NewString(table, "tags")
@@ -127,14 +121,12 @@ func (d *dbInstance) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (d *dbInstance) fillFieldMap() {
-	d.fieldMap = make(map[string]field.Expr, 16)
+	d.fieldMap = make(map[string]field.Expr, 14)
 	d.fieldMap["id"] = d.ID
 	d.fieldMap["name"] = d.Name
 	d.fieldMap["db_type"] = d.DbType
 	d.fieldMap["host"] = d.Host
 	d.fieldMap["port"] = d.Port
-	d.fieldMap["username"] = d.Username
-	d.fieldMap["password"] = d.Password
 	d.fieldMap["version"] = d.Version
 	d.fieldMap["credential_id"] = d.CredentialID
 	d.fieldMap["tags"] = d.Tags

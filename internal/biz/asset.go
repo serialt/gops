@@ -539,9 +539,6 @@ func (b *AssetBiz) UpdateDBInstance(req *api.DbInstanceRequest) (*api.DbInstance
 	}
 	updated.ID = row.ID
 	updated.CreatedAt = row.CreatedAt
-	if req.Password == "" {
-		updated.Password = row.Password
-	}
 	if err = b.db.Save(&updated).Error; err != nil {
 		return nil, err
 	}
@@ -565,17 +562,13 @@ func (b *AssetBiz) dbInstanceModel(req *api.DbInstanceRequest) (model.DbInstance
 			break
 		}
 	}
-	if databaseType == nil || req.Port < 1 {
+	if databaseType == nil || req.Port < 1 || req.CredentialID <= 0 {
 		return model.DbInstance{}, ErrInvalid
 	}
-	password, err := cryptox.Encrypt(b.aesKey, req.Password)
-	if err != nil {
-		return model.DbInstance{}, err
-	}
-	return model.DbInstance{Name: req.Name, GroupID: req.GroupID, DbType: req.DbType, Host: req.Host, Port: req.Port, Username: req.Username, Password: password, Version: req.Version, CredentialID: req.CredentialID, Tags: req.Tags, Description: req.Description, Status: *req.Status}, nil
+	return model.DbInstance{Name: req.Name, GroupID: req.GroupID, DbType: req.DbType, Host: req.Host, Port: req.Port, Version: req.Version, CredentialID: req.CredentialID, Tags: req.Tags, Description: req.Description, Status: *req.Status}, nil
 }
 func dbInstanceResponse(r model.DbInstance) *api.DbInstanceResponse {
-	return &api.DbInstanceResponse{ID: r.ID, GroupID: r.GroupID, Name: r.Name, DbType: r.DbType, Host: r.Host, Port: r.Port, Username: r.Username, Version: r.Version, CredentialID: r.CredentialID, Tags: r.Tags, Description: r.Description, Status: r.Status, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	return &api.DbInstanceResponse{ID: r.ID, GroupID: r.GroupID, Name: r.Name, DbType: r.DbType, Host: r.Host, Port: r.Port, Version: r.Version, CredentialID: r.CredentialID, Tags: r.Tags, Description: r.Description, Status: r.Status, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
 func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) ([]*api.TerminalSessionResponse, error) {
