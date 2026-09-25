@@ -369,7 +369,8 @@ onBeforeUnmount(() => {
                 :aria-label="data.assetType">
                 <Coin />
               </el-icon><span class="tree-label">{{ data.label }}</span><small v-if="data.type === 'database'"
-                class="database-type-badge">{{ data.assetType }}</small><small v-if="data.type === 'group'">({{
+                class="database-type-badge">{{ data.assetType }}</small><small v-else-if="data.type === 'host'"
+                class="database-type-badge">Host</small><small v-if="data.type === 'group'">({{
                   data.count }})</small><i v-else-if="data.type === 'host'"
                 :class="{ online: data.host?.status === 1 }" /></span></template>
         </el-tree>
@@ -724,17 +725,17 @@ onBeforeUnmount(() => {
 
 .database-type-badge {
   flex: none;
-  max-width: 72px;
-  padding: 2px 5px;
+  max-width: 48px;
+  padding: 1px 3px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid rgb(104 169 215 / 34%);
-  border-radius: 5px;
+  border-radius: 3px;
   color: #9dc9e8;
   background: rgb(104 169 215 / 12%);
-  font-size: 9px;
+  font-size: 6px;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap
@@ -748,6 +749,14 @@ onBeforeUnmount(() => {
   white-space: nowrap
 }
 
+.tree-node.is-database .tree-label {
+  flex: 0 1 auto
+}
+
+.tree-node.is-host .tree-label {
+  flex: 0 1 auto
+}
+
 .tree-node small {
   color: #91959d
 }
@@ -759,6 +768,10 @@ onBeforeUnmount(() => {
   flex: none;
   border-radius: 50%;
   background: #73767d
+}
+
+.tree-node.is-host i {
+  margin-left: auto
 }
 
 .tree-node i.online,
