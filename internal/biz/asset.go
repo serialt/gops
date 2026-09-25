@@ -788,7 +788,8 @@ func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) ([]
 			item.Username = user.Username
 		}
 		if host, ok := hostsByID[r.HostID]; ok {
-			item.HostName, item.HostAddress = host.Name, host.IP
+			item.HostName = host.Name
+			item.HostAddress = net.JoinHostPort(host.IP, fmt.Sprint(host.Port))
 		}
 		if database, ok := databasesByID[r.DbInstanceID]; ok {
 			item.DatabaseName = database.Name
