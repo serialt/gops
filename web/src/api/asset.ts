@@ -57,6 +57,15 @@ export const collectHostInfo = (id: number) => request.post<Host>('/assets/hosts
 export const deleteHost = (id: number) => request.post<null>('/assets/hosts/delete', { id })
 export interface SftpEntry { name: string; type: 'directory' | 'file'; size: number; modified: string; permissions: string }
 export const listSftp = (host_id: number, path: string) => request.post<SftpEntry[]>('/assets/terminal/sftp/list', { host_id, path })
+export const uploadSftp = (host_id: number, path: string, files: File[]) => {
+  const form = new FormData()
+  form.append('host_id', String(host_id))
+  form.append('path', path)
+  files.forEach(file => form.append('files', file, file.webkitRelativePath || file.name))
+  return request.post<null>('/assets/terminal/sftp/upload', form)
+}
+export const downloadSftp = (host_id: number, path: string, names: string[]) =>
+  request.post<Blob>('/assets/terminal/sftp/download', { host_id, path, names }, { responseType: 'blob' })
 
 export interface DbInstance { id: number; group_id: number; name: string; db_type: string; host: string; port: number; version: string; credential_id: number; tags: string; description: string; status: boolean; created_at: string; updated_at: string }
 export interface DatabaseTypeOption { value: string; label: string; default_port: number }

@@ -169,6 +169,11 @@ type SFTPEntryResponse struct {
 	Modified    string `json:"modified"`
 	Permissions string `json:"permissions"`
 }
+type SFTPDownloadRequest struct {
+	HostID int64    `json:"host_id" binding:"required"`
+	Path   string   `json:"path"`
+	Names  []string `json:"names" binding:"required,min=1"`
+}
 
 type DbInstanceListRequest struct {
 	PageRequest

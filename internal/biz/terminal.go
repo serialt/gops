@@ -1,9 +1,13 @@
 package biz
 
 import (
+	"archive/zip"
 	"fmt"
 	"io"
+	"mime/multipart"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -64,6 +68,95 @@ func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) ([]*api.SFTPEntryResponse,
 		})
 	}
 	return result, nil
+}
+
+// UploadSFTP uploads files into a remote directory over the host's SSH connection.
+func (b *AssetBiz) UploadSFTP(hostID int64, directory string, files []*multipart.FileHeader) error {
+	_, client, err := b.dialHostSSH(hostID)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		return fmt.Errorf("create SFTP client: %w", err)
+	}
+	defer sftpClient.Close()
+	directory = cleanSFTPPath(directory)
+	for _, header := range files {
+		source, err := header.Open()
+		if err != nil {
+			return fmt.Errorf("open upload %s: %w", header.Filename, err)
+		}
+		relativeName := filepath.ToSlash(filepath.Clean(header.Filename))
+		relativeName = strings.TrimPrefix(relativeName, "../")
+		target := path.Join(directory, relativeName)
+		if err = sftpClient.MkdirAll(path.Dir(target)); err == nil {
+			var destination *sftp.File
+			destination, err = sftpClient.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+			if err == nil {
+				_, err = io.Copy(destination, source)
+				_ = destination.Close()
+			}
+		}
+		_ = source.Close()
+		if err != nil {
+			return fmt.Errorf("upload %s: %w", header.Filename, err)
+		}
+	}
+	return nil
+}
+
+// DownloadSFTP writes selected remote files as a ZIP archive.
+func (b *AssetBiz) DownloadSFTP(req *api.SFTPDownloadRequest, output io.Writer) error {
+	_, client, err := b.dialHostSSH(req.HostID)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		return fmt.Errorf("create SFTP client: %w", err)
+	}
+	defer sftpClient.Close()
+	archive := zip.NewWriter(output)
+	defer archive.Close()
+	directory := cleanSFTPPath(req.Path)
+	for _, name := range req.Names {
+		name = filepath.ToSlash(filepath.Clean(name))
+		if name == "." || strings.HasPrefix(name, "../") || path.IsAbs(name) {
+			return fmt.Errorf("invalid download path")
+		}
+		remotePath := path.Join(directory, name)
+		info, err := sftpClient.Stat(remotePath)
+		if err != nil {
+			return fmt.Errorf("stat %s: %w", name, err)
+		}
+		if info.IsDir() {
+			return fmt.Errorf("directory download is not supported yet: %s", name)
+		}
+		file, err := sftpClient.Open(remotePath)
+		if err != nil {
+			return fmt.Errorf("open %s: %w", name, err)
+		}
+		entry, err := archive.Create(name)
+		if err == nil {
+			_, err = io.Copy(entry, file)
+		}
+		_ = file.Close()
+		if err != nil {
+			return fmt.Errorf("download %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func cleanSFTPPath(value string) string {
+	cleaned := path.Clean("/" + value)
+	if cleaned == "." {
+		return "/"
+	}
+	return cleaned
 }
 
 // StartSSH opens an SSH shell using the credential associated with a host.

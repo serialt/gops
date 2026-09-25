@@ -6,7 +6,7 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import gopsLogoUrl from '@/assets/gops.svg'
-import { listAssetGroups, listHosts, listSftp, type AssetGroup, type Host, type SftpEntry } from '@/api/asset'
+import { downloadSftp, listAssetGroups, listHosts, listSftp, uploadSftp, type AssetGroup, type Host, type SftpEntry } from '@/api/asset'
 import { useSystemConfigStore } from '@/stores/system-config'
 
 interface TreeNode { id: string; label: string; type: 'group' | 'host'; count?: number; host?: Host; children?: TreeNode[] }
@@ -33,6 +33,10 @@ const sftpCommittedPath = ref('/root')
 const sftpKeyword = ref('')
 const sftpSearchVisible = ref(false)
 const sftpSearchInput = ref<HTMLInputElement>()
+const sftpUploadMenuVisible = ref(false)
+const sftpFileInput = ref<HTMLInputElement>()
+const sftpDirectoryInput = ref<HTMLInputElement>()
+const sftpUploading = ref(false)
 const sftpSelected = ref<string[]>([])
 
 const sftpEntries = ref<SftpEntry[]>([])
@@ -156,6 +160,7 @@ function openSftp() {
   sftpOriginKey.value = activeKey.value
   sftpVisible.value = true
   sftpSearchVisible.value = false
+  sftpUploadMenuVisible.value = false
   sftpSelected.value = []
   sftpKeyword.value = ''
   sftpPath.value = '/root'
@@ -167,6 +172,7 @@ function closeSftp() {
   sftpVisible.value = false
   sftpOriginKey.value = null
   sftpSearchVisible.value = false
+  sftpUploadMenuVisible.value = false
   sftpSelected.value = []
   if (originKey !== null && sessions.value.some(session => session.key === originKey)) {
     activeKey.value = originKey
@@ -191,6 +197,36 @@ function toggleSftpEntry(name: string) {
 }
 function sftpAction(message: string) {
   ElMessage.info(message)
+}
+function chooseSftpUpload(kind: 'file' | 'directory') {
+  sftpUploadMenuVisible.value = false
+  if (kind === 'file') sftpFileInput.value?.click()
+  else sftpDirectoryInput.value?.click()
+}
+async function handleSftpUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  if (sftpOriginKey.value === null || !files.length) return
+  sftpUploading.value = true
+  try {
+    await uploadSftp(sftpOriginKey.value, sftpCommittedPath.value, files)
+    ElMessage.success('上传成功')
+    await loadSftpDirectory()
+  } finally {
+    sftpUploading.value = false
+  }
+}
+async function downloadSelectedSftp() {
+  if (sftpOriginKey.value === null || !sftpSelected.value.length) return
+  const response = await downloadSftp(sftpOriginKey.value, sftpCommittedPath.value, sftpSelected.value)
+  const blob = response.data as unknown as Blob
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = 'sftp-download.zip'
+  anchor.click()
+  URL.revokeObjectURL(url)
 }
 async function loadSftpDirectory(path = sftpPath.value) {
   if (sftpOriginKey.value === null) return
@@ -323,7 +359,8 @@ onBeforeUnmount(() => {
             :ref="element => setTerminalElement(session.key, element)" class="terminal-body" />
         </div>
         <div v-if="sftpVisible" class="sftp-overlay">
-          <section class="sftp-panel" aria-label="SFTP 文件管理" @click="sftpSearchVisible = false">
+          <section class="sftp-panel" aria-label="SFTP 文件管理"
+            @click="sftpSearchVisible = false; sftpUploadMenuVisible = false">
             <header class="sftp-toolbar">
               <strong>SFTP</strong>
               <button type="button" class="sftp-icon-button" aria-label="返回上级目录" title="返回上级目录"
@@ -348,14 +385,26 @@ onBeforeUnmount(() => {
               <button type="button" class="sftp-button" @click="sftpAction('新建功能尚未配置')"><el-icon>
                   <Plus />
                 </el-icon>新建</button>
-              <button type="button" class="sftp-button" @click="sftpAction('文件上传接口尚未配置')"><el-icon>
-                  <Upload />
-                </el-icon>上传文件</button>
-              <button type="button" class="sftp-button" @click="sftpAction('目录上传接口尚未配置')"><el-icon>
-                  <Folder />
-                </el-icon>上传目录</button>
+              <div class="sftp-upload-wrap" @click.stop>
+                <button type="button" class="sftp-button" :disabled="sftpUploading"
+                  @click="sftpUploadMenuVisible = !sftpUploadMenuVisible"><el-icon>
+                    <Upload />
+                  </el-icon>{{
+                    sftpUploading ? '上传中' : '上传' }}</button>
+                <div v-if="sftpUploadMenuVisible" class="sftp-upload-menu">
+                  <button type="button" @click="chooseSftpUpload('file')"><el-icon>
+                      <Upload />
+                    </el-icon>选择文件</button>
+                  <button type="button" @click="chooseSftpUpload('directory')"><el-icon>
+                      <Folder />
+                    </el-icon>选择目录</button>
+                </div>
+                <input ref="sftpFileInput" class="sftp-hidden-input" type="file" multiple @change="handleSftpUpload" />
+                <input ref="sftpDirectoryInput" class="sftp-hidden-input" type="file" webkitdirectory multiple
+                  @change="handleSftpUpload" />
+              </div>
               <button type="button" class="sftp-button" :disabled="!sftpSelected.length"
-                @click="sftpAction('文件下载接口尚未配置')"><el-icon>
+                @click="void downloadSelectedSftp()"><el-icon>
                   <Download />
                 </el-icon>下载</button>
               <button type="button" class="sftp-icon-button sftp-close" aria-label="关闭 SFTP" title="关闭 SFTP"
@@ -1011,6 +1060,48 @@ onBeforeUnmount(() => {
 
 .sftp-button .el-icon {
   font-size: 10px
+}
+
+.sftp-upload-wrap {
+  position: relative;
+  flex: none
+}
+
+.sftp-upload-menu {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  z-index: 4;
+  min-width: 90px;
+  padding: 3px;
+  border: 1px solid #45464a;
+  border-radius: 7px;
+  background: #252628;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 28%)
+}
+
+.sftp-upload-menu button {
+  width: 100%;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  color: #c8cbd1;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  white-space: nowrap
+}
+
+.sftp-upload-menu button:hover {
+  color: #fff;
+  background: #343537
+}
+
+.sftp-hidden-input {
+  display: none
 }
 
 .sftp-icon-button:hover,

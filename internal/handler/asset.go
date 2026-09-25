@@ -52,6 +52,8 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/hosts/collect", h.CollectHostInfo)
 	g.POST("/assets/hosts/delete", h.DeleteHost)
 	g.POST("/assets/terminal/sftp/list", h.ListSFTP)
+	g.POST("/assets/terminal/sftp/upload", h.UploadSFTP)
+	g.POST("/assets/terminal/sftp/download", h.DownloadSFTP)
 
 	g.POST("/assets/db-instances/options", h.DatabaseTypeOptions)
 	g.POST("/assets/db-instances/list", h.ListDBInstances)
@@ -79,6 +81,39 @@ func (h *AssetHandler) ListSFTP(c *gin.Context) {
 		return
 	}
 	response.OK(c, result)
+}
+
+// UploadSFTP POST /api/v1/assets/terminal/sftp/upload 上传文件或目录。
+func (h *AssetHandler) UploadSFTP(c *gin.Context) {
+	hostID, err := strconv.ParseInt(c.PostForm("host_id"), 10, 64)
+	if err != nil || hostID <= 0 {
+		response.Error(c, 400, "invalid host id")
+		return
+	}
+	form, err := c.MultipartForm()
+	if err != nil || len(form.File["files"]) == 0 {
+		response.Error(c, 400, "no files selected")
+		return
+	}
+	if err = h.biz.UploadSFTP(hostID, c.PostForm("path"), form.File["files"]); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// DownloadSFTP POST /api/v1/assets/terminal/sftp/download 下载选中的文件。
+func (h *AssetHandler) DownloadSFTP(c *gin.Context) {
+	req := new(api.SFTPDownloadRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid SFTP download request")
+		return
+	}
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", `attachment; filename="sftp-download.zip"`)
+	if err := h.biz.DownloadSFTP(req, c.Writer); err != nil {
+		return
+	}
 }
 
 // ConnectTerminal GET /api/v1/assets/terminal/connect/:id 建立 SSH WebSocket 终端连接。
