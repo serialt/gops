@@ -27,6 +27,7 @@ const assetPaneStartWidth = ref(180)
 const terminalElements = new Map<number, HTMLElement>()
 const runtimes = new Map<number, Runtime>()
 const sftpVisible = ref(false)
+const sftpOriginKey = ref<number | null>(null)
 const sftpPath = ref('/root')
 const sftpKeyword = ref('')
 const sftpSearchVisible = ref(false)
@@ -152,15 +153,22 @@ function clearTerminal() {
 }
 function openSftp() {
   if (activeKey.value === null) return
+  sftpOriginKey.value = activeKey.value
   sftpVisible.value = true
   sftpSearchVisible.value = false
   sftpSelected.value = []
   sftpKeyword.value = ''
 }
 function closeSftp() {
+  const originKey = sftpOriginKey.value
   sftpVisible.value = false
+  sftpOriginKey.value = null
   sftpSearchVisible.value = false
   sftpSelected.value = []
+  if (originKey !== null && sessions.value.some(session => session.key === originKey)) {
+    activeKey.value = originKey
+    void nextTick(() => { runtimes.get(originKey)?.fitAddon.fit(); runtimes.get(originKey)?.terminal.focus() })
+  }
 }
 function goSftpParent() {
   if (sftpPath.value === '/') return
@@ -281,14 +289,14 @@ onBeforeUnmount(() => {
               </el-icon></button>
           </div>
         </nav>
-        <div v-if="!sftpVisible" class="session-content">
+        <div v-show="!sftpVisible" class="session-content">
           <div v-if="!sessions.length" class="terminal-empty"><el-icon>
               <Monitor />
             </el-icon><strong>双击主机打开终端</strong><span>在左侧资产分组中选择主机</span></div>
           <div v-for="session in sessions" v-show="activeKey === session.key" :key="session.key"
             :ref="element => setTerminalElement(session.key, element)" class="terminal-body" />
         </div>
-        <div v-else class="sftp-overlay">
+        <div v-if="sftpVisible" class="sftp-overlay">
           <section class="sftp-panel" aria-label="SFTP 文件管理" @click="sftpSearchVisible = false">
             <header class="sftp-toolbar">
               <strong>SFTP</strong>
