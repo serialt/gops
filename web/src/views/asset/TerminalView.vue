@@ -1,20 +1,21 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, type ElTree } from 'element-plus'
-import { ArrowLeft, ArrowRight, Close, CollectionTag, Delete, Document, Download, Folder, FolderOpened, Monitor, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Close, CollectionTag, Coin, Delete, Document, Download, Folder, FolderOpened, Monitor, Platform, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import gopsLogoUrl from '@/assets/gops.svg'
-import { downloadSftp, listAssetGroups, listHosts, listSftp, uploadSftp, type AssetGroup, type Host, type SftpEntry } from '@/api/asset'
+import { downloadSftp, listAssetGroups, listDBInstances, listHosts, listSftp, uploadSftp, type AssetGroup, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
 import { useSystemConfigStore } from '@/stores/system-config'
 
-interface TreeNode { id: string; label: string; type: 'group' | 'host'; count?: number; host?: Host; children?: TreeNode[] }
+interface TreeNode { id: string; label: string; type: 'group' | 'host' | 'database'; assetType?: string; count?: number; host?: Host; database?: DbInstance; children?: TreeNode[] }
 interface Session { key: number; host: Host }
 interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout> }
 
 const systemConfig = useSystemConfigStore()
 const hosts = ref<Host[]>([])
+const databases = ref<DbInstance[]>([])
 const groups = ref<AssetGroup[]>([])
 const keyword = ref('')
 const treeRef = ref<InstanceType<typeof ElTree>>()
@@ -64,7 +65,12 @@ const treeData = computed<TreeNode[]>(() => {
   const ungrouped: TreeNode = { id: 'group-0', label: '未分组', type: 'group', count: 0, children: [] }
   hosts.value.forEach(host => {
     const parent = nodes.get(host.group_id) || ungrouped
-    parent.children?.push({ id: `host-${host.id}`, label: host.name, type: 'host', host })
+    parent.children?.push({ id: `host-${host.id}`, label: host.name, type: 'host', assetType: '主机', host })
+    parent.count = (parent.count || 0) + 1
+  })
+  databases.value.forEach(database => {
+    const parent = nodes.get(database.group_id) || ungrouped
+    parent.children?.push({ id: `database-${database.id}`, label: database.name, type: 'database', assetType: databaseTypeLabel(database.db_type), database })
     parent.count = (parent.count || 0) + 1
   })
   const sum = (node: TreeNode): number => {
@@ -83,7 +89,20 @@ function setTerminalElement(key: number, element: unknown) {
 }
 function filterTree(value: string, data: TreeNode) {
   if (!value.trim()) return true
-  return `${data.label} ${data.host?.ip || ''}`.toLowerCase().includes(value.trim().toLowerCase())
+  return `${data.label} ${data.assetType || ''} ${data.host?.ip || ''} ${data.database?.host || ''} ${data.database?.db_type || ''}`.toLowerCase().includes(value.trim().toLowerCase())
+}
+function databaseTypeLabel(type: string) {
+  const normalized = type.trim().toLowerCase().replace(/[\s_-]+/g, '')
+  const labels: Record<string, string> = {
+    postgresql: 'PostgreSql',
+    postgres: 'PostgreSql',
+    mysql: 'MySQL',
+    oracle: 'Oracle',
+    sqlserver: 'SQL Server',
+    mssql: 'SQL Server',
+    mariadb: 'MariaDB',
+  }
+  return labels[normalized] || type
 }
 function startAssetPaneDrag(event: PointerEvent) {
   if (event.button !== 0) return
@@ -313,8 +332,9 @@ function closeSession(key: number) {
   if (activeKey.value === key) activeKey.value = sessions.value[Math.min(index, sessions.value.length - 1)]?.key ?? null
 }
 async function load() {
-  const [hostResult, groupResult] = await Promise.all([listHosts('', 0, 1, 1000), listAssetGroups('', 1, 1000)])
+  const [hostResult, databaseResult, groupResult] = await Promise.all([listHosts('', 0, 1, 1000), listDBInstances('', 0, 1, 1000), listAssetGroups('', 1, 1000)])
   hosts.value = hostResult.data.data.list
+  databases.value = databaseResult.data.data.list
   groups.value = groupResult.data.data.list
 }
 watch(keyword, value => treeRef.value?.filter(value))
@@ -335,17 +355,23 @@ onBeforeUnmount(() => {
       <aside class="asset-panel">
         <div class="asset-title"><span><el-icon>
               <CollectionTag />
-            </el-icon>资产分组</span><small>({{ hosts.length }})</small></div>
-        <el-input v-model="keyword" class="asset-search" placeholder="搜索主机..." clearable :prefix-icon="Search" />
+            </el-icon>资产分组</span><small>({{ hosts.length + databases.length }})</small></div>
+        <el-input v-model="keyword" class="asset-search" placeholder="搜索" clearable :prefix-icon="Search" />
         <el-tree ref="treeRef" class="asset-tree" :data="treeData" node-key="id" default-expand-all
           :filter-node-method="filterTree" :expand-on-click-node="true">
           <template #default="{ data }"><span class="tree-node" :class="`is-${data.type}`"
-              @dblclick.stop="openTerminal(data.host)"><el-icon v-if="data.type === 'group'">
+              @dblclick.stop="data.type === 'host' && openTerminal(data.host)"><el-icon v-if="data.type === 'group'">
                 <ArrowRight />
-              </el-icon><el-icon v-else>
-                <Monitor />
-              </el-icon><span class="tree-label">{{ data.label }}</span><small v-if="data.type === 'group'">({{
-                data.count }})</small><i v-else :class="{ online: data.host?.status === 1 }" /></span></template>
+              </el-icon><el-icon v-else-if="data.type === 'host'" class="host-asset-icon" :title="data.assetType"
+                :aria-label="data.assetType">
+                <Platform />
+              </el-icon><el-icon v-else class="database-asset-icon" :title="data.assetType"
+                :aria-label="data.assetType">
+                <Coin />
+              </el-icon><span class="tree-label">{{ data.label }}</span><small v-if="data.type === 'database'"
+                class="database-type-badge">{{ data.assetType }}</small><small v-if="data.type === 'group'">({{
+                  data.count }})</small><i v-else-if="data.type === 'host'"
+                :class="{ online: data.host?.status === 1 }" /></span></template>
         </el-tree>
       </aside>
       <div class="asset-divider" :class="{ dragging: assetPaneDragging }" role="separator" aria-label="调整资产分组宽度"
@@ -513,8 +539,8 @@ onBeforeUnmount(() => {
 }
 
 .terminal-brand img {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 7px
 }
 
@@ -669,13 +695,49 @@ onBeforeUnmount(() => {
   cursor: default
 }
 
+.tree-node.is-database {
+  padding-left: 4px;
+  cursor: default
+}
+
 .tree-node .el-icon {
   flex: none;
   color: #8f959f
 }
 
 .tree-node.is-host .el-icon {
-  color: #61c957
+  color: #8f959f
+}
+
+.tree-node .host-asset-icon,
+.tree-node .database-asset-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 14px
+}
+
+.database-type-badge {
+  flex: none;
+  max-width: 72px;
+  padding: 2px 5px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(104 169 215 / 34%);
+  border-radius: 5px;
+  color: #9dc9e8;
+  background: rgb(104 169 215 / 12%);
+  font-size: 9px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap
 }
 
 .tree-label {
