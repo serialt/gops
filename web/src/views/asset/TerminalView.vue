@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, type ElTree } from 'element-plus'
-import { ArrowLeft, ArrowRight, Close, CollectionTag, Delete, FolderOpened, Monitor, Refresh, Search } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Close, CollectionTag, Delete, Download, Folder, FolderOpened, Monitor, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
@@ -26,6 +26,17 @@ const assetPaneStartX = ref(0)
 const assetPaneStartWidth = ref(180)
 const terminalElements = new Map<number, HTMLElement>()
 const runtimes = new Map<number, Runtime>()
+const sftpVisible = ref(false)
+const sftpPath = ref('/root')
+const sftpKeyword = ref('')
+const sftpSelected = ref<string[]>([])
+
+interface SftpEntry { name: string; type: 'directory' | 'file'; size: string; modified: string; permissions: string }
+const sftpEntries = ref<SftpEntry[]>([])
+const filteredSftpEntries = computed(() => {
+  const value = sftpKeyword.value.trim().toLowerCase()
+  return value ? sftpEntries.value.filter(entry => entry.name.toLowerCase().includes(value)) : sftpEntries.value
+})
 
 const treeData = computed<TreeNode[]>(() => {
   const nodes = new Map<number, TreeNode>()
@@ -139,7 +150,31 @@ function clearTerminal() {
 }
 function openSftp() {
   if (activeKey.value === null) return
-  ElMessage.info('SFTP 文件管理功能即将开放')
+  sftpVisible.value = true
+  sftpSelected.value = []
+  sftpKeyword.value = ''
+}
+function closeSftp() {
+  sftpVisible.value = false
+  sftpSelected.value = []
+}
+function goSftpParent() {
+  if (sftpPath.value === '/') return
+  const parent = sftpPath.value.replace(/\/+$/, '').split('/').slice(0, -1).join('/')
+  sftpPath.value = parent || '/'
+}
+function openSftpEntry(entry: SftpEntry) {
+  if (entry.type !== 'directory') return
+  sftpPath.value = `${sftpPath.value.replace(/\/$/, '')}/${entry.name}`
+  sftpSelected.value = []
+}
+function toggleSftpEntry(name: string) {
+  sftpSelected.value = sftpSelected.value.includes(name)
+    ? sftpSelected.value.filter(item => item !== name)
+    : [...sftpSelected.value, name]
+}
+function sftpAction(message: string) {
+  ElMessage.info(message)
 }
 async function reconnectSession() {
   if (activeKey.value === null) return
@@ -226,7 +261,7 @@ onBeforeUnmount(() => {
           <div class="terminal-actions">
             <button type="button" class="terminal-action" :disabled="activeKey === null" aria-label="SFTP文件管理"
               title="SFTP文件管理" @click="openSftp"><el-icon>
-                <FolderOpened />
+                <Folder />
               </el-icon></button>
             <button type="button" class="terminal-action" :disabled="activeKey === null" aria-label="重新连接" title="重新连接"
               @click="void reconnectSession()"><el-icon>
@@ -238,12 +273,63 @@ onBeforeUnmount(() => {
               </el-icon></button>
           </div>
         </nav>
-        <div class="session-content">
+        <div v-if="!sftpVisible" class="session-content">
           <div v-if="!sessions.length" class="terminal-empty"><el-icon>
               <Monitor />
             </el-icon><strong>双击主机打开终端</strong><span>在左侧资产分组中选择主机</span></div>
           <div v-for="session in sessions" v-show="activeKey === session.key" :key="session.key"
             :ref="element => setTerminalElement(session.key, element)" class="terminal-body" />
+        </div>
+        <div v-else class="sftp-overlay">
+          <section class="sftp-panel" aria-label="SFTP 文件管理">
+            <header class="sftp-toolbar">
+              <strong>SFTP</strong>
+              <button type="button" class="sftp-icon-button" aria-label="返回上级目录" title="返回上级目录"
+                @click="goSftpParent"><el-icon>
+                  <ArrowLeft />
+                </el-icon></button>
+              <div class="sftp-path">{{ sftpPath }}</div>
+              <button type="button" class="sftp-icon-button" aria-label="刷新目录" title="刷新目录"
+                @click="sftpAction('目录刷新接口尚未配置')"><el-icon>
+                  <Refresh />
+                </el-icon></button>
+              <label class="sftp-search"><el-icon>
+                  <Search />
+                </el-icon><input v-model="sftpKeyword" placeholder="搜索当前目录" /></label>
+              <button type="button" class="sftp-button" @click="sftpAction('新建功能尚未配置')"><el-icon>
+                  <Plus />
+                </el-icon>新建</button>
+              <button type="button" class="sftp-button" @click="sftpAction('文件上传接口尚未配置')"><el-icon>
+                  <Upload />
+                </el-icon>上传文件</button>
+              <button type="button" class="sftp-button" @click="sftpAction('目录上传接口尚未配置')"><el-icon>
+                  <Folder />
+                </el-icon>上传目录</button>
+              <button type="button" class="sftp-button" :disabled="!sftpSelected.length"
+                @click="sftpAction('文件下载接口尚未配置')"><el-icon>
+                  <Download />
+                </el-icon>下载</button>
+              <button type="button" class="sftp-icon-button sftp-close" aria-label="关闭 SFTP" title="关闭 SFTP"
+                @click="closeSftp"><el-icon>
+                  <Close />
+                </el-icon></button>
+            </header>
+            <div class="sftp-table-head"><span
+                class="sftp-check" /><span>名称</span><span>大小</span><span>修改时间</span><span>权限</span></div>
+            <div class="sftp-list">
+              <button v-for="entry in filteredSftpEntries" :key="entry.name" type="button" class="sftp-row"
+                :class="{ selected: sftpSelected.includes(entry.name) }" @dblclick="openSftpEntry(entry)"
+                @click="toggleSftpEntry(entry.name)">
+                <span class="sftp-check" :class="{ checked: sftpSelected.includes(entry.name) }" />
+                <span class="sftp-name"><el-icon>
+                    <FolderOpened v-if="entry.type === 'directory'" />
+                    <Monitor v-else />
+                  </el-icon>{{ entry.name }}</span>
+                <span>{{ entry.size }}</span><span>{{ entry.modified }}</span><span>{{ entry.permissions }}</span>
+              </button>
+              <div v-if="!filteredSftpEntries.length" class="sftp-empty">暂无目录数据</div>
+            </div>
+          </section>
         </div>
       </section>
     </main>
@@ -345,9 +431,15 @@ onBeforeUnmount(() => {
 
 .asset-search :deep(.el-input__wrapper) {
   background: #343537 !important;
-  border: 1px solid #45464a;
+  border: 1px solid #3b3c40;
   box-shadow: none !important;
   border-radius: 6px
+}
+
+.asset-search :deep(.el-input__wrapper.is-focus),
+.asset-search :deep(.el-input__wrapper:focus-within) {
+  border-color: #55cbb5;
+  box-shadow: 0 0 0 1px rgb(85 203 181 / 18%) !important
 }
 
 .asset-search :deep(.el-input__inner) {
@@ -626,6 +718,291 @@ onBeforeUnmount(() => {
   font-size: 11px
 }
 
+.sftp-overlay {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background: #1d1e20;
+  font-size: 10px
+}
+
+.sftp-panel {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #c8cbd1;
+  background: #1d1e20;
+  font-size: 10px
+}
+
+.sftp-session-bar {
+  height: 42px;
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid #393a3e;
+  background: #252628
+}
+
+.sftp-session-tab,
+.sftp-session-add,
+.sftp-session-tool {
+  min-width: 0;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-right: 1px solid #393a3e;
+  color: #aeb2ba;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px
+}
+
+.sftp-session-tab {
+  min-width: 180px;
+  justify-content: flex-start;
+  border-top: 2px solid transparent
+}
+
+.sftp-session-tab.active {
+  border-top-color: #55cbb5;
+  color: #eceef2;
+  background: #1d1e20
+}
+
+.sftp-session-tab i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca6b5
+}
+
+.sftp-session-tab i.online {
+  background: #42c77b
+}
+
+.sftp-session-add {
+  width: 54px;
+  justify-content: center;
+  padding: 0;
+  font-size: 10px
+}
+
+.sftp-session-spacer {
+  flex: 1
+}
+
+.sftp-session-tool {
+  width: 54px;
+  justify-content: center;
+  padding: 0;
+  border-left: 1px solid #393a3e;
+  border-right: 0;
+  font-size: 10px
+}
+
+.sftp-session-tool.active {
+  color: #55cbb5;
+  background: #303135
+}
+
+.sftp-toolbar {
+  min-height: 52px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #252a34;
+  box-sizing: border-box;
+  background: #1d1e20
+}
+
+.sftp-toolbar strong {
+  flex: none;
+  color: #55cbb5;
+  font-size: 10px;
+  font-weight: 700
+}
+
+.sftp-path,
+.sftp-search,
+.sftp-button,
+.sftp-icon-button {
+  height: 36px;
+  border: 1px solid #45464a;
+  border-radius: 13px;
+  box-sizing: border-box;
+  background: #1d1e20;
+  color: #d7dae0
+}
+
+.sftp-path {
+  min-width: 180px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  color: #d7dae0;
+  font-size: 10px
+}
+
+.sftp-icon-button {
+  width: 36px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer
+}
+
+.sftp-icon-button .el-icon {
+  font-size: 10px
+}
+
+.sftp-close {
+  margin-left: auto
+}
+
+.sftp-search {
+  min-width: 150px;
+  flex: 1;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px
+}
+
+.sftp-search .el-icon {
+  flex: none;
+  font-size: 10px
+}
+
+.sftp-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #d7dae0;
+  background: transparent;
+  font: inherit;
+  font-size: 10px
+}
+
+.sftp-search input::placeholder {
+  color: #8a95a6
+}
+
+.sftp-button {
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: none;
+  color: #c8cbd1;
+  cursor: pointer;
+  font-size: 10px
+}
+
+.sftp-button .el-icon {
+  font-size: 10px
+}
+
+.sftp-icon-button:hover,
+.sftp-button:hover:not(:disabled) {
+  border-color: #55cbb5;
+  background: #252628
+}
+
+.sftp-button:disabled {
+  color: #777b83;
+  border-color: #1b2028;
+  cursor: not-allowed
+}
+
+.sftp-table-head,
+.sftp-row {
+  display: grid;
+  grid-template-columns: 48px minmax(280px, 1fr) 180px 300px 220px;
+  align-items: center;
+  column-gap: 8px;
+  box-sizing: border-box
+}
+
+.sftp-table-head {
+  min-height: 38px;
+  padding: 0 10px;
+  color: #8c9098;
+  border-bottom: 1px solid #393a3e;
+  font-size: 10px
+}
+
+.sftp-list {
+  min-height: 0;
+  flex: 1;
+  overflow: auto
+}
+
+.sftp-row {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 1px solid #393a3e;
+  color: #c8cbd1;
+  background: #1d1e20;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px
+}
+
+.sftp-row:hover,
+.sftp-row.selected {
+  background: #343537
+}
+
+.sftp-check {
+  width: 24px;
+  height: 24px;
+  justify-self: start;
+  border: 1px solid #73767d;
+  border-radius: 6px;
+  box-sizing: border-box
+}
+
+.sftp-check.checked {
+  border-color: #55cbb5;
+  background: #55cbb5
+}
+
+.sftp-name {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  overflow: hidden;
+  color: #d7dae0;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.sftp-name .el-icon {
+  flex: none;
+  color: #55cbb5;
+  font-size: 10px
+}
+
+.sftp-empty {
+  padding-top: 50px;
+  color: #8a95a6;
+  text-align: center;
+  font-size: 10px
+}
+
 @media(max-width:900px) {
   .terminal-header {
     height: 44px
@@ -634,10 +1011,74 @@ onBeforeUnmount(() => {
   .terminal-workbench {
     height: calc(100vh - 44px)
   }
+
+  .sftp-toolbar {
+    min-height: 58px;
+    gap: 6px
+  }
+
+  .sftp-toolbar strong {
+    font-size: 10px
+  }
+
+  .sftp-path,
+  .sftp-search,
+  .sftp-button,
+  .sftp-icon-button {
+    height: 44px;
+    border-radius: 8px
+  }
+
+  .sftp-path {
+    min-width: 110px;
+    padding: 0 10px;
+    font-size: 10px
+  }
+
+  .sftp-icon-button {
+    width: 44px
+  }
+
+  .sftp-search {
+    min-width: 120px;
+    padding: 0 8px
+  }
+
+  .sftp-search input,
+  .sftp-button {
+    font-size: 10px
+  }
+
+  .sftp-button {
+    padding: 0 10px
+  }
+
+  .sftp-table-head,
+  .sftp-row {
+    grid-template-columns: 32px minmax(180px, 1fr) 100px 160px 130px;
+    font-size: 10px
+  }
 }
 
 .asset-search :deep(.el-input__wrapper) {
   min-height: 32px;
-  border-radius: 7px !important
+  border-radius: 7px !important;
+  background: #343537 !important;
+  border: 1px solid #3b3c40 !important;
+  box-shadow: none !important
+}
+
+.asset-search :deep(.el-input__wrapper.is-focus),
+.asset-search :deep(.el-input__wrapper:focus-within) {
+  border-color: #55cbb5 !important;
+  box-shadow: 0 0 0 1px rgb(85 203 181 / 18%) !important
+}
+
+.asset-search :deep(.el-input__inner),
+.asset-search :deep(.el-input__inner::placeholder),
+.asset-search :deep(.el-input__prefix),
+.asset-search :deep(.el-input__suffix) {
+  color: #c8cbd1 !important;
+  -webkit-text-fill-color: #c8cbd1 !important
 }
 </style>
