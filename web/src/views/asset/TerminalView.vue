@@ -29,6 +29,8 @@ const runtimes = new Map<number, Runtime>()
 const sftpVisible = ref(false)
 const sftpPath = ref('/root')
 const sftpKeyword = ref('')
+const sftpSearchVisible = ref(false)
+const sftpSearchInput = ref<HTMLInputElement>()
 const sftpSelected = ref<string[]>([])
 
 interface SftpEntry { name: string; type: 'directory' | 'file'; size: string; modified: string; permissions: string }
@@ -151,11 +153,13 @@ function clearTerminal() {
 function openSftp() {
   if (activeKey.value === null) return
   sftpVisible.value = true
+  sftpSearchVisible.value = false
   sftpSelected.value = []
   sftpKeyword.value = ''
 }
 function closeSftp() {
   sftpVisible.value = false
+  sftpSearchVisible.value = false
   sftpSelected.value = []
 }
 function goSftpParent() {
@@ -175,6 +179,10 @@ function toggleSftpEntry(name: string) {
 }
 function sftpAction(message: string) {
   ElMessage.info(message)
+}
+function toggleSftpSearch() {
+  sftpSearchVisible.value = !sftpSearchVisible.value
+  if (sftpSearchVisible.value) void nextTick(() => sftpSearchInput.value?.focus())
 }
 async function reconnectSession() {
   if (activeKey.value === null) return
@@ -281,7 +289,7 @@ onBeforeUnmount(() => {
             :ref="element => setTerminalElement(session.key, element)" class="terminal-body" />
         </div>
         <div v-else class="sftp-overlay">
-          <section class="sftp-panel" aria-label="SFTP 文件管理">
+          <section class="sftp-panel" aria-label="SFTP 文件管理" @click="sftpSearchVisible = false">
             <header class="sftp-toolbar">
               <strong>SFTP</strong>
               <button type="button" class="sftp-icon-button" aria-label="返回上级目录" title="返回上级目录"
@@ -293,9 +301,15 @@ onBeforeUnmount(() => {
                 @click="sftpAction('目录刷新接口尚未配置')"><el-icon>
                   <Refresh />
                 </el-icon></button>
-              <label class="sftp-search"><el-icon>
-                  <Search />
-                </el-icon><input v-model="sftpKeyword" placeholder="搜索当前目录" /></label>
+              <div class="sftp-search-wrap" @click.stop>
+                <button type="button" class="sftp-icon-button" aria-label="搜索当前目录" title="搜索当前目录"
+                  @click="toggleSftpSearch"><el-icon>
+                    <Search />
+                  </el-icon></button>
+                <label v-if="sftpSearchVisible" class="sftp-search-popup"><el-icon>
+                    <Search />
+                  </el-icon><input ref="sftpSearchInput" v-model="sftpKeyword" placeholder="搜索当前目录" /></label>
+              </div>
               <button type="button" class="sftp-button" @click="sftpAction('新建功能尚未配置')"><el-icon>
                   <Plus />
                 </el-icon>新建</button>
@@ -812,11 +826,12 @@ onBeforeUnmount(() => {
 }
 
 .sftp-toolbar {
-  min-height: 52px;
-  padding: 6px 8px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 5px 6px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   border-bottom: 1px solid #252a34;
   box-sizing: border-box;
   background: #1d1e20
@@ -833,25 +848,29 @@ onBeforeUnmount(() => {
 .sftp-search,
 .sftp-button,
 .sftp-icon-button {
-  height: 36px;
+  height: 32px;
   border: 1px solid #45464a;
-  border-radius: 13px;
+  border-radius: 9px;
   box-sizing: border-box;
   background: #1d1e20;
   color: #d7dae0
 }
 
 .sftp-path {
-  min-width: 180px;
-  padding: 0 10px;
+  min-width: 80px;
+  flex: 1 1 auto;
+  padding: 0 8px;
   display: flex;
   align-items: center;
+  overflow: hidden;
   color: #d7dae0;
-  font-size: 10px
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap
 }
 
 .sftp-icon-button {
-  width: 36px;
+  width: 32px;
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -865,6 +884,52 @@ onBeforeUnmount(() => {
 
 .sftp-close {
   margin-left: auto
+}
+
+.sftp-search-wrap {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 32px
+}
+
+.sftp-search-popup {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  z-index: 3;
+  width: 190px;
+  height: 32px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #45464a;
+  border-radius: 7px;
+  box-sizing: border-box;
+  background: #252628;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 28%)
+}
+
+.sftp-search-popup .el-icon {
+  flex: none;
+  color: #8c9098;
+  font-size: 10px
+}
+
+.sftp-search-popup input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #d7dae0;
+  background: transparent;
+  font: inherit;
+  font-size: 10px
+}
+
+.sftp-search-popup input::placeholder {
+  color: #8a95a6
 }
 
 .sftp-search {
@@ -896,11 +961,11 @@ onBeforeUnmount(() => {
 }
 
 .sftp-button {
-  padding: 0 10px;
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   flex: none;
   color: #c8cbd1;
   cursor: pointer;
