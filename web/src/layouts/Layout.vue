@@ -42,7 +42,6 @@ const assetMenus = computed(() => [
   { path: '/assets/cloud-accounts', title: '云账号', icon: OfficeBuilding, permission: 'POST /api/v1/assets/cloud-accounts/list' },
   { path: '/assets/hosts', title: '主机管理', icon: OfficeBuilding, permission: 'POST /api/v1/assets/hosts/list' },
   { path: '/assets/db-instances', title: '数据库管理', icon: OfficeBuilding, permission: 'POST /api/v1/assets/db-instances/list' },
-  { path: '/assets/terminal', title: '终端', icon: Monitor, permission: 'POST /api/v1/assets/hosts/list' },
   { path: '/assets/terminal-audit', title: '终端审计', icon: OfficeBuilding, permission: 'POST /api/v1/assets/terminal-sessions/list' },
 ].filter((item) => auth.hasPermission(item.permission)))
 const monitorMenus = computed(() => [
