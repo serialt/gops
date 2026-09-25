@@ -278,7 +278,8 @@ onMounted(() => { void load(); void loadFormOptions() })
 }
 
 .search-input {
-    width: 260px;
+    width: 156px;
+    flex: none;
 }
 
 .host-filters,
@@ -288,12 +289,18 @@ onMounted(() => { void load(); void loadFormOptions() })
     gap: 6px;
 }
 
+.host-filters {
+    flex: 1;
+    min-width: 0;
+}
+
 .toolbar-actions :deep(.el-button + .el-button) {
     margin-left: 0;
 }
 
 .status-filter {
-    width: 150px;
+    width: 120px;
+    flex: none;
 }
 
 .host-grid {

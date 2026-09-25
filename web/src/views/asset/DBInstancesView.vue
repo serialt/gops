@@ -151,7 +151,7 @@ onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDataba
 }
 
 .db-search {
-    width: 260px;
+    width: 156px;
 }
 
 .db-filters {
@@ -171,7 +171,7 @@ onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDataba
 }
 
 .type-filter {
-    width: 150px;
+    width: 120px;
 }
 
 .section-card {
