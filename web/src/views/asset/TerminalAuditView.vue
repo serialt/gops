@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, render, type Component } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'
 import { Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue'
 import type { ColDef } from 'ag-grid-community'
 import AppDataGrid from '@/components/AppDataGrid.vue'
@@ -40,14 +40,13 @@ function formatBytes(bytes: number) {
   return kilobytes < 1024 ? `${kilobytes.toFixed(kilobytes < 10 ? 1 : 0)} KB` : `${(kilobytes / 1024).toFixed(1)} MB`
 }
 function iconButton(title: string, kind: string, icon: Component, click: () => void) {
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = `audit-icon-action ${kind}`
-  button.title = title
-  button.setAttribute('aria-label', title)
-  render(h(icon), button)
-  button.addEventListener('click', click)
-  return button
+  const root = document.createElement('span')
+  render(h(ElTooltip, { content: title, placement: 'top', showAfter: 250 }, {
+    default: () => h('button', { type: 'button', 'aria-label': title, class: `audit-icon-action ${kind}`, onClick: click }, [
+      h('span', { class: 'el-icon' }, [h(icon)]),
+    ]),
+  }), root)
+  return root
 }
 function assetCell(row: TerminalSession) {
   const cell = document.createElement('div')
@@ -263,28 +262,35 @@ onBeforeUnmount(stopPlayback)
 }
 
 :deep(.audit-icon-action) {
-  width: 28px;
-  height: 28px;
-  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
   background: transparent;
-  color: #737b89;
-  cursor: pointer;
-  transition: background-color .15s, color .15s
+  color: var(--text-soft);
+  cursor: pointer
 }
 
-:deep(.audit-icon-action.view:hover) {
-  background: #eef2ff;
+:deep(.audit-icon-action .el-icon),
+:deep(.audit-icon-action svg) {
+  width: 16px;
+  height: 16px
+}
+
+:deep(.audit-icon-action:hover) {
+  border-color: var(--line);
+  background: #f6f7fa;
   color: var(--primary)
 }
 
 :deep(.audit-icon-action.delete:hover) {
-  background: #fff0f0;
-  color: #e85858
+  border-color: #ffd5d5;
+  background: #fff7f7;
+  color: #ef6262
 }
 
 :deep(.audit-type),
