@@ -7,6 +7,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/403', name: 'forbidden', component: () => import('@/views/HttpErrorView.vue'), props: { code: 403 }, meta: { public: true, title: '无权限' } },
   { path: '/404', name: 'not-found', component: () => import('@/views/HttpErrorView.vue'), props: { code: 404 }, meta: { public: true, title: '页面不存在' } },
   { path: '/429', name: 'too-many-requests', component: () => import('@/views/HttpErrorView.vue'), props: { code: 429 }, meta: { public: true, title: '请求过于频繁' } },
+  { path: '/assets/terminal', name: 'terminal', component: () => import('@/views/asset/TerminalView.vue'), meta: { title: 'Web终端', permission: 'POST /api/v1/assets/hosts/list' } },
   {
     path: '/',
     component: () => import('@/layouts/Layout.vue'),
@@ -21,7 +22,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'assets/cloud-accounts', name: 'cloud-accounts', component: () => import('@/views/asset/CloudAccountsView.vue'), meta: { title: '云账号', permission: 'POST /api/v1/assets/cloud-accounts/list' } },
       { path: 'assets/hosts', name: 'hosts', component: () => import('@/views/asset/HostsView.vue'), meta: { title: '主机管理', permission: 'POST /api/v1/assets/hosts/list' } },
       { path: 'assets/db-instances', name: 'db-instances', component: () => import('@/views/asset/DBInstancesView.vue'), meta: { title: '数据库管理', permission: 'POST /api/v1/assets/db-instances/list' } },
-      { path: 'assets/terminal', name: 'terminal', component: () => import('@/views/asset/TerminalView.vue'), meta: { title: '终端', permission: 'POST /api/v1/assets/hosts/list' } },
       { path: 'assets/terminal-audit', name: 'terminal-audit', component: () => import('@/views/asset/TerminalAuditView.vue'), meta: { title: '终端审计', permission: 'POST /api/v1/assets/terminal-sessions/list' } },
       { path: 'monitor/domains', name: 'monitor-domains', component: () => import('@/views/monitor/DomainMonitorView.vue'), meta: { title: '域名监控', permission: 'POST /api/v1/monitor/domains/list' } },
       { path: 'monitor/channels', name: 'monitor-channels', component: () => import('@/views/monitor/AlertChannelsView.vue'), meta: { title: '告警通道', permission: 'POST /api/v1/monitor/channels/list' } },

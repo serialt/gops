@@ -594,6 +594,28 @@ func (b *AssetBiz) CollectDBInstanceInfo(ctx context.Context, req *api.DbInstanc
 	return dbInstanceResponse(*updated), nil
 }
 
+func (b *AssetBiz) TestDBInstanceConnection(ctx context.Context, req *api.DbInstanceTestRequest) (*api.DbInstanceTestResponse, error) {
+	credential, err := b.repo.GetCredential(ctx, req.CredentialID)
+	if err != nil {
+		return nil, fmt.Errorf("读取数据库凭据失败: %w", err)
+	}
+	if credential.CredentialType != "password" {
+		return nil, fmt.Errorf("数据库连接仅支持用户名密码凭据")
+	}
+	password, err := cryptox.Decrypt(b.aesKey, credential.Password)
+	if err != nil {
+		return nil, fmt.Errorf("解密数据库凭据: %w", err)
+	}
+	testCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	instance := &model.DbInstance{DbType: req.DbType, Host: req.Host, Port: req.Port}
+	version, err := collectDatabaseVersion(testCtx, instance, credential.Username, password)
+	if err != nil {
+		return nil, err
+	}
+	return &api.DbInstanceTestResponse{Version: version}, nil
+}
+
 func (b *AssetBiz) collectDBInstanceAsync(id int64) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

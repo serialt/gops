@@ -55,6 +55,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/db-instances/list", h.ListDBInstances)
 	g.POST("/assets/db-instances/create", h.CreateDBInstance)
 	g.POST("/assets/db-instances/update", h.UpdateDBInstance)
+	g.POST("/assets/db-instances/test", h.TestDBInstanceConnection)
 	g.POST("/assets/db-instances/collect", h.CollectDBInstanceInfo)
 	g.POST("/assets/db-instances/delete", h.DeleteDBInstance)
 
@@ -439,6 +440,21 @@ func (h *AssetHandler) UpdateDBInstance(c *gin.Context) {
 		return
 	}
 	result, err := h.biz.UpdateDBInstance(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// TestDBInstanceConnection POST /api/v1/assets/db-instances/test 测试数据库连接。
+func (h *AssetHandler) TestDBInstanceConnection(c *gin.Context) {
+	req := new(api.DbInstanceTestRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid database connection data")
+		return
+	}
+	result, err := h.biz.TestDBInstanceConnection(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return

@@ -13,6 +13,11 @@ type AssetRepo struct{ db *gorm.DB }
 
 func NewAssetRepo(db *gorm.DB) *AssetRepo { return &AssetRepo{db: db} }
 
+func (r *AssetRepo) GetCredential(ctx context.Context, id int64) (*model.Credential, error) {
+	q := query.Use(r.db)
+	return q.Credential.WithContext(ctx).Where(q.Credential.ID.Eq(id)).First()
+}
+
 func (r *AssetRepo) GetDBInstanceAndCredential(ctx context.Context, id int64) (*model.DbInstance, *model.Credential, error) {
 	q := query.Use(r.db)
 	instance, err := q.DbInstance.WithContext(ctx).Where(q.DbInstance.ID.Eq(id)).First()

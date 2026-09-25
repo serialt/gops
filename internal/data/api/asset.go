@@ -171,6 +171,15 @@ type DbInstanceRequest struct {
 type DbInstanceIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
 }
+type DbInstanceTestRequest struct {
+	DbType       string `json:"db_type" binding:"required"`
+	Host         string `json:"host" binding:"required"`
+	Port         int64  `json:"port" binding:"min=1,max=65535"`
+	CredentialID int64  `json:"credential_id" binding:"required"`
+}
+type DbInstanceTestResponse struct {
+	Version string `json:"version"`
+}
 type DbInstanceResponse struct {
 	ID           int64     `json:"id"`
 	GroupID      int64     `json:"group_id"`
