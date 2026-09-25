@@ -618,7 +618,9 @@ onBeforeUnmount(() => {
 .asset-divider {
   position: relative;
   z-index: 4;
+  margin: 8px 0;
   background: #3b3c40;
+  border-radius: 6px;
   cursor: col-resize;
   touch-action: none
 }
