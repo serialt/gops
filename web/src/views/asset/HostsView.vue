@@ -1,10 +1,28 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'; import { ElMessage, ElMessageBox } from 'element-plus'; import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { createCredential, createHost, deleteHost, listAssetGroups, listCloudAccounts, listCredentials, listHosts, type AssetGroup, type CloudAccount, type Credential, type Host, updateHost } from '@/api/asset'
+import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox } from 'element-plus'; import { ArrowLeft, ArrowRight, Cpu, Delete, Edit, Folder, Monitor, Refresh, Search } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectHostInfo, createCredential, createHost, deleteHost, listAssetGroups, listCloudAccounts, listCredentials, listHosts, type AssetGroup, type CloudAccount, type Credential, type Host, updateHost } from '@/api/asset'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 interface AssetTreeNode { id: number; label: string; children: AssetTreeNode[] }
-const rows = ref<Host[]>([]); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const cloudAccounts = ref<CloudAccount[]>([]); const keyword = ref(''); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ name: string; group_id: number | null; host_type: string; ip: string; port: number; ssh_user: string; credential_id: number | null; cloud_account_id: number | null; tags: string; description: string; status: number }>({ name: '', group_id: null, host_type: '', ip: '', port: 22, ssh_user: 'root', credential_id: null, cloud_account_id: null, tags: '', description: '', status: -1 })
+const rows = ref<Host[]>([]); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const cloudAccounts = ref<CloudAccount[]>([]); const keyword = ref(''); const statusFilter = ref<number | null>(null); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ name: string; group_id: number | null; host_type: string; ip: string; port: number; ssh_user: string; credential_id: number | null; cloud_account_id: number | null; tags: string; description: string; status: number }>({ name: '', group_id: null, host_type: '', ip: '', port: 22, ssh_user: 'root', credential_id: null, cloud_account_id: null, tags: '', description: '', status: -1 })
+const router = useRouter(); const auth = useAuthStore()
 const tagItems = computed(() => form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
+const hostTypeLabels: Record<string, string> = { self: '自建主机', cloud: '云主机' }
+const visibleRows = computed(() => statusFilter.value === null ? rows.value : rows.value.filter(row => row.status === statusFilter.value))
 const treeData = computed<AssetTreeNode[]>(() => { const nodes = new Map<number, AssetTreeNode>(); const roots: AssetTreeNode[] = []; groups.value.forEach(group => nodes.set(group.id, { id: group.id, label: group.name, children: [] })); groups.value.forEach(group => { const node = nodes.get(group.id); const parent = nodes.get(group.parent_id); if (!node) return; if (group.parent_id && parent) parent.children.push(node); else roots.push(node) }); return roots })
-function action(text: string, kind: string, fn: () => void) { const el = document.createElement('button'); el.textContent = text; el.className = `host-action ${kind}`; el.onclick = fn; return el }; const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '主机名称', minWidth: 130 }, { field: 'ip', headerName: '地址', minWidth: 140 }, { field: 'port', headerName: '端口', width: 80 }, { field: 'ssh_user', headerName: 'SSH 用户', width: 110 }, { field: 'host_type', headerName: '类型', width: 100 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value === 1 ? '' : ' is-disabled'}">${p.value === 1 ? '在线' : p.value === 0 ? '离线' : '未知'}</span>` }, { field: 'tags', headerName: '标签', minWidth: 120 }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'host-actions'; wrap.append(action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
+function componentIcon(icon: Component, className = 'el-icon') { const root = document.createElement('span'); root.className = className; render(h(icon), root); return root }
+function hostRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = `host-summary status-${p.data.status}`; const icon = componentIcon(Monitor, 'host-summary-icon el-icon'); const text = document.createElement('span'); text.className = 'host-summary-text'; const name = document.createElement('strong'); name.textContent = p.data.name || '-'; const address = document.createElement('small'); address.textContent = `${p.data.ip || '-'}:${p.data.port || 22}`; text.append(name, address); wrap.append(icon, text); return wrap }
+function typeRenderer(p: any) { const tag = document.createElement('span'); tag.className = `host-type is-${p.value || 'unknown'}`; tag.textContent = hostTypeLabels[String(p.value || '')] || '未知'; return tag }
+function statusRenderer(p: any) { const tag = document.createElement('span'); tag.className = `host-status is-${p.value}`; tag.textContent = p.value === 1 ? '在线' : p.value === 0 ? '离线' : '未知'; return tag }
+function tagsRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-tags'; const tags = String(p.value || '').split(',').map((tag: string) => tag.trim()).filter(Boolean); if (!tags.length) { wrap.textContent = '-'; return wrap }; tags.slice(0, 2).forEach((value: string) => { const tag = document.createElement('span'); tag.textContent = value; wrap.append(tag) }); if (tags.length > 2) { const more = document.createElement('small'); more.textContent = `+${tags.length - 2}`; wrap.append(more) }; return wrap }
+function actionIcon(title: string, kind: string, icon: Component, fn: () => void) { const el = document.createElement('button'); el.type = 'button'; el.title = title; el.setAttribute('aria-label', title); el.className = `host-action-icon ${kind}`; el.append(componentIcon(icon)); el.onclick = fn; return el }
+function openTerminal() { void router.push('/assets/terminal') }
+async function collectHost(row: Host) { await collectHostInfo(row.id); ElMessage.success(`${row.name} 信息采集成功`); await load() }
+function openFiles(row: Host) { ElMessage.info(`正在准备打开 ${row.name} 的文件管理`) }
+function actionRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-actions'; if (auth.hasPermission('POST /api/v1/assets/hosts/collect')) wrap.append(actionIcon('采集信息', 'collect', Refresh, () => { void collectHost(p.data) })); wrap.append(actionIcon('文件管理', 'files', Folder, () => openFiles(p.data))); if (auth.hasPermission('POST /api/v1/assets/hosts/update')) wrap.append(actionIcon('编辑', 'edit', Edit, () => edit(p.data))); if (auth.hasPermission('POST /api/v1/assets/hosts/delete')) wrap.append(actionIcon('删除', 'delete', Delete, () => remove(p.data))); return wrap }
+function formatBytes(value: number) { if (!value) return '-'; const units = ['B', 'K', 'M', 'G', 'T']; let size = value; let index = 0; while (size >= 1024 && index < units.length - 1) { size /= 1024; index++ }; return `${size.toFixed(index > 2 ? 1 : 0)}${units[index]}` }
+function metricRenderer(kind: 'cpu' | 'memory' | 'disk') { return (p: any) => { const row = p.data as Host; const usage = kind === 'cpu' ? row.cpu_usage : kind === 'memory' ? row.memory_usage : row.disk_usage; const headline = kind === 'cpu' ? (row.cpu_cores ? `${row.cpu_cores}核` : '-') : `${formatBytes(kind === 'memory' ? row.memory_used : row.disk_used)} / ${formatBytes(kind === 'memory' ? row.memory_total : row.disk_total)}`; const wrap = document.createElement('div'); wrap.className = `host-metric${usage >= 70 ? ' is-warning' : ''}`; const text = document.createElement('span'); text.textContent = headline; const details = document.createElement('div'); const bar = document.createElement('i'); const fill = document.createElement('b'); fill.style.width = `${Math.max(0, Math.min(100, usage || 0))}%`; bar.append(fill); const percent = document.createElement('small'); percent.textContent = usage ? `${usage.toFixed(1)}%` : '-'; details.append(bar, percent); wrap.append(text, details); return wrap } }
+function systemRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-system'; const os = document.createElement('span'); os.append(componentIcon(Monitor)); const osText = document.createElement('em'); osText.textContent = p.data.os || '-'; os.append(osText); const arch = document.createElement('small'); arch.append(componentIcon(Cpu)); const archText = document.createElement('em'); archText.textContent = p.data.arch || '-'; arch.append(archText); wrap.append(os, arch); return wrap }
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 58 }, { field: 'name', headerName: '主机', minWidth: 190, cellRenderer: hostRenderer }, { field: 'status', headerName: '状态', width: 86, cellRenderer: statusRenderer }, { field: 'host_type', headerName: '类型', width: 90, cellRenderer: typeRenderer }, { headerName: 'CPU', width: 132, cellRenderer: metricRenderer('cpu') }, { headerName: '内存', width: 160, cellRenderer: metricRenderer('memory') }, { headerName: '磁盘', width: 160, cellRenderer: metricRenderer('disk') }, { field: 'tags', headerName: '标签', width: 115, cellRenderer: tagsRenderer }, { headerName: '系统信息', minWidth: 170, flex: 1, cellRenderer: systemRenderer }, { headerName: '操作', pinned: 'right', width: 170, cellRenderer: actionRenderer }])
 async function load() { const { data } = await listHosts(keyword.value, selectedGroupID.value ?? 0); rows.value = data.data }
 async function loadFormOptions() { const [groupResult, credentialResult, cloudResult] = await Promise.all([listAssetGroups(), listCredentials(), listCloudAccounts()]); groups.value = groupResult.data.data; credentials.value = credentialResult.data.data; cloudAccounts.value = cloudResult.data.data }
 function selectTreeNode(node: AssetTreeNode) { selectedGroupID.value = node.id }
@@ -38,10 +56,10 @@ onMounted(() => { void load(); void loadFormOptions() })
             </div>
             <section class="section-card host-content">
                 <div class="page-toolbar">
-                    <el-input v-model="keyword" class="search-input" placeholder="搜索主机名称或地址" clearable @input="load" />
-                    <el-button type="primary" class="primary-btn" @click="create">新增主机</el-button>
+                    <div class="host-filters"><el-input v-model="keyword" class="search-input" placeholder="搜索主机名/IP..." clearable :prefix-icon="Search" @input="load" /><el-select v-model="statusFilter" class="status-filter" placeholder="主机状态" clearable><el-option label="在线" :value="1" /><el-option label="离线" :value="0" /><el-option label="未知" :value="-1" /></el-select></div>
+                    <div class="toolbar-actions"><el-button :icon="Monitor" @click="openTerminal">终端</el-button><el-button type="primary" class="primary-btn" @click="create">新增主机</el-button></div>
                 </div>
-                <AppDataGrid class="host-grid" :row-data="rows" :column-defs="columns" pagination />
+                <AppDataGrid class="host-grid" :row-data="visibleRows" :column-defs="columns" pagination />
             </section>
         </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑主机' : '新增主机'" width="60%">
             <el-form :model="form" label-width="92px" class="host-form">
@@ -93,6 +111,8 @@ onMounted(() => { void load(); void loadFormOptions() })
 .section-card { display: flex; flex-direction: column; min-height: 100%; padding: 12px 16px 16px; }
 .page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .search-input { width: 260px; }
+.host-filters, .toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.status-filter { width: 150px; }
 .host-grid { flex: 1; min-height: 0; }
 .host-grid :deep(.app-data-grid-shell) { height: 100%; }
 .content-divider { position: relative; width: 2px; cursor: col-resize; touch-action: none; background: transparent; }
@@ -120,31 +140,43 @@ onMounted(() => { void load(); void loadFormOptions() })
     position: absolute;
     inset: 0;
     display: flex;
-    gap: 8px;
+    gap: 5px;
     align-items: center;
     justify-content: flex-start;
     padding-left: 12px
 }
 
-:deep(.host-action) {
-    padding: 4px 9px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: #fff;
-    font-size: 11px;
-    box-shadow: 0 1px 3px rgba(24, 34, 53, .08)
-}
+:deep(.host-summary) { display: flex; align-items: center; gap: 9px; height: 100%; }
+:deep(.host-summary-icon) { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: none; border-radius: 9px; background: #f1f3f7; color: var(--text-muted); font-size: 18px; }
+:deep(.host-summary-icon svg) { width: 18px; height: 18px; }
+:deep(.host-summary.status-1 .host-summary-icon) { background: #eaf8e8; color: #58b83d; }
+:deep(.host-summary-text) { display: flex; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; line-height: 1.35; }
+:deep(.host-summary-text strong) { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+:deep(.host-summary-text small) { color: var(--text-muted); font-size: 11px; }
+:deep(.host-status) { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); }
+:deep(.host-status::before) { width: 7px; height: 7px; border-radius: 50%; background: currentColor; content: ''; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent); }
+:deep(.host-status.is-1) { color: #58b83d; }
+:deep(.host-status.is-0) { color: #ef6262; }
+:deep(.host-type) { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: #f6f7f9; color: var(--text-soft); }
+:deep(.host-type.is-cloud) { border-color: #f4d6a0; background: #fff9ef; color: #d79222; }
+:deep(.host-tags) { display: flex; align-items: center; gap: 4px; height: 100%; color: var(--text-muted); }
+:deep(.host-tags span), :deep(.host-tags small) { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border: 1px solid var(--line); border-radius: 6px; background: #f7f8fa; color: var(--text-soft); font-size: 10px; }
+:deep(.host-metric) { display: flex; flex-direction: column; justify-content: center; gap: 5px; height: 100%; color: var(--text-soft); font-size: 11px; line-height: 1.2; }
+:deep(.host-metric > span) { font-weight: 600; white-space: nowrap; }
+:deep(.host-metric > div) { display: grid; grid-template-columns: minmax(42px, 1fr) 34px; align-items: center; gap: 6px; }
+:deep(.host-metric i) { display: block; height: 5px; overflow: hidden; border-radius: 3px; background: #eceef5; }
+:deep(.host-metric b) { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+:deep(.host-metric.is-warning b) { background: #e5a331; }
+:deep(.host-metric small) { color: var(--text-muted); font-size: 9px; }
+:deep(.host-system) { display: flex; min-width: 0; flex-direction: column; justify-content: center; gap: 5px; height: 100%; line-height: 1.35; }
+:deep(.host-system > span), :deep(.host-system > small) { display: flex; min-width: 0; align-items: center; gap: 5px; color: var(--text-soft); }
+:deep(.host-system .el-icon) { width: 13px; height: 13px; flex: none; color: var(--text-muted); }
+:deep(.host-system em) { overflow: hidden; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+:deep(.host-system small) { color: var(--text-muted); font-size: 10px; }
 
-:deep(.host-action.edit) {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: #f7f8ff
-}
-
-:deep(.host-action.delete) {
-    border-color: #ffd5d5;
-    color: #ef6262;
-    background: #fff7f7
-}
+:deep(.host-action-icon) { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--text-soft); cursor: pointer; }
+:deep(.host-action-icon .el-icon), :deep(.host-action-icon svg) { width: 16px; height: 16px; }
+:deep(.host-action-icon:hover) { border-color: var(--line); background: #f6f7fa; color: var(--primary); }
+:deep(.host-action-icon.delete:hover) { border-color: #ffd5d5; background: #fff7f7; color: #ef6262; }
 @media (max-width: 900px) { .host-layout { grid-template-columns: 1fr !important; } .asset-tree-panel { max-height: 220px; overflow: auto; } .content-divider { display: none; } .search-input { width: min(260px, 60vw); } }
 </style>

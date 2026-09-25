@@ -33,6 +33,17 @@ type Host struct {
 	CreatedAt      time.Time      `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt      time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
 	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	CPUInfo        string         `gorm:"column:cpu_info;not null;default:''" json:"cpu_info"`
+	CPUCores       int64          `gorm:"column:cpu_cores;not null" json:"cpu_cores"`
+	CPUUsage       float64        `gorm:"column:cpu_usage;not null" json:"cpu_usage"`
+	MemoryTotal    int64          `gorm:"column:memory_total;not null" json:"memory_total"`
+	MemoryUsed     int64          `gorm:"column:memory_used;not null" json:"memory_used"`
+	MemoryUsage    float64        `gorm:"column:memory_usage;not null" json:"memory_usage"`
+	DiskTotal      int64          `gorm:"column:disk_total;not null" json:"disk_total"`
+	DiskUsed       int64          `gorm:"column:disk_used;not null" json:"disk_used"`
+	DiskUsage      float64        `gorm:"column:disk_usage;not null" json:"disk_usage"`
+	Uptime         string         `gorm:"column:uptime;not null;default:''" json:"uptime"`
+	Hostname       string         `gorm:"column:hostname;not null;default:''" json:"hostname"`
 }
 
 // TableName Host's table name

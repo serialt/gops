@@ -4,10 +4,12 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	"gops/internal/config"
 	"gops/internal/data/api"
 	"gops/internal/data/model"
+	"gops/internal/pkg/collector"
 	"gops/internal/pkg/cryptox"
 
 	"gorm.io/gorm"
@@ -442,6 +444,11 @@ func (b *AssetBiz) UpdateHost(req *api.HostRequest) (*api.HostResponse, error) {
 	updated := hostModel(req)
 	updated.ID = row.ID
 	updated.CreatedAt = row.CreatedAt
+	updated.LastSeenAt, updated.Os, updated.Kernel, updated.Arch = row.LastSeenAt, row.Os, row.Kernel, row.Arch
+	updated.CPUInfo, updated.CPUCores, updated.CPUUsage = row.CPUInfo, row.CPUCores, row.CPUUsage
+	updated.MemoryTotal, updated.MemoryUsed, updated.MemoryUsage = row.MemoryTotal, row.MemoryUsed, row.MemoryUsage
+	updated.DiskTotal, updated.DiskUsed, updated.DiskUsage = row.DiskTotal, row.DiskUsed, row.DiskUsage
+	updated.Uptime, updated.Hostname = row.Uptime, row.Hostname
 	if err := b.db.Save(&updated).Error; err != nil {
 		return nil, err
 	}
@@ -457,11 +464,34 @@ func (b *AssetBiz) DeleteHost(req *api.HostIDRequest) error {
 	}
 	return nil
 }
+
+func (b *AssetBiz) CollectHostInfo(req *api.HostIDRequest) (*api.HostResponse, error) {
+	host, client, err := b.dialHostSSH(req.ID)
+	if err != nil {
+		_ = b.db.Model(&model.Host{}).Where("id = ?", req.ID).Update("status", 0).Error
+		return nil, err
+	}
+	defer client.Close()
+	info, err := collector.New(sshCommandExecutor{client: client}).CollectAll()
+	if err != nil {
+		_ = b.db.Model(host).Update("status", 0).Error
+		return nil, err
+	}
+	now := time.Now()
+	updates := map[string]any{"status": 1, "last_seen_at": now, "os": info.OS, "kernel": info.Kernel, "arch": info.Arch, "cpu_info": info.CPU.JSON(), "cpu_cores": info.CPU.Cores, "cpu_usage": info.CPU.Usage, "memory_total": info.Memory.Total, "memory_used": info.Memory.Used, "memory_usage": info.Memory.Usage, "disk_total": info.Disk.Total, "disk_used": info.Disk.Used, "disk_usage": info.Disk.Usage, "uptime": info.Uptime, "hostname": info.Hostname}
+	if err := b.db.Model(host).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	if err := b.db.First(host, host.ID).Error; err != nil {
+		return nil, err
+	}
+	return hostResponse(*host), nil
+}
 func hostModel(req *api.HostRequest) model.Host {
 	return model.Host{Name: req.Name, GroupID: req.GroupID, HostType: req.HostType, IP: req.IP, Port: req.Port, SSHUser: req.SSHUser, CredentialID: req.CredentialID, CloudAccountID: req.CloudAccountID, Tags: req.Tags, Description: req.Description, Status: req.Status}
 }
 func hostResponse(r model.Host) *api.HostResponse {
-	return &api.HostResponse{ID: r.ID, Name: r.Name, GroupID: r.GroupID, HostType: r.HostType, IP: r.IP, Port: r.Port, SSHUser: r.SSHUser, CredentialID: r.CredentialID, CloudAccountID: r.CloudAccountID, Tags: r.Tags, Description: r.Description, Status: r.Status, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	return &api.HostResponse{ID: r.ID, Name: r.Name, GroupID: r.GroupID, HostType: r.HostType, IP: r.IP, Port: r.Port, SSHUser: r.SSHUser, CredentialID: r.CredentialID, CloudAccountID: r.CloudAccountID, Tags: r.Tags, Description: r.Description, Status: r.Status, LastSeenAt: r.LastSeenAt, OS: r.Os, Kernel: r.Kernel, Arch: r.Arch, CPUInfo: r.CPUInfo, CPUCores: r.CPUCores, CPUUsage: r.CPUUsage, MemoryTotal: r.MemoryTotal, MemoryUsed: r.MemoryUsed, MemoryUsage: r.MemoryUsage, DiskTotal: r.DiskTotal, DiskUsed: r.DiskUsed, DiskUsage: r.DiskUsage, Uptime: r.Uptime, Hostname: r.Hostname, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
 func (b *AssetBiz) ListDBInstances(req *api.DbInstanceListRequest) ([]*api.DbInstanceResponse, error) {

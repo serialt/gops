@@ -30,6 +30,7 @@ func Catalog() []Permission {
 		{Group: "资产管理", Name: "查看主机", Path: "/api/v1/assets/hosts/list", Method: "POST"},
 		{Group: "资产管理", Name: "新增主机", Path: "/api/v1/assets/hosts/create", Method: "POST"},
 		{Group: "资产管理", Name: "修改主机", Path: "/api/v1/assets/hosts/update", Method: "POST"},
+		{Group: "资产管理", Name: "采集主机信息", Path: "/api/v1/assets/hosts/collect", Method: "POST"},
 		{Group: "资产管理", Name: "删除主机", Path: "/api/v1/assets/hosts/delete", Method: "POST"},
 		{Group: "资产管理", Name: "查看数据库类型枚举", Path: "/api/v1/assets/db-instances/options", Method: "POST"},
 		{Group: "资产管理", Name: "查看数据库实例", Path: "/api/v1/assets/db-instances/list", Method: "POST"},

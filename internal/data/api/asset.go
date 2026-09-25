@@ -132,6 +132,21 @@ type HostResponse struct {
 	Tags           string    `json:"tags"`
 	Description    string    `json:"description"`
 	Status         int64     `json:"status"`
+	LastSeenAt     time.Time `json:"last_seen_at"`
+	OS             string    `json:"os"`
+	Kernel         string    `json:"kernel"`
+	Arch           string    `json:"arch"`
+	CPUInfo        string    `json:"cpu_info"`
+	CPUCores       int64     `json:"cpu_cores"`
+	CPUUsage       float64   `json:"cpu_usage"`
+	MemoryTotal    int64     `json:"memory_total"`
+	MemoryUsed     int64     `json:"memory_used"`
+	MemoryUsage    float64   `json:"memory_usage"`
+	DiskTotal      int64     `json:"disk_total"`
+	DiskUsed       int64     `json:"disk_used"`
+	DiskUsage      float64   `json:"disk_usage"`
+	Uptime         string    `json:"uptime"`
+	Hostname       string    `json:"hostname"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }

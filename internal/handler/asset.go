@@ -48,6 +48,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/hosts/list", h.ListHosts)
 	g.POST("/assets/hosts/create", h.CreateHost)
 	g.POST("/assets/hosts/update", h.UpdateHost)
+	g.POST("/assets/hosts/collect", h.CollectHostInfo)
 	g.POST("/assets/hosts/delete", h.DeleteHost)
 
 	g.POST("/assets/db-instances/options", h.DatabaseTypeOptions)
@@ -59,7 +60,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
 	g.POST("/assets/terminal-sessions/recording", h.GetTerminalSessionRecording)
 	g.POST("/assets/terminal-sessions/delete", h.DeleteTerminalSession)
-}	
+}
 
 // ConnectTerminal GET /api/v1/assets/terminal/connect/:id 建立 SSH WebSocket 终端连接。
 func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
@@ -358,6 +359,21 @@ func (h *AssetHandler) UpdateHost(c *gin.Context) {
 		return
 	}
 	result, err := h.biz.UpdateHost(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// CollectHostInfo POST /api/v1/assets/hosts/collect 通过 SSH 采集主机运行信息。
+func (h *AssetHandler) CollectHostInfo(c *gin.Context) {
+	req := new(api.HostIDRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid host id")
+		return
+	}
+	result, err := h.biz.CollectHostInfo(req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return

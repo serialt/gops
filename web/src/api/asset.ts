@@ -46,11 +46,12 @@ export const createCloudAccount = (data: CloudAccountRequest) => request.post<Cl
 export const updateCloudAccount = (data: Required<Pick<CloudAccountRequest, 'id'>> & CloudAccountRequest) => request.post<CloudAccount>('/assets/cloud-accounts/update', data)
 export const deleteCloudAccount = (id: number) => request.post<null>('/assets/cloud-accounts/delete', { id })
 
-export interface Host { id:number; name:string; group_id:number; host_type:string; ip:string; port:number; ssh_user:string; credential_id:number; cloud_account_id:number; tags:string; description:string; status:number; created_at:string; updated_at:string }
+export interface Host { id:number; name:string; group_id:number; host_type:string; ip:string; port:number; ssh_user:string; credential_id:number; cloud_account_id:number; tags:string; description:string; status:number; last_seen_at:string; os:string; kernel:string; arch:string; cpu_info:string; cpu_cores:number; cpu_usage:number; memory_total:number; memory_used:number; memory_usage:number; disk_total:number; disk_used:number; disk_usage:number; uptime:string; hostname:string; created_at:string; updated_at:string }
 export interface HostRequest { id?:number; name:string; group_id:number; host_type:string; ip:string; port:number; ssh_user:string; credential_id:number; cloud_account_id:number; tags:string; description:string; status:number }
 export const listHosts = (keyword='', group_id=0) => request.post<Host[]>('/assets/hosts/list', { keyword, group_id })
 export const createHost = (data:HostRequest) => request.post<Host>('/assets/hosts/create',data)
 export const updateHost = (data:Required<Pick<HostRequest,'id'>>&HostRequest) => request.post<Host>('/assets/hosts/update',data)
+export const collectHostInfo = (id:number) => request.post<Host>('/assets/hosts/collect',{id})
 export const deleteHost = (id:number) => request.post<null>('/assets/hosts/delete',{id})
 
 export interface DbInstance { id:number; name:string; db_type:string; host:string; port:number; username:string; version:string; credential_id:number; tags:string; description:string; status:boolean; created_at:string; updated_at:string }

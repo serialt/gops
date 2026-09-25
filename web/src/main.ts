@@ -1,6 +1,7 @@
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { createPinia } from 'pinia'
 import TDesign from 'tdesign-vue-next'
 import 'tdesign-vue-next/es/style/index.css'
@@ -11,6 +12,9 @@ import router from './router'
 import './styles/global.css'
 
 const app = createApp(App)
+for (const [name, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(name, component)
+}
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
