@@ -4,8 +4,9 @@ const rows = ref<NginxSource[]>([]), keyword = ref(''), dialog = ref(false), for
 </script>
 <template>
     <section class="page">
-        <div class="toolbar"><el-input v-model="keyword" placeholder="搜索数据源" clearable /><el-button type="primary"
-                @click="open()">新增数据源</el-button></div>
+        <div class="toolbar"><el-input v-model="keyword" placeholder="搜索数据源" clearable />
+            <div class="toolbar-actions"><el-button type="primary" @click="open()">新增数据源</el-button></div>
+        </div>
         <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination :bulk-delete="batchRemove" />
         <el-dialog v-model="dialog" title="Nginx 数据源" width="520px"><el-form label-width="90px"><el-form-item
                     label="名称"><el-input v-model="form.name" /></el-form-item><el-form-item label="日志路径"><el-input
@@ -33,6 +34,16 @@ const rows = ref<NginxSource[]>([]), keyword = ref(''), dialog = ref(false), for
 
 .toolbar .el-input {
     width: 260px
+}
+
+.toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px
+}
+
+.toolbar-actions :deep(.el-button + .el-button) {
+    margin-left: 0
 }
 
 .grid {

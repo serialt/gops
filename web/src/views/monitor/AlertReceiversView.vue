@@ -54,8 +54,9 @@ onMounted(load)
 
 <template>
   <section class="receiver-page">
-    <div class="toolbar"><el-input v-model="keyword" placeholder="搜索接收人姓名或邮箱" clearable /><el-button type="primary"
-        @click="open()">新增接收人</el-button></div>
+    <div class="toolbar"><el-input v-model="keyword" placeholder="搜索接收人姓名或邮箱" clearable />
+      <div class="toolbar-actions"><el-button type="primary" @click="open()">新增接收人</el-button></div>
+    </div>
     <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination :bulk-delete="batchRemove" />
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑告警接收人' : '新增告警接收人'" width="min(760px, 76vw)"
       :close-on-click-modal="false" destroy-on-close>
@@ -107,6 +108,16 @@ onMounted(load)
 
 .toolbar .el-input {
   width: 280px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .grid {
