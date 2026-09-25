@@ -308,7 +308,9 @@ onBeforeUnmount(() => {
 }
 
 .asset-search :deep(.el-input__inner) {
-  color: #e1e3e8
+  color: #fff !important;
+  caret-color: #fff;
+  -webkit-text-fill-color: #fff
 }
 
 .asset-search :deep(.el-input__inner::placeholder) {
