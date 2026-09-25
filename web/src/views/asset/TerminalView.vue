@@ -561,14 +561,25 @@ onBeforeUnmount(() => {
 }
 
 .asset-title {
+  position: relative;
   height: 42px;
   padding: 0 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-sizing: border-box;
-  font-weight: 700;
-  border-bottom: 1px solid #393a3e
+  font-weight: 700
+}
+
+.asset-title::after {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  height: 1px;
+  border-radius: 2px;
+  background: #393a3e;
+  content: ''
 }
 
 .asset-title>span {
@@ -801,14 +812,25 @@ onBeforeUnmount(() => {
 }
 
 .session-tabs {
+  position: relative;
   height: 42px;
   display: flex;
   align-items: flex-end;
   padding-left: 8px;
   background: #303135;
-  border-bottom: 1px solid #3b3c40;
   box-sizing: border-box;
   overflow-x: auto
+}
+
+.session-tabs::after {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: #3b3c40;
+  content: ''
 }
 
 .session-tab {
