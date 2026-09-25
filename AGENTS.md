@@ -50,6 +50,7 @@
 - 新增或调整接口时，必须同步修改 Gin 路由、Casbin 权限目录、前端 API 封装、页面调用及 `v-permission` 权限键。
 - 每个对外 Gin handler 方法必须紧邻方法声明前添加 Go 文档注释，格式为：`// 方法名 POST /api/v1/完整路由 功能说明。`；方法与路由变更时必须同步更新该注释。
 - 所有数据列表接口必须接收 `page`、`limit`，由后端查询层执行 `Count` 和 `Offset/Limit`，并统一返回 `{ "list": [...], "total": n }`；前端不得获取全量数据后自行分页。树形选项、关联下拉等非列表展示场景也必须显式传分页参数，并根据业务需要设置受控的 `limit`。
+- 前端列表请求中的 `page` 必须取列表右下角分页器的当前页码，`limit` 必须取分页器当前选择的每页条数；切换每页条数时将 `page` 重置为 `1` 后重新请求，切换页码时保持当前 `limit`。
 
 ## 后端分层规范
 
@@ -71,6 +72,9 @@
 - 所有业务数据库读写必须封装在 `internal/data/repo/` 中；`internal/data/query/` 生成的类型安全 Query API 只能由 Repo 层直接使用，handler、biz 及其他业务代码禁止直接引用生成的 Query。
 - Repo 必须使用 GORM Gen Query API 完成查询和写入，禁止使用 `db.Where`、`db.First`、`db.Find`、`db.Raw` 等方式拼写业务查询。新增字段或 Query 能力不足时，应先完成 SQL 迁移并重新生成代码。
 - Repo 方法必须显式接收 `*gorm.DB` 参数，并通过 `query.Use(db)` 创建 GORM Gen Query；Repo 结构体不得长期持有数据库连接。Biz 在普通调用时传入自身数据库连接，在事务中传入当前 `tx`，以保证同一 Repo 方法同时支持普通查询和事务查询。
+- Repo 中所有 `List` 类型方法必须接收定义在 `internal/data/define/` 中的 `XxxListCond` 指针，不得通过多个独立参数传递分页、关键词或业务过滤条件。API Request 仅用于接口层，Biz 负责将 Request 显式转换为对应 Cond，Repo 禁止依赖 `internal/data/api`。
+- Biz 只向 Repo 透传请求中的 `page`、`limit`，不得在 Biz 中计算 offset。Repo 负责规范化分页参数、计算 `offset = (page - 1) * limit`，并在完成过滤和排序条件构造后调用 GORM Gen 的 `FindByPage(offset, limit)`，直接取得当前页数据和总数；禁止分别调用 `Count()` 与 `Offset/Limit/Find()` 拼装分页结果。
+- 分页参数规范化和 offset 计算统一复用 `internal/pkg/utils.PageBounds`，禁止在各 Repo 中重复定义分页计算工具。
 - 需要事务时，由 Biz 发起业务事务编排，并将事务 `*gorm.DB` 传递给 Repo；Repo 不得自行开启或提交业务事务。仅数据库初始化、Goose 迁移、GORM Gen 代码生成等基础设施代码可以直接操作底层 `*gorm.DB`。
 - 数据模型位于 `internal/data/model/`，使用 SQLite model 格式：包含 `TableName<模型名>` 常量、`// <模型> mapped from table <表名>` 注释，以及指针接收器的 `TableName()` 方法。
 - model 字段统一使用 `gorm:"column:<name>;..." json:"<name>"` 格式；字段业务说明通过同一行末尾注释维护。

@@ -3,8 +3,10 @@ package repo
 import (
 	"context"
 
+	"gops/internal/data/define"
 	"gops/internal/data/model"
 	"gops/internal/data/query"
+	"gops/internal/pkg/utils"
 
 	"gorm.io/gen/field"
 	"gorm.io/gorm"
@@ -14,85 +16,65 @@ type AssetRepo struct{}
 
 func NewAssetRepo() *AssetRepo { return &AssetRepo{} }
 
-func (r *AssetRepo) ListGroups(ctx context.Context, db *gorm.DB, keyword string, offset, limit int) ([]*model.AssetGroup, int64, error) {
+func (r *AssetRepo) ListGroups(ctx context.Context, db *gorm.DB, cond *define.AssetGroupListCond) ([]*model.AssetGroup, int64, error) {
+	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).AssetGroup
 	do := q.WithContext(ctx)
-	if keyword != "" {
-		value := "%" + keyword + "%"
+	if cond.Keyword != "" {
+		value := "%" + cond.Keyword + "%"
 		do = do.Where(field.Or(q.Name.Like(value), q.Code.Like(value)))
 	}
-	total, err := do.Count()
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := do.Order(q.SortOrder, q.ID).Offset(offset).Limit(limit).Find()
-	return rows, total, err
+	return do.Order(q.SortOrder, q.ID).FindByPage(offset, limit)
 }
 
-func (r *AssetRepo) ListCredentials(ctx context.Context, db *gorm.DB, keyword string, offset, limit int) ([]*model.Credential, int64, error) {
+func (r *AssetRepo) ListCredentials(ctx context.Context, db *gorm.DB, cond *define.CredentialListCond) ([]*model.Credential, int64, error) {
+	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).Credential
 	do := q.WithContext(ctx)
-	if keyword != "" {
-		value := "%" + keyword + "%"
+	if cond.Keyword != "" {
+		value := "%" + cond.Keyword + "%"
 		do = do.Where(field.Or(q.Name.Like(value), q.Username.Like(value)))
 	}
-	total, err := do.Count()
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := do.Order(q.ID.Desc()).Offset(offset).Limit(limit).Find()
-	return rows, total, err
+	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
 }
 
-func (r *AssetRepo) ListCloudAccounts(ctx context.Context, db *gorm.DB, keyword string, offset, limit int) ([]*model.CloudAccount, int64, error) {
+func (r *AssetRepo) ListCloudAccounts(ctx context.Context, db *gorm.DB, cond *define.CloudAccountListCond) ([]*model.CloudAccount, int64, error) {
+	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).CloudAccount
 	do := q.WithContext(ctx)
-	if keyword != "" {
-		value := "%" + keyword + "%"
+	if cond.Keyword != "" {
+		value := "%" + cond.Keyword + "%"
 		do = do.Where(field.Or(q.Name.Like(value), q.Provider.Like(value)))
 	}
-	total, err := do.Count()
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := do.Order(q.ID.Desc()).Offset(offset).Limit(limit).Find()
-	return rows, total, err
+	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
 }
 
-func (r *AssetRepo) ListHosts(ctx context.Context, db *gorm.DB, keyword string, groupID int64, offset, limit int) ([]*model.Host, int64, error) {
+func (r *AssetRepo) ListHosts(ctx context.Context, db *gorm.DB, cond *define.HostListCond) ([]*model.Host, int64, error) {
+	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).Host
 	do := q.WithContext(ctx)
-	if keyword != "" {
-		value := "%" + keyword + "%"
+	if cond.Keyword != "" {
+		value := "%" + cond.Keyword + "%"
 		do = do.Where(field.Or(q.Name.Like(value), q.IP.Like(value)))
 	}
-	if groupID > 0 {
-		do = do.Where(q.GroupID.Eq(groupID))
+	if cond.GroupID > 0 {
+		do = do.Where(q.GroupID.Eq(cond.GroupID))
 	}
-	total, err := do.Count()
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := do.Order(q.ID.Desc()).Offset(offset).Limit(limit).Find()
-	return rows, total, err
+	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
 }
 
-func (r *AssetRepo) ListDBInstances(ctx context.Context, db *gorm.DB, keyword string, groupID int64, offset, limit int) ([]*model.DbInstance, int64, error) {
+func (r *AssetRepo) ListDBInstances(ctx context.Context, db *gorm.DB, cond *define.DBInstanceListCond) ([]*model.DbInstance, int64, error) {
+	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).DbInstance
 	do := q.WithContext(ctx)
-	if keyword != "" {
-		value := "%" + keyword + "%"
+	if cond.Keyword != "" {
+		value := "%" + cond.Keyword + "%"
 		do = do.Where(field.Or(q.Name.Like(value), q.Host.Like(value)))
 	}
-	if groupID > 0 {
-		do = do.Where(q.GroupID.Eq(groupID))
+	if cond.GroupID > 0 {
+		do = do.Where(q.GroupID.Eq(cond.GroupID))
 	}
-	total, err := do.Count()
-	if err != nil {
-		return nil, 0, err
-	}
-	rows, err := do.Order(q.ID.Desc()).Offset(offset).Limit(limit).Find()
-	return rows, total, err
+	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
 }
 
 func (r *AssetRepo) GetCredential(ctx context.Context, db *gorm.DB, id int64) (*model.Credential, error) {

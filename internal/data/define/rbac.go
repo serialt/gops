@@ -7,6 +7,7 @@ type RbacCond struct {
 }
 
 type UserListCond struct {
+	PageCond
 	UserIds        []int64
 	Keyword        string `json:"keyword"`
 	OrganizationID int64  `json:"organization_id"`

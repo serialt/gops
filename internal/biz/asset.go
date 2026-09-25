@@ -13,6 +13,7 @@ import (
 
 	"gops/internal/config"
 	"gops/internal/data/api"
+	"gops/internal/data/define"
 	"gops/internal/data/model"
 	"gops/internal/data/repo"
 	"gops/internal/pkg/collector"
@@ -82,7 +83,7 @@ func (b *AssetBiz) DatabaseTypeOptions() []*api.DatabaseTypeOptionResponse {
 }
 
 func (b *AssetBiz) ListGroups(ctx context.Context, req *api.AssetGroupListRequest) (*api.PageResponse[*api.AssetGroupResponse], error) {
-	rows, total, err := b.repo.ListGroups(ctx, b.db, req.Keyword, req.Offset(), req.Limit)
+	rows, total, err := b.repo.ListGroups(ctx, b.db, &define.AssetGroupListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword})
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +220,7 @@ func assetGroupResponse(row model.AssetGroup) *api.AssetGroupResponse {
 }
 
 func (b *AssetBiz) ListCredentials(ctx context.Context, req *api.CredentialListRequest) (*api.PageResponse[*api.CredentialResponse], error) {
-	rows, total, err := b.repo.ListCredentials(ctx, b.db, req.Keyword, req.Offset(), req.Limit)
+	rows, total, err := b.repo.ListCredentials(ctx, b.db, &define.CredentialListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword})
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +302,7 @@ func credentialResponse(row model.Credential) *api.CredentialResponse {
 }
 
 func (b *AssetBiz) ListCloudAccounts(ctx context.Context, req *api.CloudAccountListRequest) (*api.PageResponse[*api.CloudAccountResponse], error) {
-	rows, total, err := b.repo.ListCloudAccounts(ctx, b.db, req.Keyword, req.Offset(), req.Limit)
+	rows, total, err := b.repo.ListCloudAccounts(ctx, b.db, &define.CloudAccountListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword})
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +405,7 @@ func cloudAccountResponse(row model.CloudAccount) *api.CloudAccountResponse {
 }
 
 func (b *AssetBiz) ListHosts(ctx context.Context, req *api.HostListRequest) (*api.PageResponse[*api.HostResponse], error) {
-	rows, total, err := b.repo.ListHosts(ctx, b.db, req.Keyword, req.GroupID, req.Offset(), req.Limit)
+	rows, total, err := b.repo.ListHosts(ctx, b.db, &define.HostListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword, GroupID: req.GroupID})
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +487,7 @@ func hostResponse(r model.Host) *api.HostResponse {
 }
 
 func (b *AssetBiz) ListDBInstances(ctx context.Context, req *api.DbInstanceListRequest) (*api.PageResponse[*api.DbInstanceResponse], error) {
-	rows, total, err := b.repo.ListDBInstances(ctx, b.db, req.Keyword, req.GroupID, req.Offset(), req.Limit)
+	rows, total, err := b.repo.ListDBInstances(ctx, b.db, &define.DBInstanceListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword, GroupID: req.GroupID})
 	if err != nil {
 		return nil, err
 	}
