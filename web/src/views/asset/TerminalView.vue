@@ -38,6 +38,11 @@ const sftpFileInput = ref<HTMLInputElement>()
 const sftpDirectoryInput = ref<HTMLInputElement>()
 const sftpUploading = ref(false)
 const sftpSelected = ref<string[]>([])
+type SftpColumn = 'size' | 'modified' | 'permissions'
+const sftpColumnWidths = ref({ size: 144, modified: 210, permissions: 150 })
+const sftpResizingColumn = ref<SftpColumn | null>(null)
+const sftpResizeStartX = ref(0)
+const sftpResizeStartWidth = ref(0)
 
 const sftpEntries = ref<SftpEntry[]>([])
 const filteredSftpEntries = computed(() => {
@@ -195,6 +200,31 @@ function toggleSftpEntry(name: string) {
     ? sftpSelected.value.filter(item => item !== name)
     : [...sftpSelected.value, name]
 }
+function startSftpColumnResize(event: PointerEvent, column: SftpColumn) {
+  if (event.button !== 0) return
+  event.preventDefault()
+  sftpResizingColumn.value = column
+  sftpResizeStartX.value = event.clientX
+  sftpResizeStartWidth.value = sftpColumnWidths.value[column]
+  document.addEventListener('pointermove', moveSftpColumnResize)
+  document.addEventListener('pointerup', stopSftpColumnResize)
+  document.addEventListener('pointercancel', stopSftpColumnResize)
+}
+function moveSftpColumnResize(event: PointerEvent) {
+  const column = sftpResizingColumn.value
+  if (!column) return
+  const minimum = column === 'size' ? 80 : 100
+  const maximum = column === 'modified' ? 480 : 360
+  sftpColumnWidths.value[column] = Math.max(minimum, Math.min(maximum, sftpResizeStartWidth.value + event.clientX - sftpResizeStartX.value))
+}
+function stopSftpColumnResize() {
+  if (!sftpResizingColumn.value) return
+  sftpResizingColumn.value = null
+  document.removeEventListener('pointermove', moveSftpColumnResize)
+  document.removeEventListener('pointerup', stopSftpColumnResize)
+  document.removeEventListener('pointercancel', stopSftpColumnResize)
+  window.getSelection()?.removeAllRanges()
+}
 function sftpAction(message: string) {
   ElMessage.info(message)
 }
@@ -293,6 +323,7 @@ onBeforeUnmount(() => {
   sessions.value.forEach(session => disposeSession(session.key))
   document.removeEventListener('pointermove', moveAssetPane)
   document.removeEventListener('pointerup', stopAssetPaneDrag)
+  stopSftpColumnResize()
 })
 </script>
 
@@ -412,20 +443,30 @@ onBeforeUnmount(() => {
                   <Close />
                 </el-icon></button>
             </header>
-            <div class="sftp-table-head"><span
-                class="sftp-check-spacer" /><span>名称</span><span>大小</span><span>修改时间</span><span>权限</span></div>
-            <div class="sftp-list">
-              <button v-for="entry in filteredSftpEntries" :key="entry.name" type="button" class="sftp-row"
-                :class="{ selected: sftpSelected.includes(entry.name) }" @dblclick="openSftpEntry(entry)"
-                @click="toggleSftpEntry(entry.name)">
-                <span class="sftp-check" :class="{ checked: sftpSelected.includes(entry.name) }" />
-                <span class="sftp-name"><el-icon>
-                    <FolderOpened v-if="entry.type === 'directory'" />
-                    <Document v-else />
-                  </el-icon>{{ entry.name }}</span>
-                <span>{{ entry.size }}</span><span>{{ entry.modified }}</span><span>{{ entry.permissions }}</span>
-              </button>
-              <div v-if="!filteredSftpEntries.length" class="sftp-empty">暂无目录数据</div>
+            <div class="sftp-table-scroll" :class="{ 'is-resizing': sftpResizingColumn }"
+              :style="{ '--sftp-size-width': `${sftpColumnWidths.size}px`, '--sftp-modified-width': `${sftpColumnWidths.modified}px`, '--sftp-permissions-width': `${sftpColumnWidths.permissions}px` }">
+              <div class="sftp-table-head"><span class="sftp-check-spacer" /><span class="sftp-name-head">名称</span>
+                <span class="sftp-column-head">大小<button type="button" class="sftp-resize-handle" aria-label="调整大小列宽度"
+                    title="拖动调整列宽" @pointerdown.stop="startSftpColumnResize($event, 'size')" /></span>
+                <span class="sftp-column-head">修改时间<button type="button" class="sftp-resize-handle"
+                    aria-label="调整修改时间列宽度" title="拖动调整列宽"
+                    @pointerdown.stop="startSftpColumnResize($event, 'modified')" /></span>
+                <span class="sftp-column-head">权限<button type="button" class="sftp-resize-handle" aria-label="调整权限列宽度"
+                    title="拖动调整列宽" @pointerdown.stop="startSftpColumnResize($event, 'permissions')" /></span>
+              </div>
+              <div class="sftp-list">
+                <button v-for="entry in filteredSftpEntries" :key="entry.name" type="button" class="sftp-row"
+                  :class="{ selected: sftpSelected.includes(entry.name) }" @dblclick="openSftpEntry(entry)"
+                  @click="toggleSftpEntry(entry.name)">
+                  <span class="sftp-check" :class="{ checked: sftpSelected.includes(entry.name) }" />
+                  <span class="sftp-name"><el-icon>
+                      <FolderOpened v-if="entry.type === 'directory'" />
+                      <Document v-else />
+                    </el-icon>{{ entry.name }}</span>
+                  <span>{{ entry.size }}</span><span>{{ entry.modified }}</span><span>{{ entry.permissions }}</span>
+                </button>
+                <div v-if="!filteredSftpEntries.length" class="sftp-empty">暂无目录数据</div>
+              </div>
             </div>
           </section>
         </div>
@@ -1118,29 +1159,42 @@ onBeforeUnmount(() => {
 
 .sftp-table-head,
 .sftp-row {
+  width: max(100%, calc(34px + 50px + var(--sftp-size-width) + var(--sftp-modified-width) + var(--sftp-permissions-width) + 52px));
   display: grid;
-  grid-template-columns: 24px minmax(280px, 1fr) 180px 300px 220px;
+  grid-template-columns: 34px minmax(50px, 1fr) var(--sftp-size-width) var(--sftp-modified-width) var(--sftp-permissions-width);
   align-items: center;
   column-gap: 8px;
   box-sizing: border-box
 }
 
-.sftp-table-head {
-  min-height: 38px;
-  padding: 0 10px;
-  color: #8c9098;
-  border-bottom: 1px solid #393a3e;
-  font-size: 10px
-}
-
-.sftp-list {
+.sftp-table-scroll {
   min-height: 0;
   flex: 1;
   overflow: auto
 }
 
+.sftp-table-scroll.is-resizing {
+  cursor: col-resize;
+  user-select: none
+}
+
+.sftp-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-height: 38px;
+  padding: 0 10px;
+  color: #8c9098;
+  background: #252628;
+  border-bottom: 1px solid #393a3e;
+  font-size: 10px
+}
+
+.sftp-list {
+  min-height: 0
+}
+
 .sftp-row {
-  width: 100%;
   min-height: 44px;
   padding: 0 10px;
   border: 0;
@@ -1159,15 +1213,22 @@ onBeforeUnmount(() => {
 }
 
 .sftp-check {
+  position: sticky;
+  left: 0;
+  z-index: 2;
   width: 12px;
   height: 12px;
   justify-self: start;
   border: 1px solid #73767d;
   border-radius: 3px;
+  background: #1d1e20;
   box-sizing: border-box
 }
 
 .sftp-check-spacer {
+  position: sticky;
+  left: 0;
+  z-index: 4;
   width: 12px;
   height: 1px
 }
@@ -1178,14 +1239,73 @@ onBeforeUnmount(() => {
 }
 
 .sftp-name {
+  position: sticky;
+  left: 42px;
+  z-index: 2;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 14px;
   overflow: hidden;
   color: #d7dae0;
+  background: #1d1e20;
   text-overflow: ellipsis;
   white-space: nowrap
+}
+
+.sftp-row:hover .sftp-check:not(.checked),
+.sftp-row.selected .sftp-check:not(.checked),
+.sftp-row:hover .sftp-name,
+.sftp-row.selected .sftp-name {
+  background: #343537
+}
+
+.sftp-name-head {
+  position: sticky;
+  left: 42px;
+  z-index: 4;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  background: #252628
+}
+
+.sftp-column-head {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap
+}
+
+.sftp-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -8px;
+  z-index: 5;
+  width: 16px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none
+}
+
+.sftp-resize-handle::after {
+  position: absolute;
+  top: 25%;
+  left: 7px;
+  width: 1px;
+  height: 50%;
+  background: #56585e;
+  content: ''
+}
+
+.sftp-resize-handle:hover::after {
+  width: 2px;
+  background: #55cbb5
 }
 
 .sftp-name .el-icon {
@@ -1253,7 +1373,6 @@ onBeforeUnmount(() => {
 
   .sftp-table-head,
   .sftp-row {
-    grid-template-columns: 16px minmax(180px, 1fr) 100px 160px 130px;
     font-size: 10px
   }
 }
