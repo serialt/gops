@@ -1,25 +1,31 @@
 package biz
 
 import (
-	"gops/internal/data/api"
-	"gops/internal/data/model"
+	"context"
+	"time"
 
-	"gorm.io/gorm"
+	"gops/internal/data/api"
+	"gops/internal/data/repo"
 )
 
 type DashboardBiz struct {
-	db *gorm.DB
+	repo *repo.DashboardRepo
 }
 
-func NewDashboardBiz(db *gorm.DB) *DashboardBiz {
-	return &DashboardBiz{db: db}
+func NewDashboardBiz(dashboardRepo *repo.DashboardRepo) *DashboardBiz {
+	return &DashboardBiz{repo: dashboardRepo}
 }
 
-func (b *DashboardBiz) Stats() *api.DashboardStatsResponse {
-	result := &api.DashboardStatsResponse{}
-	b.db.Model(&model.User{}).Count(&result.Users)
-	b.db.Model(&model.User{}).Where("status = ?", true).Count(&result.EnabledUsers)
-	b.db.Model(&model.Role{}).Count(&result.Roles)
-	b.db.Table("casbin_rule").Where("ptype = ?", "p").Count(&result.Policies)
-	return result
+func (b *DashboardBiz) Stats(ctx context.Context) (*api.DashboardStatsResponse, error) {
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	stats, err := b.repo.Stats(ctx, todayStart)
+	if err != nil {
+		return nil, err
+	}
+	return &api.DashboardStatsResponse{
+		HostsTotal: stats.HostsTotal, HostsOnline: stats.HostsOnline, HostsOffline: stats.HostsTotal - stats.HostsOnline,
+		ClustersTotal: stats.ClustersTotal, NodesTotal: stats.NodesTotal, PodsTotal: stats.PodsTotal,
+		TodayOperations: stats.TodayOperations, ActiveAlerts: stats.ActiveAlerts,
+	}, nil
 }

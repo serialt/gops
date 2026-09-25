@@ -2,49 +2,49 @@
 import { computed, onMounted, ref } from 'vue'
 import { getDashboardStats } from '@/api/dashboard'
 
-const stats = ref({ users: 0, enabled_users: 0, roles: 0, policies: 0 })
+const stats = ref({ hosts_total: 0, hosts_online: 0, hosts_offline: 0, clusters_total: 0, nodes_total: 0, pods_total: 0, today_operations: 0, active_alerts: 0 })
 
 const topCards = computed(() => [
   {
     title: '主机总数',
-    value: stats.value.users,
-    secondary: '在线状态',
+    value: stats.value.hosts_total,
+    secondary: `在线 ${stats.value.hosts_online} · 离线 ${stats.value.hosts_offline}`,
     accent: 'blue',
     tone: 'blue',
   },
   {
     title: 'K8s 集群',
-    value: '0',
-    secondary: '集群资源',
+    value: stats.value.clusters_total,
+    secondary: `节点 ${stats.value.nodes_total} · Pod ${stats.value.pods_total}`,
     accent: 'green',
     tone: 'green',
   },
   {
     title: '今日操作',
-    value: '0',
+    value: stats.value.today_operations,
     secondary: '审计记录',
     accent: 'cyan',
     tone: 'cyan',
   },
   {
     title: '活跃告警',
-    value: '0',
-    secondary: '告警事件',
+    value: stats.value.active_alerts,
+    secondary: '待处理告警',
     accent: 'red',
     tone: 'red',
   },
 ])
 
 const onlineRate = computed(() => {
-  if (!stats.value.users) return 0
-  return Math.min(100, Math.round((stats.value.enabled_users / stats.value.users) * 100))
+  if (!stats.value.hosts_total) return 0
+  return Math.min(100, Math.round((stats.value.hosts_online / stats.value.hosts_total) * 100))
 })
 
 const donutStyle = computed(() => ({
   background: `conic-gradient(#2bb673 0 ${onlineRate.value}%, #dfe5ec ${onlineRate.value}% 100%)`,
 }))
 
-const dotValue = computed(() => Math.max(stats.value.enabled_users || 0, 0))
+const dotValue = computed(() => Math.max(stats.value.hosts_online || 0, 0))
 
 onMounted(async () => {
   const { data } = await getDashboardStats()
@@ -87,8 +87,8 @@ onMounted(async () => {
           <div class="status-row"><span class="legend legend--green"></span> 在线 <span class="count">{{ dotValue
               }}</span></div>
           <div class="status-row"><span class="legend legend--gray"></span> 离线 <span class="count">{{
-            Math.max((stats.users || 0) - dotValue, 0) }}</span></div>
-          <div class="status-row"><span class="legend legend--default"></span> 资产总量 <span class="count">{{ stats.users
+            stats.hosts_offline }}</span></div>
+          <div class="status-row"><span class="legend legend--default"></span> 资产总量 <span class="count">{{ stats.hosts_total
               }}</span></div>
         </div>
       </section>
@@ -101,36 +101,20 @@ onMounted(async () => {
 
         <div class="resource-summary">
           <div class="summary-box">
-            <div class="summary-value">0</div>
+            <div class="summary-value">{{ stats.nodes_total }}</div>
             <div class="summary-label">节点总数</div>
           </div>
           <div class="summary-box">
-            <div class="summary-value">0</div>
+            <div class="summary-value">{{ stats.pods_total }}</div>
             <div class="summary-label">Pod 总数</div>
           </div>
           <div class="summary-box">
-            <div class="summary-value">0</div>
+            <div class="summary-value">{{ stats.clusters_total }}</div>
             <div class="summary-label">集群数量</div>
           </div>
         </div>
 
-        <div class="chart-area">
-          <div class="chart-grid"></div>
-          <div class="chart-bars">
-            <span class="bar bar--blue" style="height: 20%"></span>
-            <span class="bar bar--green" style="height: 60%"></span>
-            <span class="bar bar--blue" style="height: 35%"></span>
-            <span class="bar bar--green" style="height: 80%"></span>
-            <span class="bar bar--blue" style="height: 55%"></span>
-            <span class="bar bar--green" style="height: 46%"></span>
-            <span class="bar bar--blue" style="height: 30%"></span>
-          </div>
-        </div>
-
-        <div class="legend-row">
-          <span><i class="legend legend--green"></i>节点</span>
-          <span><i class="legend legend--blue"></i>Pod</span>
-        </div>
+        <div class="resource-details"><div><span>平均节点数</span><strong>{{ stats.clusters_total ? (stats.nodes_total / stats.clusters_total).toFixed(1) : '0' }}</strong></div><div><span>平均 Pod 数</span><strong>{{ stats.clusters_total ? (stats.pods_total / stats.clusters_total).toFixed(1) : '0' }}</strong></div></div>
       </section>
     </div>
   </div>
@@ -392,6 +376,30 @@ onMounted(async () => {
 .summary-label {
   font-size: 12px;
   color: #5c6978;
+}
+
+.resource-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.resource-details>div {
+  display: flex;
+  min-height: 92px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  color: var(--text-soft);
+}
+
+.resource-details strong {
+  color: var(--text);
+  font-size: 24px;
 }
 
 .chart-area {
