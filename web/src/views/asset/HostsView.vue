@@ -78,7 +78,9 @@ onMounted(() => { void load(); void loadFormOptions() })
                             @click="openTerminal">终端</el-button><el-button type="primary" class="primary-btn"
                             @click="create">新增主机</el-button></div>
                 </div>
-                <AppDataGrid class="host-grid" :row-data="visibleRows" :column-defs="columns" pagination server-pagination :total="total" :current-page="page" :page-size="pageSize" @page-change="changePage" @page-size-change="changePageSize" />
+                <AppDataGrid class="host-grid" :row-data="visibleRows" :column-defs="columns" pagination
+                    server-pagination :total="total" :current-page="page" :page-size="pageSize"
+                    @page-change="changePage" @page-size-change="changePageSize" />
             </section>
         </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑主机' : '新增主机'" width="60%">
             <el-form :model="form" label-width="92px" class="host-form">
@@ -126,7 +128,10 @@ onMounted(() => { void load(); void loadFormOptions() })
                 <el-form-item label="备注"><el-input v-model="form.description" type="textarea" :rows="3"
                         placeholder="请输入备注信息" /></el-form-item>
             </el-form>
-            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button v-permission="'POST /api/v1/assets/hosts/test'" :loading="testingConnection" @click="testConnection">测试连接</el-button><el-button type="primary" @click="save">保存</el-button></template>
+            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button
+                    v-permission="'POST /api/v1/assets/hosts/test'" :loading="testingConnection"
+                    @click="testConnection">测试连接</el-button><el-button type="primary"
+                    @click="save">保存</el-button></template>
         </el-dialog>
         <el-dialog v-model="credentialDialogVisible" title="新建凭据" width="460px" append-to-body>
             <el-form :model="credentialForm" label-width="82px" class="credential-form">
@@ -280,7 +285,11 @@ onMounted(() => { void load(); void loadFormOptions() })
 .toolbar-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+}
+
+.toolbar-actions :deep(.el-button + .el-button) {
+    margin-left: 0;
 }
 
 .status-filter {
