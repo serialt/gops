@@ -6,7 +6,7 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import gopsLogoUrl from '@/assets/gops.svg'
-import { listAssetGroups, listHosts, type AssetGroup, type Host } from '@/api/asset'
+import { listAssetGroups, listHosts, listSftp, type AssetGroup, type Host, type SftpEntry } from '@/api/asset'
 import { useSystemConfigStore } from '@/stores/system-config'
 
 interface TreeNode { id: string; label: string; type: 'group' | 'host'; count?: number; host?: Host; children?: TreeNode[] }
@@ -29,12 +29,12 @@ const runtimes = new Map<number, Runtime>()
 const sftpVisible = ref(false)
 const sftpOriginKey = ref<number | null>(null)
 const sftpPath = ref('/root')
+const sftpCommittedPath = ref('/root')
 const sftpKeyword = ref('')
 const sftpSearchVisible = ref(false)
 const sftpSearchInput = ref<HTMLInputElement>()
 const sftpSelected = ref<string[]>([])
 
-interface SftpEntry { name: string; type: 'directory' | 'file'; size: string; modified: string; permissions: string }
 const sftpEntries = ref<SftpEntry[]>([])
 const filteredSftpEntries = computed(() => {
   const value = sftpKeyword.value.trim().toLowerCase()
@@ -158,6 +158,9 @@ function openSftp() {
   sftpSearchVisible.value = false
   sftpSelected.value = []
   sftpKeyword.value = ''
+  sftpPath.value = '/root'
+  sftpCommittedPath.value = '/root'
+  void loadSftpDirectory()
 }
 function closeSftp() {
   const originKey = sftpOriginKey.value
@@ -171,14 +174,15 @@ function closeSftp() {
   }
 }
 function goSftpParent() {
-  if (sftpPath.value === '/') return
-  const parent = sftpPath.value.replace(/\/+$/, '').split('/').slice(0, -1).join('/')
-  sftpPath.value = parent || '/'
+  if (sftpCommittedPath.value === '/') return
+  const parent = sftpCommittedPath.value.replace(/\/+$/, '').split('/').slice(0, -1).join('/')
+  void navigateSftpPath(parent || '/')
 }
-function openSftpEntry(entry: SftpEntry) {
+async function openSftpEntry(entry: SftpEntry) {
   if (entry.type !== 'directory') return
-  sftpPath.value = `${sftpPath.value.replace(/\/$/, '')}/${entry.name}`
+  const nextPath = `${sftpPath.value.replace(/\/$/, '')}/${entry.name}`
   sftpSelected.value = []
+  await navigateSftpPath(nextPath)
 }
 function toggleSftpEntry(name: string) {
   sftpSelected.value = sftpSelected.value.includes(name)
@@ -187,6 +191,28 @@ function toggleSftpEntry(name: string) {
 }
 function sftpAction(message: string) {
   ElMessage.info(message)
+}
+async function loadSftpDirectory(path = sftpPath.value) {
+  if (sftpOriginKey.value === null) return
+  try {
+    const result = await listSftp(sftpOriginKey.value, path)
+    sftpEntries.value = result.data.data
+    return true
+  } catch {
+    sftpEntries.value = []
+    return false
+  }
+}
+async function navigateSftpPath(path: string) {
+  const previousPath = sftpCommittedPath.value
+  const normalizedPath = path.trim().replace(/\/{2,}/g, '/') || '/'
+  sftpPath.value = normalizedPath
+  if (!await loadSftpDirectory(normalizedPath)) {
+    sftpPath.value = previousPath
+    ElMessage.error('目录不存在或没有访问权限')
+    return
+  }
+  sftpCommittedPath.value = normalizedPath
 }
 function toggleSftpSearch() {
   sftpSearchVisible.value = !sftpSearchVisible.value
@@ -304,9 +330,10 @@ onBeforeUnmount(() => {
                 @click="goSftpParent"><el-icon>
                   <ArrowLeft />
                 </el-icon></button>
-              <div class="sftp-path">{{ sftpPath }}</div>
+              <input v-model="sftpPath" class="sftp-path" aria-label="当前目录路径" title="输入路径后按回车跳转"
+                @keydown.enter.prevent="void navigateSftpPath(sftpPath)" />
               <button type="button" class="sftp-icon-button" aria-label="刷新目录" title="刷新目录"
-                @click="sftpAction('目录刷新接口尚未配置')"><el-icon>
+                @click="void loadSftpDirectory()"><el-icon>
                   <Refresh />
                 </el-icon></button>
               <div class="sftp-search-wrap" @click.stop>
@@ -871,7 +898,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   overflow: hidden;
+  outline: none;
   color: #d7dae0;
+  font: inherit;
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap

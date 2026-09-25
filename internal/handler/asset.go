@@ -51,6 +51,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/hosts/test", h.TestHostConnection)
 	g.POST("/assets/hosts/collect", h.CollectHostInfo)
 	g.POST("/assets/hosts/delete", h.DeleteHost)
+	g.POST("/assets/terminal/sftp/list", h.ListSFTP)
 
 	g.POST("/assets/db-instances/options", h.DatabaseTypeOptions)
 	g.POST("/assets/db-instances/list", h.ListDBInstances)
@@ -63,6 +64,21 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
 	g.POST("/assets/terminal-sessions/recording", h.GetTerminalSessionRecording)
 	g.POST("/assets/terminal-sessions/delete", h.DeleteTerminalSession)
+}
+
+// ListSFTP POST /api/v1/assets/terminal/sftp/list 查询主机远程目录。
+func (h *AssetHandler) ListSFTP(c *gin.Context) {
+	req := new(api.SFTPListRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid SFTP directory request")
+		return
+	}
+	result, err := h.biz.ListSFTP(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 // ConnectTerminal GET /api/v1/assets/terminal/connect/:id 建立 SSH WebSocket 终端连接。

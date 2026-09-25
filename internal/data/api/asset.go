@@ -158,6 +158,18 @@ type HostResponse struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
+type SFTPListRequest struct {
+	HostID int64  `json:"host_id" binding:"required"`
+	Path   string `json:"path"`
+}
+type SFTPEntryResponse struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Size        int64  `json:"size"`
+	Modified    string `json:"modified"`
+	Permissions string `json:"permissions"`
+}
+
 type DbInstanceListRequest struct {
 	PageRequest
 	Keyword string `json:"keyword"`

@@ -3,13 +3,16 @@ package biz
 import (
 	"fmt"
 	"io"
+	"path"
 	"strings"
 	"sync"
 	"time"
 
+	"gops/internal/data/api"
 	"gops/internal/data/model"
 	"gops/internal/pkg/cryptox"
 
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -27,6 +30,40 @@ type SSHConnection struct {
 	recording    strings.Builder
 	commandCount int64
 	mu           sync.Mutex
+}
+
+// ListSFTP lists the entries in a remote directory over the host's SSH connection.
+func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) ([]*api.SFTPEntryResponse, error) {
+	_, client, err := b.dialHostSSH(req.HostID)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		return nil, fmt.Errorf("create SFTP client: %w", err)
+	}
+	defer sftpClient.Close()
+	directory := path.Clean(req.Path)
+	if directory == "." || directory == "" {
+		directory = "/"
+	}
+	entries, err := sftpClient.ReadDir(directory)
+	if err != nil {
+		return nil, fmt.Errorf("read SFTP directory: %w", err)
+	}
+	result := make([]*api.SFTPEntryResponse, 0, len(entries))
+	for _, entry := range entries {
+		entryType := "file"
+		if entry.IsDir() {
+			entryType = "directory"
+		}
+		result = append(result, &api.SFTPEntryResponse{
+			Name: entry.Name(), Type: entryType, Size: entry.Size(),
+			Modified: entry.ModTime().Format("2006/01/02 15:04:05"), Permissions: entry.Mode().String(),
+		})
+	}
+	return result, nil
 }
 
 // StartSSH opens an SSH shell using the credential associated with a host.
