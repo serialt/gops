@@ -345,11 +345,12 @@ onBeforeUnmount(() => {
         <el-input v-model="keyword" class="asset-search" placeholder="搜索" clearable :prefix-icon="Search" />
         <el-tree ref="treeRef" class="asset-tree" :data="treeData" node-key="id" default-expand-all
           :filter-node-method="filterTree" :expand-on-click-node="true">
-          <template #default="{ data }"><span class="tree-node"
+          <template #default="{ data, node }"><span class="tree-node"
               :class="[`is-${data.type}`, { 'asset-tree-leaf': data.type !== 'group' }]"
               @dblclick.stop="data.type === 'host' ? openTerminal(data.host) : data.type === 'database' && openDatabaseTerminal(data.database)"><el-icon
-                v-if="data.type === 'group'">
-                <ArrowRight />
+                v-if="data.type === 'group'" class="group-folder-icon" @click.stop="node.expanded = !node.expanded">
+                <FolderOpened v-if="node.expanded" />
+                <Folder v-else />
               </el-icon><el-icon v-else-if="data.type === 'host'" class="host-asset-icon" title="主机" aria-label="主机">
                 <Platform />
               </el-icon><el-icon v-else class="database-asset-icon"
@@ -704,11 +705,17 @@ onBeforeUnmount(() => {
   color: #8f959f
 }
 
+.tree-node.is-group .group-folder-icon {
+  color: #8f959f;
+  cursor: pointer
+}
+
 .tree-node.is-host .el-icon {
   color: #8f959f
 }
 
 .tree-node .host-asset-icon,
+.tree-node .group-folder-icon,
 .tree-node .database-asset-icon {
   display: inline-flex;
   width: 14px;
