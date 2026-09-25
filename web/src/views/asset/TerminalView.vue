@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, type ElTree } from 'element-plus'
-import { ArrowLeft, ArrowRight, Close, CollectionTag, Delete, Download, Folder, FolderOpened, Monitor, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Close, CollectionTag, Delete, Document, Download, Folder, FolderOpened, Monitor, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
@@ -413,7 +413,7 @@ onBeforeUnmount(() => {
                 </el-icon></button>
             </header>
             <div class="sftp-table-head"><span
-                class="sftp-check" /><span>名称</span><span>大小</span><span>修改时间</span><span>权限</span></div>
+                class="sftp-check-spacer" /><span>名称</span><span>大小</span><span>修改时间</span><span>权限</span></div>
             <div class="sftp-list">
               <button v-for="entry in filteredSftpEntries" :key="entry.name" type="button" class="sftp-row"
                 :class="{ selected: sftpSelected.includes(entry.name) }" @dblclick="openSftpEntry(entry)"
@@ -421,7 +421,7 @@ onBeforeUnmount(() => {
                 <span class="sftp-check" :class="{ checked: sftpSelected.includes(entry.name) }" />
                 <span class="sftp-name"><el-icon>
                     <FolderOpened v-if="entry.type === 'directory'" />
-                    <Monitor v-else />
+                    <Document v-else />
                   </el-icon>{{ entry.name }}</span>
                 <span>{{ entry.size }}</span><span>{{ entry.modified }}</span><span>{{ entry.permissions }}</span>
               </button>
@@ -1119,7 +1119,7 @@ onBeforeUnmount(() => {
 .sftp-table-head,
 .sftp-row {
   display: grid;
-  grid-template-columns: 48px minmax(280px, 1fr) 180px 300px 220px;
+  grid-template-columns: 24px minmax(280px, 1fr) 180px 300px 220px;
   align-items: center;
   column-gap: 8px;
   box-sizing: border-box
@@ -1159,12 +1159,17 @@ onBeforeUnmount(() => {
 }
 
 .sftp-check {
-  width: 24px;
-  height: 24px;
+  width: 12px;
+  height: 12px;
   justify-self: start;
   border: 1px solid #73767d;
-  border-radius: 6px;
+  border-radius: 3px;
   box-sizing: border-box
+}
+
+.sftp-check-spacer {
+  width: 12px;
+  height: 1px
 }
 
 .sftp-check.checked {
@@ -1248,7 +1253,7 @@ onBeforeUnmount(() => {
 
   .sftp-table-head,
   .sftp-row {
-    grid-template-columns: 32px minmax(180px, 1fr) 100px 160px 130px;
+    grid-template-columns: 16px minmax(180px, 1fr) 100px 160px 130px;
     font-size: 10px
   }
 }
