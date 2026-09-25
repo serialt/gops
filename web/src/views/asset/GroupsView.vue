@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, CollectionTag } from '@element-plus/icons-vue'
 import type { ColDef } from 'ag-grid-community'
 import AppDataGrid from '@/components/AppDataGrid.vue'
 import { createAssetGroup, deleteAssetGroup, listAssetGroups, updateAssetGroup, type AssetGroup } from '@/api/asset'
 
-interface AssetGroupTreeNode { id: number; label: string; children: AssetGroupTreeNode[] }
+interface AssetGroupTreeNode { id: number; label: string; count: number; children: AssetGroupTreeNode[] }
 
 const rows = ref<AssetGroup[]>([])
 const keyword = ref('')
@@ -27,7 +27,7 @@ const groupNameByID = computed(() => new Map(rows.value.map((group) => [group.id
 const treeData = computed<AssetGroupTreeNode[]>(() => {
   const nodes = new Map<number, AssetGroupTreeNode>()
   const roots: AssetGroupTreeNode[] = []
-  rows.value.forEach((group) => nodes.set(group.id, { id: group.id, label: group.name, children: [] }))
+  rows.value.forEach((group) => nodes.set(group.id, { id: group.id, label: group.name, count: 0, children: [] }))
   rows.value.forEach((group) => {
     const node = nodes.get(group.id)
     const parent = nodes.get(group.parent_id)
@@ -35,6 +35,7 @@ const treeData = computed<AssetGroupTreeNode[]>(() => {
     if (group.parent_id && parent) parent.children.push(node)
     else roots.push(node)
   })
+  nodes.forEach((node) => { node.count = node.children.length })
   return roots
 })
 const selectedName = computed(() => groupNameByID.value.get(selectedID.value ?? 0) ?? '全部资产分组')
@@ -112,73 +113,332 @@ onMounted(load)
   <div class="page-container asset-group-page">
     <div class="asset-group-layout" :style="{ gridTemplateColumns: `${treePaneWidth}px 2px minmax(0, 1fr)` }">
       <aside class="asset-tree-panel">
-        <div class="tree-title"><span>资产分组</span><el-input v-model="treeKeyword" class="tree-search" placeholder="搜索" clearable /></div>
+        <div class="tree-title"><span>资产分组</span><el-input v-model="treeKeyword" class="tree-search" placeholder="搜索"
+            clearable /></div>
         <el-tree ref="groupTreeRef" :data="treeData" node-key="id" highlight-current default-expand-all
-          :current-node-key="selectedID" :filter-node-method="filterTreeNode" :expand-on-click-node="false" @node-click="selectNode" />
+          :current-node-key="selectedID" :filter-node-method="filterTreeNode" :expand-on-click-node="false"
+          @node-click="selectNode">
+          <template #default="{ data }"><span class="asset-tree-node"><el-icon>
+                <CollectionTag />
+              </el-icon><span class="asset-tree-label">{{ data.label }}</span><span class="asset-tree-count">({{
+                data.count }})</span></span></template>
+        </el-tree>
       </aside>
       <div class="content-divider" :class="{ dragging: treePaneDragging }" role="separator" aria-label="调整资产分组树宽度"
         @pointerdown="startTreePaneDrag" @dblclick="toggleTreePane">
         <button class="content-divider-handle" type="button" :aria-label="treePaneWidth ? '收起资产分组树' : '展开资产分组树'"
           @pointerdown.stop @click.stop="toggleTreePane">
-          <el-icon><component :is="treePaneWidth ? ArrowLeft : ArrowRight" /></el-icon>
+          <el-icon>
+            <component :is="treePaneWidth ? ArrowLeft : ArrowRight" />
+          </el-icon>
         </button>
       </div>
       <section class="section-card asset-group-content">
         <div class="page-toolbar">
-          <div class="toolbar-left"><el-input v-model="keyword" class="search-input" placeholder="搜索分组名称或编码" clearable /></div>
+          <div class="toolbar-left"><el-input v-model="keyword" class="search-input" placeholder="搜索分组名称或编码"
+              clearable />
+          </div>
           <div class="toolbar-actions">
-            <el-button v-if="selectedGroups.length" v-permission="'POST /api/v1/assets/groups/delete'" type="danger" plain @click="batchRemoveGroups">批量删除（{{ selectedGroups.length }}）</el-button>
-            <el-button v-permission="'POST /api/v1/assets/groups/create'" type="primary" class="primary-btn" @click="openCreate">新增分组</el-button>
+            <el-button v-if="selectedGroups.length" v-permission="'POST /api/v1/assets/groups/delete'" type="danger"
+              plain @click="batchRemoveGroups">批量删除（{{ selectedGroups.length }}）</el-button>
+            <el-button v-permission="'POST /api/v1/assets/groups/create'" type="primary" class="primary-btn"
+              @click="openCreate">新增分组</el-button>
           </div>
         </div>
-        <AppDataGrid class="asset-group-grid" :row-data="tableRows" :column-defs="columnDefs" pagination @selection-changed="handleGroupSelectionChanged" />
+        <AppDataGrid class="asset-group-grid" :row-data="tableRows" :column-defs="columnDefs" pagination
+          @selection-changed="handleGroupSelectionChanged" />
       </section>
     </div>
     <el-dialog v-model="dialogVisible" :title="editingID ? '编辑资产分组' : '新增资产分组'" width="460px">
       <el-form :model="form" label-width="80px">
-        <el-form-item label="上级分组"><el-select v-model="form.parent_id" placeholder="请选择上级分组" style="width: 100%"><el-option :value="0" label="顶级分组" /><el-option v-for="group in parentOptions" :key="group.id" :label="group.name" :value="group.id" /></el-select></el-form-item>
+        <el-form-item label="上级分组"><el-select v-model="form.parent_id" placeholder="请选择上级分组"
+            style="width: 100%"><el-option :value="0" label="顶级分组" /><el-option v-for="group in parentOptions"
+              :key="group.id" :label="group.name" :value="group.id" /></el-select></el-form-item>
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="编码"><el-input v-model="form.code" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort_order" :min="0" /></el-form-item>
         <el-form-item label="状态"><el-switch v-model="form.status" /></el-form-item>
         <el-form-item label="说明"><el-input v-model="form.description" type="textarea" /></el-form-item>
       </el-form>
-      <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template>
+      <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
+          @click="save">保存</el-button></template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.asset-group-page, .asset-group-layout, .asset-group-content { min-width: 0; min-height: 0; }
-.asset-group-layout { display: grid; gap: 0; height: 100%; min-height: 100%; }
-.asset-tree-panel, .section-card { border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
-.asset-tree-panel { min-width: 0; overflow: hidden; padding: 12px 8px; }
-.tree-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line); color: var(--text); font-size: 13px; font-weight: 700; white-space: nowrap; }
-.tree-search { width: 92px; }
-.tree-search :deep(.el-input__wrapper) { min-height: 28px; border-radius: 6px; box-shadow: 0 0 0 1px var(--line) inset; }
-.asset-tree-panel :deep(.el-tree) { --el-tree-node-hover-bg-color: var(--primary-soft); background: transparent; font-size: 11px; }
-.asset-tree-panel :deep(.el-tree-node__content) { height: 32px; border-radius: 6px; }
-.asset-tree-panel :deep(.is-current > .el-tree-node__content) { color: var(--primary); font-weight: 700; background: var(--primary-soft); }
-.section-card { display: flex; flex-direction: column; min-height: 100%; padding: 16px; }
-.page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.toolbar-left { display: flex; align-items: center; gap: 8px; }
-.toolbar-actions { display: flex; align-items: center; gap: 8px; }
-.search-input { width: 240px; }
-.primary-btn { border-radius: 6px; }
-.asset-group-grid { flex: 1; min-height: 0; }
-.asset-group-grid :deep(.app-data-grid-shell) { height: 100%; }
-.content-divider { position: relative; width: 2px; cursor: col-resize; touch-action: none; background: transparent; }
-.content-divider::before { position: absolute; z-index: 1; top: 0; bottom: 0; left: -6px; width: 13px; content: ''; }
-.content-divider::after { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; content: ''; background: var(--line); }
-.content-divider:hover::after, .content-divider.dragging::after { background: var(--primary); }
-.content-divider-handle { position: absolute; z-index: 2; top: 50%; left: 50%; display: flex; align-items: center; justify-content: center; width: 15px; height: 20px; padding: 0; transform: translate(-50%, -50%); border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #667085; box-shadow: 0 2px 5px rgba(31, 42, 68, .12); cursor: pointer; }
-.content-divider-handle:hover { border-color: var(--primary); color: var(--primary); }
-.content-divider-handle :deep(.el-icon) { font-size: 10px; }
-:deep(.asset-actions) { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding-left: 12px; }
-:deep(.asset-action) { padding: 4px 9px; border: 1px solid transparent; border-radius: 8px; background: #fff; font-size: 11px; cursor: pointer; box-shadow: 0 1px 3px rgba(24, 34, 53, .08); }
-:deep(.asset-action.edit) { border-color: var(--primary); color: var(--primary); background: #f7f8ff; }
-:deep(.asset-action.delete) { border-color: #ffd5d5; color: #ef6262; background: #fff7f7; }
-:deep(.grid-status) { display: inline-flex; padding: 3px 8px; border: 1px solid #d9f0d0; border-radius: 8px; color: #67c23a; background: #f0f9eb; }
-:deep(.grid-status.is-disabled) { border-color: #e4e7ed; color: #909399; background: #f4f4f5; }
-@media (max-width: 900px) { .asset-group-layout { grid-template-columns: 1fr !important; } .asset-tree-panel { max-height: 220px; overflow: auto; } .content-divider { display: none; } }
+.asset-group-page,
+.asset-group-layout,
+.asset-group-content {
+  min-width: 0;
+  min-height: 0;
+}
+
+.asset-group-layout {
+  display: grid;
+  gap: 0;
+  height: 100%;
+  min-height: 100%;
+}
+
+.asset-tree-panel,
+.section-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+}
+
+.asset-tree-panel {
+  min-width: 0;
+  overflow: hidden;
+  padding: 12px 8px;
+}
+
+.tree-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tree-search {
+  width: 92px;
+}
+
+.tree-search :deep(.el-input__wrapper) {
+  min-height: 28px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--line) inset;
+}
+
+.asset-tree-panel :deep(.el-tree) {
+  --el-tree-node-hover-bg-color: var(--primary-soft);
+  background: transparent;
+  font-size: 11px;
+}
+
+.asset-tree-panel :deep(.el-tree-node__content) {
+  height: 32px;
+  margin: 1px 0;
+  border-radius: 7px;
+}
+
+.asset-tree-panel :deep(.is-current > .el-tree-node__content) {
+  color: var(--primary);
+  font-weight: 700;
+  background: var(--primary-soft);
+}
+
+.asset-tree-node {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 7px;
+  padding-right: 8px;
+  color: var(--text-soft);
+}
+
+.asset-tree-node>.el-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: #55bd39;
+  font-size: 15px;
+}
+
+.asset-tree-label {
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-tree-count {
+  flex: none;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.asset-tree-panel :deep(.is-current > .el-tree-node__content .asset-tree-label) {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.section-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 16px;
+}
+
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-input {
+  width: 240px;
+}
+
+.primary-btn {
+  border-radius: 6px;
+}
+
+.asset-group-grid {
+  flex: 1;
+  min-height: 0;
+}
+
+.asset-group-grid :deep(.app-data-grid-shell) {
+  height: 100%;
+}
+
+.content-divider {
+  position: relative;
+  width: 2px;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+}
+
+.content-divider::before {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  width: 13px;
+  content: '';
+}
+
+.content-divider::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  content: '';
+  background: var(--line);
+}
+
+.content-divider:hover::after,
+.content-divider.dragging::after {
+  background: var(--primary);
+}
+
+.content-divider-handle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 20px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: #667085;
+  box-shadow: 0 2px 5px rgba(31, 42, 68, .12);
+  cursor: pointer;
+}
+
+.content-divider-handle:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.content-divider-handle :deep(.el-icon) {
+  font-size: 10px;
+}
+
+:deep(.asset-actions) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-left: 12px;
+}
+
+:deep(.asset-action) {
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(24, 34, 53, .08);
+}
+
+:deep(.asset-action.edit) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #f7f8ff;
+}
+
+:deep(.asset-action.delete) {
+  border-color: #ffd5d5;
+  color: #ef6262;
+  background: #fff7f7;
+}
+
+:deep(.grid-status) {
+  display: inline-flex;
+  padding: 3px 8px;
+  border: 1px solid #d9f0d0;
+  border-radius: 8px;
+  color: #67c23a;
+  background: #f0f9eb;
+}
+
+:deep(.grid-status.is-disabled) {
+  border-color: #e4e7ed;
+  color: #909399;
+  background: #f4f4f5;
+}
+
+@media (max-width: 900px) {
+  .asset-group-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .asset-tree-panel {
+    max-height: 220px;
+    overflow: auto;
+  }
+
+  .content-divider {
+    display: none;
+  }
+}
 </style>

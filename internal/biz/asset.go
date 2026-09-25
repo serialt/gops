@@ -500,6 +500,9 @@ func (b *AssetBiz) ListDBInstances(req *api.DbInstanceListRequest) ([]*api.DbIns
 	if req.Keyword != "" {
 		q = q.Where("name LIKE ? OR host LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
+	if req.GroupID > 0 {
+		q = q.Where("group_id = ?", req.GroupID)
+	}
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -569,10 +572,10 @@ func (b *AssetBiz) dbInstanceModel(req *api.DbInstanceRequest) (model.DbInstance
 	if err != nil {
 		return model.DbInstance{}, err
 	}
-	return model.DbInstance{Name: req.Name, DbType: req.DbType, Host: req.Host, Port: req.Port, Username: req.Username, Password: password, Version: req.Version, CredentialID: req.CredentialID, Tags: req.Tags, Description: req.Description, Status: *req.Status}, nil
+	return model.DbInstance{Name: req.Name, GroupID: req.GroupID, DbType: req.DbType, Host: req.Host, Port: req.Port, Username: req.Username, Password: password, Version: req.Version, CredentialID: req.CredentialID, Tags: req.Tags, Description: req.Description, Status: *req.Status}, nil
 }
 func dbInstanceResponse(r model.DbInstance) *api.DbInstanceResponse {
-	return &api.DbInstanceResponse{ID: r.ID, Name: r.Name, DbType: r.DbType, Host: r.Host, Port: r.Port, Username: r.Username, Version: r.Version, CredentialID: r.CredentialID, Tags: r.Tags, Description: r.Description, Status: r.Status, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	return &api.DbInstanceResponse{ID: r.ID, GroupID: r.GroupID, Name: r.Name, DbType: r.DbType, Host: r.Host, Port: r.Port, Username: r.Username, Version: r.Version, CredentialID: r.CredentialID, Tags: r.Tags, Description: r.Description, Status: r.Status, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
 func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) ([]*api.TerminalSessionResponse, error) {

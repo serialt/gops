@@ -29,6 +29,7 @@ type DbInstance struct {
 	CreatedAt    time.Time      `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt    time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	GroupID      int64          `gorm:"column:group_id;not null" json:"group_id"`
 }
 
 // TableName DbInstance's table name

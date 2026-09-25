@@ -1,32 +1,50 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'; import { ElMessage, ElMessageBox } from 'element-plus'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { createCredential, createDBInstance, deleteDBInstance, getDatabaseTypeOptions, listCredentials, listDBInstances, type Credential, type DatabaseTypeOption, type DbInstance, updateDBInstance } from '@/api/asset'
-const rows = ref<DbInstance[]>([]); const credentials = ref<Credential[]>([]); const databaseTypes = ref<DatabaseTypeOption[]>([]); const keyword = ref(''); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ name: string; db_type: string; host: string; port: number | null; username: string; password: string; version: string; credential_id: number | null; tags: string; description: string; status: boolean }>({ name: '', db_type: '', host: '', port: null, username: '', password: '', version: '', credential_id: null, tags: '', description: '', status: true })
+import { computed, onMounted, reactive, ref, watch } from 'vue'; import { ElMessage, ElMessageBox } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Search } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { createCredential, createDBInstance, deleteDBInstance, getDatabaseTypeOptions, listAssetGroups, listCredentials, listDBInstances, type AssetGroup, type Credential, type DatabaseTypeOption, type DbInstance, updateDBInstance } from '@/api/asset'
+interface AssetTreeNode { id: number; label: string; count: number; children: AssetTreeNode[] }
+const rows = ref<DbInstance[]>([]); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const databaseTypes = ref<DatabaseTypeOption[]>([]); const keyword = ref(''); const typeFilter = ref(''); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ group_id: number | null; name: string; db_type: string; host: string; port: number | null; username: string; password: string; version: string; credential_id: number | null; tags: string; description: string; status: boolean }>({ group_id: null, name: '', db_type: '', host: '', port: null, username: '', password: '', version: '', credential_id: null, tags: '', description: '', status: true })
 const tagItems = computed(() => form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
+const visibleRows = computed(() => rows.value.filter(row => (!selectedGroupID.value || row.group_id === selectedGroupID.value) && (!typeFilter.value || row.db_type === typeFilter.value)))
+const treeData = computed<AssetTreeNode[]>(() => { const counts = new Map<number, number>(); rows.value.forEach(row => counts.set(row.group_id, (counts.get(row.group_id) || 0) + 1)); const nodes = new Map<number, AssetTreeNode>(); const roots: AssetTreeNode[] = []; groups.value.forEach(group => nodes.set(group.id, { id: group.id, label: group.name, count: counts.get(group.id) || 0, children: [] })); groups.value.forEach(group => { const node = nodes.get(group.id); const parent = nodes.get(group.parent_id); if (!node) return; if (group.parent_id && parent) parent.children.push(node); else roots.push(node) }); return roots })
 function action(text: string, kind: string, fn: () => void) { const el = document.createElement('button'); el.textContent = text; el.className = `db-action ${kind}`; el.onclick = fn; return el }; const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '实例名称', minWidth: 130 }, { field: 'db_type', headerName: '类型', width: 110, valueFormatter: p => databaseTypes.value.find(item => item.value === p.value)?.label ?? p.value }, { field: 'host', headerName: '地址', minWidth: 140 }, { field: 'port', headerName: '端口', width: 80, valueFormatter: p => p.value ? String(p.value) : '—' }, { field: 'username', headerName: '用户名', width: 110 }, { field: 'version', headerName: '版本', width: 100 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value ? '' : ' is-disabled'}">${p.value ? '启用' : '禁用'}</span>` }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'db-actions'; wrap.append(action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
 async function load() { const { data } = await listDBInstances(keyword.value); rows.value = data.data }
 async function loadCredentials() { const { data } = await listCredentials(); credentials.value = data.data }
 async function loadDatabaseTypes() { const { data } = await getDatabaseTypeOptions(); databaseTypes.value = data.data }
-function create() { editingID.value = null; tagDraft.value = ''; Object.assign(form, { name: '', db_type: '', host: '', port: null, username: '', password: '', version: '', credential_id: null, tags: '', description: '', status: true }); dialogVisible.value = true }
-function edit(row: DbInstance) { editingID.value = row.id; tagDraft.value = ''; Object.assign(form, { ...row, password: '', credential_id: row.credential_id || null }); dialogVisible.value = true }
+function create() { editingID.value = null; tagDraft.value = ''; Object.assign(form, { group_id: selectedGroupID.value, name: '', db_type: '', host: '', port: null, username: '', password: '', version: '', credential_id: null, tags: '', description: '', status: true }); dialogVisible.value = true }
+function edit(row: DbInstance) { editingID.value = row.id; tagDraft.value = ''; Object.assign(form, { ...row, group_id: row.group_id || null, password: '', credential_id: row.credential_id || null }); dialogVisible.value = true }
 function addTag() { const tag = tagDraft.value.trim(); if (tag && !tagItems.value.includes(tag)) form.tags = [...tagItems.value, tag].join(','); tagDraft.value = '' }
 function removeTag(tag: string) { form.tags = tagItems.value.filter(item => item !== tag).join(',') }
 function openCredentialCreate() { Object.assign(credentialForm, { name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); credentialDialogVisible.value = true }
 async function saveCredential() { if (!credentialForm.name.trim()) return ElMessage.warning('请填写凭证名称'); if (credentialForm.credential_type === 'password' && !credentialForm.password) return ElMessage.warning('请填写密码'); if (credentialForm.credential_type === 'key' && !credentialForm.private_key.trim()) return ElMessage.warning('请填写私钥'); const { data } = await createCredential(credentialForm); await loadCredentials(); form.credential_id = data.data.id; credentialDialogVisible.value = false; ElMessage.success('凭证创建成功') }
 function applyDefaultPort(type: string) { const option = databaseTypes.value.find(item => item.value === type); if (option) form.port = option.default_port }
-async function save() { if (!form.name || !form.db_type || !form.host || !form.port) return ElMessage.warning('请填写数据库名称、类型、地址和端口'); const payload = { ...form, port: form.port, credential_id: form.credential_id ?? 0 }; if (editingID.value) await updateDBInstance({ ...payload, id: editingID.value }); else await createDBInstance(payload); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
+async function save() { if (!form.name || !form.db_type || !form.host || !form.port) return ElMessage.warning('请填写数据库名称、类型、地址和端口'); const payload = { ...form, group_id: form.group_id ?? 0, port: form.port, credential_id: form.credential_id ?? 0 }; if (editingID.value) await updateDBInstance({ ...payload, id: editingID.value }); else await createDBInstance(payload); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
 async function remove(row: DbInstance) { await ElMessageBox.confirm(`确定删除数据库 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteDBInstance(row.id); ElMessage.success('删除成功'); await load() }
-onMounted(() => { void load(); void loadCredentials(); void loadDatabaseTypes() })
+function selectTreeNode(node: AssetTreeNode) { selectedGroupID.value = node.id }
+function filterTreeNode(value: string, data: AssetTreeNode) { return !value || data.label.toLowerCase().includes(value.toLowerCase()) }
+function startTreePaneDrag(event: PointerEvent) { if (event.button !== 0) return; treePaneDragging.value = true; treePaneStartX.value = event.clientX; treePaneStartWidth.value = treePaneWidth.value; document.addEventListener('pointermove', moveTreePane); document.addEventListener('pointerup', stopTreePaneDrag) }
+function moveTreePane(event: PointerEvent) { if (treePaneDragging.value) treePaneWidth.value = Math.max(0, Math.min(360, treePaneStartWidth.value + event.clientX - treePaneStartX.value)) }
+function stopTreePaneDrag() { treePaneDragging.value = false; if (treePaneWidth.value < 90) treePaneWidth.value = 0; document.removeEventListener('pointermove', moveTreePane); document.removeEventListener('pointerup', stopTreePaneDrag) }
+function toggleTreePane() { treePaneWidth.value = treePaneWidth.value === 0 ? 200 : 0 }
+watch(treeKeyword, value => assetTreeRef.value?.filter(value))
+onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDatabaseTypes(), listAssetGroups().then(({ data }) => { groups.value = data.data })]) })
 </script>
 <template>
-    <div class="page-container table-shell">
+    <div class="page-container db-page">
+      <div class="db-layout" :style="{ gridTemplateColumns: `${treePaneWidth}px 2px minmax(0, 1fr)` }">
+        <aside class="asset-tree-panel">
+          <div class="tree-title"><span>资产树</span><el-input v-model="treeKeyword" class="tree-search" placeholder="搜索" clearable /></div>
+          <el-tree ref="assetTreeRef" :data="treeData" node-key="id" highlight-current default-expand-all :current-node-key="selectedGroupID" :filter-node-method="filterTreeNode" :expand-on-click-node="false" @node-click="selectTreeNode">
+            <template #default="{ data }"><span class="asset-tree-node"><el-icon><CollectionTag /></el-icon><span class="asset-tree-label">{{ data.label }}</span><span class="asset-tree-count">({{ data.count }})</span></span></template>
+          </el-tree>
+        </aside>
+        <div class="content-divider" :class="{ dragging: treePaneDragging }" role="separator" @pointerdown="startTreePaneDrag" @dblclick="toggleTreePane"><button class="content-divider-handle" type="button" @pointerdown.stop @click.stop="toggleTreePane"><el-icon><component :is="treePaneWidth ? ArrowLeft : ArrowRight" /></el-icon></button></div>
         <div class="section-card">
             <div class="page-toolbar">
-                <h2 class="page-title">数据库管理</h2><el-button type="primary" class="primary-btn"
-                    @click="create">新增数据库</el-button>
-            </div><el-input v-model="keyword" class="db-search" placeholder="搜索实例名称或地址" clearable @input="load" />
-            <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
+                <div class="db-filters"><el-input v-model="keyword" class="db-search" placeholder="搜索数据库名称/IP..." clearable :prefix-icon="Search" @input="load" /><el-select v-model="typeFilter" class="type-filter" placeholder="数据库类型" clearable><el-option v-for="item in databaseTypes" :key="item.value" :label="item.label" :value="item.value" /></el-select></div><el-button type="primary" class="primary-btn" @click="create">新增数据库</el-button>
+            </div>
+            <AppDataGrid class="db-grid" :row-data="visibleRows" :column-defs="columns" pagination />
         </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑数据库' : '新增数据库'" width="60%">
             <el-form :model="form" label-width="92px" class="db-form">
+                <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="所属分组"><el-select v-model="form.group_id" placeholder="请选择分组" clearable><el-option v-for="group in groups" :key="group.id" :label="group.name" :value="group.id" /></el-select></el-form-item></el-col></el-row>
                 <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="数据库名称" required><el-input v-model="form.name" placeholder="请输入数据库名称" /></el-form-item></el-col><el-col :xs="24" :sm="12"><el-form-item label="数据库类型" required><el-select v-model="form.db_type" placeholder="请选择数据库类型" clearable @change="applyDefaultPort"><el-option v-for="databaseType in databaseTypes" :key="databaseType.value" :label="databaseType.label" :value="databaseType.value" /></el-select></el-form-item></el-col></el-row>
                 <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="数据库地址" required><el-input v-model="form.host" placeholder="IP 地址或主机名" /></el-form-item></el-col><el-col :xs="24" :sm="12"><el-form-item label="端口"><el-input-number v-model="form.port" placeholder="请选择类型" :min="1" :max="65535" controls-position="right" :disabled="!form.db_type" /></el-form-item></el-col></el-row>
                 <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="用户名"><el-input v-model="form.username" placeholder="请输入用户名" /></el-form-item></el-col><el-col :xs="24" :sm="12"><el-form-item label="密码"><el-input v-model="form.password" type="password" show-password :placeholder="editingID ? '留空则不修改密码' : '请输入密码'" /></el-form-item></el-col></el-row>
@@ -47,18 +65,35 @@ onMounted(() => { void load(); void loadCredentials(); void loadDatabaseTypes() 
             </el-form>
             <template #footer><el-button @click="credentialDialogVisible = false">取消</el-button><el-button type="primary" @click="saveCredential">创建并选择</el-button></template>
         </el-dialog>
+      </div>
     </div>
 </template>
 <style
     scoped>
-    .db-search {
-        width: 260px;
-        margin-bottom: 8px
-    }
-
-    .table-shell { background: var(--bg); min-height: 100%; }
+    .db-page, .db-layout, .section-card { min-width: 0; min-height: 0; }
+    .db-layout { display: grid; gap: 0; height: 100%; min-height: 100%; }
+    .db-search { width: 260px; }
+    .db-filters { display: flex; align-items: center; gap: 8px; }
+    .type-filter { width: 150px; }
     .section-card { display: flex; flex-direction: column; min-height: 100%; padding: 12px 16px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
-    .page-toolbar { margin-bottom: 8px; }
+    .page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .db-grid { flex: 1; min-height: 0; }
+    .db-grid :deep(.app-data-grid-shell) { height: 100%; }
+    .asset-tree-panel { min-width: 0; overflow: hidden; padding: 12px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow); }
+    .tree-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line); color: var(--text); font-size: 13px; font-weight: 700; white-space: nowrap; }
+    .tree-search { width: 92px; }
+    .tree-search :deep(.el-input__wrapper) { min-height: 28px; border-radius: 6px; box-shadow: 0 0 0 1px var(--line) inset; }
+    .asset-tree-panel :deep(.el-tree) { --el-tree-node-hover-bg-color: var(--primary-soft); background: transparent; font-size: 11px; }
+    .asset-tree-panel :deep(.el-tree-node__content) { height: 32px; margin: 1px 0; border-radius: 7px; }
+    .asset-tree-panel :deep(.is-current > .el-tree-node__content) { background: var(--primary-soft); }
+    .asset-tree-node { display: flex; min-width: 0; flex: 1; align-items: center; gap: 7px; padding-right: 8px; color: var(--text-soft); }
+    .asset-tree-node > .el-icon { width: 15px; height: 15px; flex: none; color: #55bd39; }
+    .asset-tree-label { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
+    .asset-tree-count { flex: none; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .content-divider { position: relative; width: 2px; cursor: col-resize; touch-action: none; }
+    .content-divider::after { position: absolute; inset: 0; width: 2px; background: var(--line); content: ''; }
+    .content-divider:hover::after, .content-divider.dragging::after { background: var(--primary); }
+    .content-divider-handle { position: absolute; z-index: 2; top: 50%; left: 50%; display: flex; width: 15px; height: 20px; align-items: center; justify-content: center; padding: 0; transform: translate(-50%, -50%); border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--text-soft); cursor: pointer; }
     .db-form :deep(.el-form-item) { margin-bottom: 16px; }
     .db-form :deep(.el-form-item__label) { color: var(--text); font-size: 12px; font-weight: 600; }
     .db-form :deep(.el-input__wrapper), .db-form :deep(.el-textarea__inner) { box-shadow: 0 0 0 1px var(--line) inset; }
@@ -102,4 +137,5 @@ onMounted(() => { void load(); void loadCredentials(); void loadDatabaseTypes() 
         color: #ef6262;
         background: #fff7f7
     }
+    @media (max-width: 900px) { .db-layout { grid-template-columns: 1fr !important; } .asset-tree-panel { max-height: 220px; overflow: auto; } .content-divider { display: none; } }
 </style>

@@ -153,9 +153,11 @@ type HostResponse struct {
 
 type DbInstanceListRequest struct {
 	Keyword string `json:"keyword"`
+	GroupID int64  `json:"group_id"`
 }
 type DbInstanceRequest struct {
 	ID           int64  `json:"id"`
+	GroupID      int64  `json:"group_id"`
 	Name         string `json:"name" binding:"required"`
 	DbType       string `json:"db_type" binding:"required"`
 	Host         string `json:"host" binding:"required"`
@@ -173,6 +175,7 @@ type DbInstanceIDRequest struct {
 }
 type DbInstanceResponse struct {
 	ID           int64     `json:"id"`
+	GroupID      int64     `json:"group_id"`
 	Name         string    `json:"name"`
 	DbType       string    `json:"db_type"`
 	Host         string    `json:"host"`
