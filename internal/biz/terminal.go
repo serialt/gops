@@ -85,17 +85,28 @@ func (b *AssetBiz) dialHostSSH(hostID int64) (*model.Host, *ssh.Client, error) {
 	if err := b.db.First(&credential, host.CredentialID).Error; err != nil {
 		return nil, nil, fmt.Errorf("加载主机凭证: %w", err)
 	}
+	client, err := b.dialSSH(&host, &credential)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &host, client, nil
+}
+
+func (b *AssetBiz) dialSSH(host *model.Host, credential *model.Credential) (*ssh.Client, error) {
+	if credential.Username == "" {
+		return nil, fmt.Errorf("凭证未配置用户名")
+	}
 	password, err := cryptox.Decrypt(b.aesKey, credential.Password)
 	if err != nil {
-		return nil, nil, fmt.Errorf("解密凭证密码: %w", err)
+		return nil, fmt.Errorf("解密凭证密码: %w", err)
 	}
 	privateKey, err := cryptox.Decrypt(b.aesKey, credential.PrivateKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("解密凭证私钥: %w", err)
+		return nil, fmt.Errorf("解密凭证私钥: %w", err)
 	}
 	passphrase, err := cryptox.Decrypt(b.aesKey, credential.Passphrase)
 	if err != nil {
-		return nil, nil, fmt.Errorf("解密凭证口令: %w", err)
+		return nil, fmt.Errorf("解密凭证口令: %w", err)
 	}
 
 	var method ssh.AuthMethod
@@ -107,23 +118,19 @@ func (b *AssetBiz) dialHostSSH(hostID int64) (*model.Host, *ssh.Client, error) {
 			signer, err = ssh.ParsePrivateKey([]byte(privateKey))
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("解析 SSH 私钥: %w", err)
+			return nil, fmt.Errorf("解析 SSH 私钥: %w", err)
 		}
 		method = ssh.PublicKeys(signer)
 	} else {
 		method = ssh.Password(password)
 	}
-	sshUser := host.SSHUser
-	if sshUser == "" {
-		sshUser = credential.Username
-	}
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host.IP, host.Port), &ssh.ClientConfig{
-		User: sshUser, Auth: []ssh.AuthMethod{method}, HostKeyCallback: ssh.InsecureIgnoreHostKey(), Timeout: 10 * time.Second,
+		User: credential.Username, Auth: []ssh.AuthMethod{method}, HostKeyCallback: ssh.InsecureIgnoreHostKey(), Timeout: 10 * time.Second,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("连接 SSH: %w", err)
+		return nil, fmt.Errorf("连接 SSH: %w", err)
 	}
-	return &host, client, nil
+	return client, nil
 }
 
 type sshCommandExecutor struct{ client *ssh.Client }

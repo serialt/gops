@@ -457,6 +457,18 @@ func (b *AssetBiz) DeleteHost(req *api.HostIDRequest) error {
 	return nil
 }
 
+func (b *AssetBiz) TestHostConnection(ctx context.Context, req *api.HostTestRequest) error {
+	credential, err := b.repo.GetCredential(ctx, b.db, req.CredentialID)
+	if err != nil {
+		return fmt.Errorf("加载主机凭证: %w", err)
+	}
+	client, err := b.dialSSH(&model.Host{IP: req.IP, Port: req.Port}, credential)
+	if err != nil {
+		return err
+	}
+	return client.Close()
+}
+
 func (b *AssetBiz) CollectHostInfo(req *api.HostIDRequest) (*api.HostResponse, error) {
 	host, client, err := b.dialHostSSH(req.ID)
 	if err != nil {
@@ -480,10 +492,10 @@ func (b *AssetBiz) CollectHostInfo(req *api.HostIDRequest) (*api.HostResponse, e
 	return hostResponse(*host), nil
 }
 func hostModel(req *api.HostRequest) model.Host {
-	return model.Host{Name: req.Name, GroupID: req.GroupID, HostType: req.HostType, IP: req.IP, Port: req.Port, SSHUser: req.SSHUser, CredentialID: req.CredentialID, CloudAccountID: req.CloudAccountID, Tags: req.Tags, Description: req.Description, Status: req.Status}
+	return model.Host{Name: req.Name, GroupID: req.GroupID, HostType: req.HostType, IP: req.IP, Port: req.Port, CredentialID: req.CredentialID, CloudAccountID: req.CloudAccountID, Tags: req.Tags, Description: req.Description, Status: req.Status}
 }
 func hostResponse(r model.Host) *api.HostResponse {
-	return &api.HostResponse{ID: r.ID, Name: r.Name, GroupID: r.GroupID, HostType: r.HostType, IP: r.IP, Port: r.Port, SSHUser: r.SSHUser, CredentialID: r.CredentialID, CloudAccountID: r.CloudAccountID, Tags: r.Tags, Description: r.Description, Status: r.Status, LastSeenAt: r.LastSeenAt, OS: r.Os, Kernel: r.Kernel, Arch: r.Arch, CPUInfo: r.CPUInfo, CPUCores: r.CPUCores, CPUUsage: r.CPUUsage, MemoryTotal: r.MemoryTotal, MemoryUsed: r.MemoryUsed, MemoryUsage: r.MemoryUsage, DiskTotal: r.DiskTotal, DiskUsed: r.DiskUsed, DiskUsage: r.DiskUsage, Uptime: r.Uptime, Hostname: r.Hostname, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	return &api.HostResponse{ID: r.ID, Name: r.Name, GroupID: r.GroupID, HostType: r.HostType, IP: r.IP, Port: r.Port, CredentialID: r.CredentialID, CloudAccountID: r.CloudAccountID, Tags: r.Tags, Description: r.Description, Status: r.Status, LastSeenAt: r.LastSeenAt, OS: r.Os, Kernel: r.Kernel, Arch: r.Arch, CPUInfo: r.CPUInfo, CPUCores: r.CPUCores, CPUUsage: r.CPUUsage, MemoryTotal: r.MemoryTotal, MemoryUsed: r.MemoryUsed, MemoryUsage: r.MemoryUsage, DiskTotal: r.DiskTotal, DiskUsed: r.DiskUsed, DiskUsage: r.DiskUsage, Uptime: r.Uptime, Hostname: r.Hostname, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
 func (b *AssetBiz) ListDBInstances(ctx context.Context, req *api.DbInstanceListRequest) (*api.PageResponse[*api.DbInstanceResponse], error) {

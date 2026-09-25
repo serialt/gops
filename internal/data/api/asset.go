@@ -113,8 +113,7 @@ type HostRequest struct {
 	HostType       string `json:"host_type"`
 	IP             string `json:"ip" binding:"required"`
 	Port           int64  `json:"port" binding:"min=1,max=65535"`
-	SSHUser        string `json:"ssh_user"`
-	CredentialID   int64  `json:"credential_id"`
+	CredentialID   int64  `json:"credential_id" binding:"required"`
 	CloudAccountID int64  `json:"cloud_account_id"`
 	Tags           string `json:"tags"`
 	Description    string `json:"description"`
@@ -123,6 +122,11 @@ type HostRequest struct {
 type HostIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
 }
+type HostTestRequest struct {
+	IP           string `json:"ip" binding:"required"`
+	Port         int64  `json:"port" binding:"min=1,max=65535"`
+	CredentialID int64  `json:"credential_id" binding:"required"`
+}
 type HostResponse struct {
 	ID             int64     `json:"id"`
 	Name           string    `json:"name"`
@@ -130,7 +134,6 @@ type HostResponse struct {
 	HostType       string    `json:"host_type"`
 	IP             string    `json:"ip"`
 	Port           int64     `json:"port"`
-	SSHUser        string    `json:"ssh_user"`
 	CredentialID   int64     `json:"credential_id"`
 	CloudAccountID int64     `json:"cloud_account_id"`
 	Tags           string    `json:"tags"`

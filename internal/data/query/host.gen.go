@@ -33,7 +33,6 @@ func newHost(db *gorm.DB, opts ...gen.DOOption) host {
 	_host.HostType = field.NewString(tableName, "host_type")
 	_host.IP = field.NewString(tableName, "ip")
 	_host.Port = field.NewInt64(tableName, "port")
-	_host.SSHUser = field.NewString(tableName, "ssh_user")
 	_host.CredentialID = field.NewInt64(tableName, "credential_id")
 	_host.CloudAccountID = field.NewInt64(tableName, "cloud_account_id")
 	_host.Tags = field.NewString(tableName, "tags")
@@ -73,7 +72,6 @@ type host struct {
 	HostType       field.String
 	IP             field.String
 	Port           field.Int64
-	SSHUser        field.String
 	CredentialID   field.Int64
 	CloudAccountID field.Int64
 	Tags           field.String
@@ -119,7 +117,6 @@ func (h *host) updateTableName(table string) *host {
 	h.HostType = field.NewString(table, "host_type")
 	h.IP = field.NewString(table, "ip")
 	h.Port = field.NewInt64(table, "port")
-	h.SSHUser = field.NewString(table, "ssh_user")
 	h.CredentialID = field.NewInt64(table, "credential_id")
 	h.CloudAccountID = field.NewInt64(table, "cloud_account_id")
 	h.Tags = field.NewString(table, "tags")
@@ -167,14 +164,13 @@ func (h *host) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (h *host) fillFieldMap() {
-	h.fieldMap = make(map[string]field.Expr, 30)
+	h.fieldMap = make(map[string]field.Expr, 29)
 	h.fieldMap["id"] = h.ID
 	h.fieldMap["name"] = h.Name
 	h.fieldMap["group_id"] = h.GroupID
 	h.fieldMap["host_type"] = h.HostType
 	h.fieldMap["ip"] = h.IP
 	h.fieldMap["port"] = h.Port
-	h.fieldMap["ssh_user"] = h.SSHUser
 	h.fieldMap["credential_id"] = h.CredentialID
 	h.fieldMap["cloud_account_id"] = h.CloudAccountID
 	h.fieldMap["tags"] = h.Tags

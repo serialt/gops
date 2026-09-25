@@ -20,7 +20,6 @@ type Host struct {
 	HostType       string         `gorm:"column:host_type;not null;default:'self'" json:"host_type"`
 	IP             string         `gorm:"column:ip;not null" json:"ip"`
 	Port           int64          `gorm:"column:port;not null;default:22" json:"port"`
-	SSHUser        string         `gorm:"column:ssh_user;not null;default:''" json:"ssh_user"`
 	CredentialID   int64          `gorm:"column:credential_id" json:"credential_id"`
 	CloudAccountID int64          `gorm:"column:cloud_account_id" json:"cloud_account_id"`
 	Tags           string         `gorm:"column:tags;not null;default:''" json:"tags"`

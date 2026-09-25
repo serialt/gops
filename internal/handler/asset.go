@@ -48,6 +48,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/hosts/list", h.ListHosts)
 	g.POST("/assets/hosts/create", h.CreateHost)
 	g.POST("/assets/hosts/update", h.UpdateHost)
+	g.POST("/assets/hosts/test", h.TestHostConnection)
 	g.POST("/assets/hosts/collect", h.CollectHostInfo)
 	g.POST("/assets/hosts/delete", h.DeleteHost)
 
@@ -366,6 +367,20 @@ func (h *AssetHandler) UpdateHost(c *gin.Context) {
 		return
 	}
 	response.OK(c, result)
+}
+
+// TestHostConnection POST /api/v1/assets/hosts/test 测试主机 SSH 连接。
+func (h *AssetHandler) TestHostConnection(c *gin.Context) {
+	req := new(api.HostTestRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid host connection data")
+		return
+	}
+	if err := h.biz.TestHostConnection(c.Request.Context(), req); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
 }
 
 // CollectHostInfo POST /api/v1/assets/hosts/collect 通过 SSH 采集主机运行信息。
