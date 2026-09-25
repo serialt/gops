@@ -30,6 +30,8 @@ var terminalUpgrader = websocket.Upgrader{
 	},
 }
 
+const terminalHeartbeatTimeout = 3 * time.Minute
+
 func NewAssetHandler(assetBiz *biz.AssetBiz) *AssetHandler { return &AssetHandler{biz: assetBiz} }
 
 func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
@@ -157,6 +159,7 @@ func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
 	}
 	defer ws.Close()
 	defer h.biz.CloseSSH(connection)
+	_ = ws.SetReadDeadline(time.Now().Add(terminalHeartbeatTimeout))
 
 	done := make(chan struct{})
 	go func() {
@@ -181,6 +184,7 @@ func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
 		if readErr != nil {
 			return
 		}
+		_ = ws.SetReadDeadline(time.Now().Add(terminalHeartbeatTimeout))
 		if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
 			continue
 		}
@@ -191,6 +195,9 @@ func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
 		}
 		if json.Unmarshal(payload, &control) == nil && control.Type == "resize" {
 			_ = connection.Resize(control.Cols, control.Rows)
+			continue
+		}
+		if control.Type == "heartbeat" {
 			continue
 		}
 		if err := connection.Write(payload); err != nil && !errors.Is(err, io.EOF) {
@@ -228,6 +235,7 @@ func (h *AssetHandler) ConnectDatabaseTerminal(c *gin.Context) {
 	}
 	defer ws.Close()
 	defer h.biz.CloseDatabaseTerminal(connection)
+	_ = ws.SetReadDeadline(time.Now().Add(terminalHeartbeatTimeout))
 
 	write := func(text string) error {
 		connection.Record([]byte(text))
@@ -243,6 +251,7 @@ func (h *AssetHandler) ConnectDatabaseTerminal(c *gin.Context) {
 		if readErr != nil {
 			return
 		}
+		_ = ws.SetReadDeadline(time.Now().Add(terminalHeartbeatTimeout))
 		if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
 			continue
 		}
@@ -250,6 +259,9 @@ func (h *AssetHandler) ConnectDatabaseTerminal(c *gin.Context) {
 			Type string `json:"type"`
 		}
 		if json.Unmarshal(payload, &control) == nil && control.Type == "resize" {
+			continue
+		}
+		if control.Type == "heartbeat" {
 			continue
 		}
 		for _, char := range string(payload) {

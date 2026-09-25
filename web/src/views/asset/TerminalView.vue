@@ -11,7 +11,7 @@ import { useSystemConfigStore } from '@/stores/system-config'
 
 type TreeNode = AssetTreeNode
 interface Session { key: string; kind: 'host' | 'database'; label: string; host?: Host; database?: DbInstance }
-interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout> }
+interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout>; heartbeatTimer: ReturnType<typeof setInterval> }
 
 const systemConfig = useSystemConfigStore()
 const treeData = ref<TreeNode[]>([])
@@ -127,7 +127,10 @@ async function initializeSession(session: Session) {
       socket.close()
     }
   }, 15000)
-  const runtime = { terminal, fitAddon, socket, resizeObserver, connectTimer }
+  const heartbeatTimer = setInterval(() => {
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'heartbeat' }))
+  }, 25000)
+  const runtime = { terminal, fitAddon, socket, resizeObserver, connectTimer, heartbeatTimer }
   runtimes.set(session.key, runtime)
   terminal.onData(data => socket.readyState === WebSocket.OPEN && socket.send(data))
   socket.onopen = () => { clearTimeout(connectTimer); fitAddon.fit(); sendResize(runtime); terminal.focus() }
@@ -297,6 +300,7 @@ async function reconnectSession() {
   const runtime = runtimes.get(activeKey.value)
   if (!session || !runtime) return
   clearTimeout(runtime.connectTimer)
+  clearInterval(runtime.heartbeatTimer)
   runtime.resizeObserver.disconnect()
   runtime.socket.close()
   runtime.terminal.dispose()
@@ -306,6 +310,7 @@ async function reconnectSession() {
 function disposeSession(key: string) {
   const runtime = runtimes.get(key)
   if (runtime) clearTimeout(runtime.connectTimer)
+  if (runtime) clearInterval(runtime.heartbeatTimer)
   runtime?.resizeObserver.disconnect()
   runtime?.socket.close()
   runtime?.terminal.dispose()
