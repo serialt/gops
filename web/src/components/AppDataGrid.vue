@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef, type RowSelectionOptions, type SelectionColumnDef } from 'ag-grid-community'
 
@@ -15,12 +15,15 @@ const props = defineProps<{
   pageSize?: number
   rowHeight?: number
   getRowId?: (row: unknown) => string
+  bulkDelete?: (rows: unknown[]) => Promise<void>
 }>()
 const emit = defineEmits<{
   selectionChanged: [rows: unknown[]]
   pageChange: [page: number]
   pageSizeChange: [pageSize: number]
 }>()
+const instance = getCurrentInstance()
+const selectable = computed(() => Boolean(props.bulkDelete || instance?.vnode.props?.onSelectionChanged))
 
 const defaultColDef: ColDef = {
   minWidth: 10,
@@ -57,6 +60,11 @@ const localeText = {
 }
 const localCurrentPage = ref(1)
 const localPageSize = ref(20)
+const selectedRows = ref<unknown[]>([])
+const shellRef = ref<HTMLElement>()
+const bulkActionTarget = ref<HTMLElement>()
+let gridApi: any
+let bulkActionHost: HTMLElement | undefined
 const pagedRows = computed(() => {
   if (!props.pagination || props.serverPagination) return props.rowData
   const start = (localCurrentPage.value - 1) * localPageSize.value
@@ -94,7 +102,11 @@ const columnDefsWithTimestamps = computed<ColDef[]>(() => {
   return columns
 })
 
-watch(() => props.rowData, () => { if (!props.serverPagination) localCurrentPage.value = 1 })
+watch(() => props.rowData, () => {
+  if (!props.serverPagination) localCurrentPage.value = 1
+  selectedRows.value = []
+  gridApi?.deselectAll()
+})
 const paginationPage = computed({ get: () => props.serverPagination ? (props.currentPage || 1) : localCurrentPage.value, set: value => { if (props.serverPagination) emit('pageChange', value); else localCurrentPage.value = value } })
 const paginationSize = computed({ get: () => props.serverPagination ? (props.pageSize || 20) : localPageSize.value, set: value => { if (props.serverPagination) emit('pageSizeChange', value); else localPageSize.value = value } })
 // 操作列保持固定宽度。仅其左侧最后一个数据列填充余量，其他列继续贴合实际内容。
@@ -125,7 +137,31 @@ function resizeColumns(event: any) {
   })
 }
 
-onBeforeUnmount(() => cancelAnimationFrame(resizeFrame))
+onMounted(() => {
+  if (!props.bulkDelete) return
+  let container = shellRef.value?.parentElement
+  let toolbar: HTMLElement | null = null
+  while (container && container !== document.body) {
+    toolbar = container.querySelector<HTMLElement>(':scope > .toolbar-actions, :scope > .header-actions, :scope > .node-header-actions, :scope > .page-toolbar, :scope > .toolbar, :scope > .el-dialog__header')
+    if (toolbar) break
+    container = container.parentElement
+  }
+  if (!toolbar) return
+  const actionArea = toolbar.matches('.toolbar-actions, .header-actions, .node-header-actions, .el-dialog__header')
+    ? toolbar
+    : toolbar.querySelector<HTMLElement>(':scope > .toolbar-actions, :scope > .header-actions, :scope > .node-header-actions') || toolbar
+  bulkActionHost = document.createElement('span')
+  bulkActionHost.className = 'app-data-grid-bulk-action-host'
+  bulkActionHost.style.display = 'contents'
+  const firstButton = actionArea.querySelector<HTMLElement>(':scope > .el-button')
+  actionArea.insertBefore(bulkActionHost, firstButton)
+  bulkActionTarget.value = bulkActionHost
+})
+
+onBeforeUnmount(() => {
+  cancelAnimationFrame(resizeFrame)
+  bulkActionHost?.remove()
+})
 
 function resolveRowId(params: any) {
   return props.getRowId!(params.data)
@@ -137,54 +173,105 @@ function fillRemainingSpace(event: any) {
 }
 
 function handleSelectionChanged(event: any) {
-  emit('selectionChanged', event.api.getSelectedRows())
+  selectedRows.value = event.api.getSelectedRows()
+  emit('selectionChanged', selectedRows.value)
+}
+
+async function handleBulkDelete() {
+  if (!props.bulkDelete || !selectedRows.value.length) return
+  await props.bulkDelete([...selectedRows.value])
+  gridApi?.deselectAll()
+  selectedRows.value = []
+  emit('selectionChanged', [])
+}
+
+function handleGridReady(event: any) {
+  gridApi = event.api
+  resizeColumns(event)
 }
 </script>
 
 <template>
-  <div class="app-data-grid-shell">
-    <AgGridVue
-      class="app-data-grid"
-      :theme="themeQuartz"
-      :row-data="pagedRows"
-      :column-defs="normalizedColumnDefs"
-      :default-col-def="defaultColDef"
-      :row-selection="rowSelection"
-      :selection-column-def="selectionColumnDef"
-      :locale-text="localeText"
-      :animate-rows="false"
-      :get-row-id="getRowId ? resolveRowId : undefined"
-      :row-height="rowHeight"
-      :row-buffer="5"
-      :dom-layout="domLayout"
-      :enable-cell-text-selection="true"
-      :ensure-dom-order="false"
-      :tooltip-show-delay="200"
-      :tooltip-hide-delay="10000"
-      @grid-ready="resizeColumns"
-      @first-data-rendered="resizeColumns"
-      @column-resized="fillRemainingSpace"
-      @grid-size-changed="fillRemainingSpace"
-      @selection-changed="handleSelectionChanged"
-    />
+  <div ref="shellRef" class="app-data-grid-shell">
+    <Teleport v-if="bulkActionTarget" :to="bulkActionTarget">
+      <el-button v-if="bulkDelete && selectedRows.length" class="app-data-grid-bulk-button" type="danger" plain
+        @click="handleBulkDelete">批量删除（{{ selectedRows.length }}）</el-button>
+    </Teleport>
+    <AgGridVue class="app-data-grid" :theme="themeQuartz" :row-data="pagedRows" :column-defs="normalizedColumnDefs"
+      :default-col-def="defaultColDef" :row-selection="selectable ? rowSelection : undefined"
+      :selection-column-def="selectable ? selectionColumnDef : undefined"
+      :locale-text="localeText" :animate-rows="false" :get-row-id="getRowId ? resolveRowId : undefined"
+      :row-height="rowHeight" :row-buffer="5" :dom-layout="domLayout" :enable-cell-text-selection="true"
+      :ensure-dom-order="false" :tooltip-show-delay="200" :tooltip-hide-delay="10000" @grid-ready="handleGridReady"
+      @first-data-rendered="resizeColumns" @column-resized="fillRemainingSpace" @grid-size-changed="fillRemainingSpace"
+      @selection-changed="handleSelectionChanged" />
     <div v-if="pagination" class="grid-pagination">
-      <el-pagination
-        v-model:current-page="paginationPage"
-        v-model:page-size="paginationSize"
-        :page-sizes="[20, 50, 100, 500, 1000]"
-        :total="serverPagination ? (total || 0) : rowData.length"
-        layout="total, sizes, prev, pager, next, jumper"
-      />
+      <el-pagination v-model:current-page="paginationPage" v-model:page-size="paginationSize"
+        :page-sizes="[20, 50, 100, 500, 1000]" :total="serverPagination ? (total || 0) : rowData.length"
+        layout="total, sizes, prev, pager, next, jumper" />
     </div>
   </div>
 </template>
 
 <style scoped>
-.app-data-grid-shell { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; }
-.app-data-grid { flex: 1; width: 100%; min-height: 0; --ag-font-size: 11px; --ag-font-family: inherit; --ag-border-color: var(--line); --ag-header-background-color: #fafafa; --ag-row-border-color: var(--line); --ag-background-color: #fff; --ag-odd-row-background-color: #fafafa; --ag-header-foreground-color: var(--text); --ag-foreground-color: var(--text); --ag-row-hover-color: #f0f0f0; }
-.app-data-grid :deep(.ag-cell-focus), .app-data-grid :deep(.ag-cell-range-selected) { border-radius: 6px; }
-.app-data-grid :deep(.ag-checkbox-input-wrapper), .app-data-grid :deep(.ag-checkbox-input-wrapper::after) { border-radius: 5px; }
-.grid-pagination { display: flex; justify-content: flex-end; min-height: 30px; padding: 2px 0 0; overflow-x: auto; }
-.grid-pagination :deep(.el-pagination) { flex-wrap: nowrap; min-width: max-content; font-size: 10px; --el-pagination-font-size: 10px; }
-.grid-pagination :deep(.el-pagination .el-select .el-input__wrapper), .grid-pagination :deep(.el-pagination .el-input__wrapper), .grid-pagination :deep(.el-pagination .el-input__inner) { font-size: 10px; }
+.app-data-grid-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-data-grid-bulk-button {
+  border-radius: 8px;
+  background: #fff3f1;
+  font-weight: 700;
+}
+
+.app-data-grid {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  --ag-font-size: 11px;
+  --ag-font-family: inherit;
+  --ag-border-color: var(--line);
+  --ag-header-background-color: #fafafa;
+  --ag-row-border-color: var(--line);
+  --ag-background-color: #fff;
+  --ag-odd-row-background-color: #fafafa;
+  --ag-header-foreground-color: var(--text);
+  --ag-foreground-color: var(--text);
+  --ag-row-hover-color: #f0f0f0;
+}
+
+.app-data-grid :deep(.ag-cell-focus),
+.app-data-grid :deep(.ag-cell-range-selected) {
+  border-radius: 6px;
+}
+
+.app-data-grid :deep(.ag-checkbox-input-wrapper),
+.app-data-grid :deep(.ag-checkbox-input-wrapper::after) {
+  border-radius: 5px;
+}
+
+.grid-pagination {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 30px;
+  padding: 2px 0 0;
+  overflow-x: auto;
+}
+
+.grid-pagination :deep(.el-pagination) {
+  flex-wrap: nowrap;
+  min-width: max-content;
+  font-size: 10px;
+  --el-pagination-font-size: 10px;
+}
+
+.grid-pagination :deep(.el-pagination .el-select .el-input__wrapper),
+.grid-pagination :deep(.el-pagination .el-input__wrapper),
+.grid-pagination :deep(.el-pagination .el-input__inner) {
+  font-size: 10px;
+}
 </style>

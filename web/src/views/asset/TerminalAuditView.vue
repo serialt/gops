@@ -176,6 +176,14 @@ function closePlayback() {
   recording.value = ''
 }
 async function remove(row: TerminalSession) { await ElMessageBox.confirm('确定删除该审计会话？', '删除确认', { type: 'warning' }); await deleteTerminalSession(row.id); ElMessage.success('删除成功'); await load() }
+async function batchRemove(selectedRows: unknown[]) {
+  const selectedSessions = selectedRows as TerminalSession[]
+  if (!selectedSessions.length) return
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedSessions.length} 条终端会话？`, '批量删除确认', { type: 'warning' })
+  await Promise.all(selectedSessions.map(session => deleteTerminalSession(session.id)))
+  ElMessage.success('批量删除成功')
+  await load()
+}
 onMounted(load)
 onBeforeUnmount(stopPlayback)
 </script>
@@ -188,7 +196,7 @@ onBeforeUnmount(stopPlayback)
       <div class="filters"><el-input v-model="keyword" placeholder="搜索用户、主机或数据库名称/IP..." clearable
           @input="load" /><el-select v-model="sessionType" placeholder="会话类型" clearable @change="load"><el-option
             label="SSH" value="ssh" /><el-option label="数据库" value="database" /></el-select></div>
-      <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
+      <AppDataGrid :row-data="rows" :column-defs="columns" pagination :bulk-delete="batchRemove" />
     </div><el-dialog v-model="recordingVisible" class="recording-dialog" title="会话录制" width="80%" align-center
       @closed="closePlayback">
       <div v-if="castHeader" class="recording-player">

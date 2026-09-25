@@ -22,6 +22,14 @@ async function save() {
     dialogVisible.value = false; ElMessage.success('保存成功'); await load()
 }
 async function remove(row: Credential) { await ElMessageBox.confirm(`确定删除凭证 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteCredential(row.id); ElMessage.success('删除成功'); await load() }
+async function batchRemove(selectedRows: unknown[]) {
+    const selectedCredentials = selectedRows as Credential[]
+    if (!selectedCredentials.length) return
+    await ElMessageBox.confirm(`确定删除选中的 ${selectedCredentials.length} 个凭证？`, '批量删除确认', { type: 'warning' })
+    await Promise.all(selectedCredentials.map(credential => deleteCredential(credential.id)))
+    ElMessage.success('批量删除成功')
+    await load()
+}
 onMounted(load)
 </script>
 <template>
@@ -32,24 +40,34 @@ onMounted(load)
                     type="primary" class="primary-btn" @click="create">新增凭证</el-button>
             </div><el-input v-model="keyword" class="credential-search" placeholder="搜索凭证名称或用户名" clearable
                 @input="load(true)" />
-            <AppDataGrid :row-data="rows" :column-defs="columns" pagination server-pagination :total="total" :current-page="page" :page-size="pageSize" @page-change="changePage" @page-size-change="changePageSize" />
-        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑凭证' : '新增凭证'" width="560px" class="credential-dialog">
+            <AppDataGrid :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
+                :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove" @page-change="changePage"
+                @page-size-change="changePageSize" />
+        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑凭证' : '新增凭证'" width="560px"
+            class="credential-dialog">
             <el-form :model="form" label-width="92px" class="credential-form">
-                <el-form-item label="凭证名称" required><el-input v-model="form.name" placeholder="请输入凭证名称，如：生产环境 root 凭证" /></el-form-item>
+                <el-form-item label="凭证名称" required><el-input v-model="form.name"
+                        placeholder="请输入凭证名称，如：生产环境 root 凭证" /></el-form-item>
                 <el-form-item label="认证方式" required>
-                    <el-radio-group v-model="form.credential_type"><el-radio value="password">密码认证</el-radio><el-radio value="key">密钥认证</el-radio></el-radio-group>
+                    <el-radio-group v-model="form.credential_type"><el-radio value="password">密码认证</el-radio><el-radio
+                            value="key">密钥认证</el-radio></el-radio-group>
                 </el-form-item>
                 <el-form-item label="用户名"><el-input v-model="form.username" placeholder="如：root" /></el-form-item>
                 <el-form-item v-if="form.credential_type === 'password'" label="密码" required>
-                    <el-input v-model="form.password" type="password" show-password :placeholder="editingID ? '留空则不修改密码' : '请输入密码'" />
+                    <el-input v-model="form.password" type="password" show-password
+                        :placeholder="editingID ? '留空则不修改密码' : '请输入密码'" />
                 </el-form-item>
                 <template v-else>
-                    <el-form-item label="私钥" required><el-input v-model="form.private_key" type="textarea" :rows="4" placeholder="请输入 SSH 私钥内容" /></el-form-item>
-                    <el-form-item label="私钥口令"><el-input v-model="form.passphrase" type="password" show-password :placeholder="editingID ? '留空则不修改口令' : '可选'" /></el-form-item>
+                    <el-form-item label="私钥" required><el-input v-model="form.private_key" type="textarea" :rows="4"
+                            placeholder="请输入 SSH 私钥内容" /></el-form-item>
+                    <el-form-item label="私钥口令"><el-input v-model="form.passphrase" type="password" show-password
+                            :placeholder="editingID ? '留空则不修改口令' : '可选'" /></el-form-item>
                 </template>
-                <el-form-item label="备注"><el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入备注信息" /></el-form-item>
+                <el-form-item label="备注"><el-input v-model="form.description" type="textarea" :rows="3"
+                        placeholder="请输入备注信息" /></el-form-item>
             </el-form>
-            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template>
+            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary"
+                    @click="save">保存</el-button></template>
         </el-dialog>
     </div>
 </template>

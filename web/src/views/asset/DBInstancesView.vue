@@ -26,6 +26,14 @@ function applyDefaultPort(type: string) { const option = databaseTypes.value.fin
 async function save() { if (!form.name || !form.db_type || !form.host || !form.port || !form.credential_id) return ElMessage.warning('请填写数据库名称、类型、地址、端口并选择凭据'); const payload = { ...form, group_id: form.group_id ?? 0, port: form.port, credential_id: form.credential_id }; if (editingID.value) await updateDBInstance({ ...payload, id: editingID.value }); else await createDBInstance(payload); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
 async function testConnection() { if (!form.db_type || !form.host || !form.port || !form.credential_id) return ElMessage.warning('请填写数据库类型、地址、端口并选择凭据'); testingConnection.value = true; try { const { data } = await testDBInstanceConnection({ db_type: form.db_type, host: form.host, port: form.port, credential_id: form.credential_id }); if (data.data.version) form.version = data.data.version; ElMessage.success(data.data.version ? `连接成功，版本：${data.data.version}` : '连接成功') } finally { testingConnection.value = false } }
 async function remove(row: DbInstance) { await ElMessageBox.confirm(`确定删除数据库 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteDBInstance(row.id); ElMessage.success('删除成功'); await load() }
+async function batchRemove(selectedRows: unknown[]) {
+    const selectedInstances = selectedRows as DbInstance[]
+    if (!selectedInstances.length) return
+    await ElMessageBox.confirm(`确定删除选中的 ${selectedInstances.length} 个数据库实例？`, '批量删除确认', { type: 'warning' })
+    await Promise.all(selectedInstances.map(instance => deleteDBInstance(instance.id)))
+    ElMessage.success('批量删除成功')
+    await load()
+}
 async function collect(row: DbInstance) { await collectDBInstanceInfo(row.id); ElMessage.success(`${row.name} 状态和版本采集成功`); await load() }
 function openTerminal() { window.open('/assets/terminal', '_blank', 'noopener,noreferrer') }
 function selectTreeNode(node: AssetTreeNode) { selectedGroupID.value = node.id; void load(true) }
@@ -68,6 +76,7 @@ onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDataba
                             @click="create">新增数据库</el-button></div>
                 </div>
                 <AppDataGrid class="db-grid" :row-data="visibleRows" :column-defs="columns" pagination server-pagination
+                    :bulk-delete="auth.hasPermission('POST /api/v1/assets/db-instances/delete') ? batchRemove : undefined"
                     :total="total" :current-page="page" :page-size="pageSize" @page-change="changePage"
                     @page-size-change="changePageSize" />
             </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑数据库' : '新增数据库'" width="60%">

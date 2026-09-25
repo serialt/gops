@@ -41,6 +41,14 @@ async function saveCredential() { if (!credentialForm.name.trim()) return ElMess
 async function testConnection() { if (!form.ip || !form.port || !form.credential_id) return ElMessage.warning('请填写主机地址、端口并选择凭据'); testingConnection.value = true; try { await testHostConnection({ ip: form.ip, port: form.port, credential_id: form.credential_id }); ElMessage.success('SSH 连接成功') } finally { testingConnection.value = false } }
 async function save() { if (!form.name || !form.ip || !form.host_type || !form.credential_id) return ElMessage.warning('请填写主机名称、类型、地址并选择凭据'); const payload = { ...form, group_id: form.group_id ?? 0, credential_id: form.credential_id, cloud_account_id: form.cloud_account_id ?? 0 }; if (editingID.value) await updateHost({ ...payload, id: editingID.value }); else await createHost(payload); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
 async function remove(row: Host) { await ElMessageBox.confirm(`确定删除主机 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteHost(row.id); ElMessage.success('删除成功'); await load() }
+async function batchRemove(selectedRows: unknown[]) {
+    const selectedHosts = selectedRows as Host[]
+    if (!selectedHosts.length) return
+    await ElMessageBox.confirm(`确定删除选中的 ${selectedHosts.length} 台主机？`, '批量删除确认', { type: 'warning' })
+    await Promise.all(selectedHosts.map(host => deleteHost(host.id)))
+    ElMessage.success('批量删除成功')
+    await load()
+}
 watch(treeKeyword, value => assetTreeRef.value?.filter(value))
 watch(() => form.host_type, type => { if (type !== 'cloud') form.cloud_account_id = null })
 onMounted(() => { void load(); void loadFormOptions() })
@@ -79,6 +87,7 @@ onMounted(() => { void load(); void loadFormOptions() })
                             @click="create">新增主机</el-button></div>
                 </div>
                 <AppDataGrid class="host-grid" :row-data="visibleRows" :column-defs="columns" pagination
+                    :bulk-delete="auth.hasPermission('POST /api/v1/assets/hosts/delete') ? batchRemove : undefined"
                     server-pagination :total="total" :current-page="page" :page-size="pageSize"
                     @page-change="changePage" @page-size-change="changePageSize" />
             </section>
