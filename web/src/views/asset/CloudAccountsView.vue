@@ -4,7 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ColDef } from 'ag-grid-community'
 import AppDataGrid from '@/components/AppDataGrid.vue'
 import { createCloudAccount, deleteCloudAccount, getCloudProviderOptions, listCloudAccounts, updateCloudAccount, type CloudAccount, type CloudProviderOption } from '@/api/asset'
-const rows = ref<CloudAccount[]>([]); const keyword = ref(''); const dialogVisible = ref(false); const editingID = ref<number | null>(null); const form = reactive({ name: '', provider: '', access_key: '', secret_key: '', region: '', description: '', status: true })
+const rows = ref<CloudAccount[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const keyword = ref(''); const dialogVisible = ref(false); const editingID = ref<number | null>(null); const form = reactive({ name: '', provider: '', access_key: '', secret_key: '', region: '', description: '', status: true })
 const providerOptions = ref<CloudProviderOption[]>([])
 const regionOptions = computed(() => providerOptions.value.find((provider) => provider.value === form.provider)?.regions ?? [])
 function action(text: string, kind: string, fn: () => void) { const el = document.createElement('button'); el.textContent = text; el.className = `cloud-action ${kind}`; el.onclick = fn; return el }
@@ -13,7 +13,9 @@ function applyDefaultRegion() { if (!regionOptions.value.some((region) => region
 function formatRegionLabel(region: CloudProviderOption['regions'][number]) {
   return `${region.label.replace(/\s+(?=\d)/g, '').replace(/（([^）]+)）/g, '-$1')}（${region.value}）`
 }
-async function load() { const { data } = await listCloudAccounts(keyword.value); rows.value = data.data }
+async function load(reset = false) { if (reset) page.value = 1; const { data } = await listCloudAccounts(keyword.value, page.value, pageSize.value); rows.value = data.data.list; total.value = data.data.total }
+function changePage(value: number) { page.value = value; void load() }
+function changePageSize(value: number) { pageSize.value = value; page.value = 1; void load() }
 async function loadProviderOptions() { const { data } = await getCloudProviderOptions(); providerOptions.value = Array.isArray(data.data) ? data.data : []; applyDefaultRegion() }
 function openCreate() { dialogVisible.value = true; editingID.value = null; Object.assign(form, { name: '', provider: '', access_key: '', secret_key: '', region: '', description: '', status: true }) }
 function edit(row: CloudAccount) { editingID.value = row.id; Object.assign(form, { name: row.name, provider: row.provider, access_key: '', secret_key: '', region: row.region, description: row.description, status: row.status }); dialogVisible.value = true }
@@ -28,8 +30,8 @@ onMounted(async () => { await loadProviderOptions(); await load() })
             <div class="page-toolbar">
                 <h2 class="page-title">云账号</h2><el-button v-permission="'POST /api/v1/assets/cloud-accounts/create'"
                     type="primary" class="primary-btn" @click="openCreate">新增云账号</el-button>
-            </div><el-input v-model="keyword" class="cloud-search" placeholder="搜索账号名称或云服务商" clearable @input="load" />
-            <AppDataGrid :row-data="rows" :column-defs="columns" pagination />
+            </div><el-input v-model="keyword" class="cloud-search" placeholder="搜索账号名称或云服务商" clearable @input="load(true)" />
+            <AppDataGrid :row-data="rows" :column-defs="columns" pagination server-pagination :total="total" :current-page="page" :page-size="pageSize" @page-change="changePage" @page-size-change="changePageSize" />
         </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑云账号' : '新增云账号'" width="560px">
             <el-form :model="form" label-width="92px" class="cloud-form">
                 <el-form-item label="账号名称" required><el-input v-model="form.name" placeholder="请输入云账号名称，如：生产环境阿里云" /></el-form-item>

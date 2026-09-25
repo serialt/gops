@@ -81,20 +81,16 @@ func (b *AssetBiz) DatabaseTypeOptions() []*api.DatabaseTypeOptionResponse {
 	return databaseTypeOptions
 }
 
-func (b *AssetBiz) ListGroups(req *api.AssetGroupListRequest) ([]*api.AssetGroupResponse, error) {
-	var rows []model.AssetGroup
-	query := b.db.Order("parent_id ASC, sort_order ASC, id ASC")
-	if req.Keyword != "" {
-		query = query.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
-	}
-	if err := query.Find(&rows).Error; err != nil {
+func (b *AssetBiz) ListGroups(ctx context.Context, req *api.AssetGroupListRequest) (*api.PageResponse[*api.AssetGroupResponse], error) {
+	rows, total, err := b.repo.ListGroups(ctx, b.db, req.Keyword, req.Offset(), req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.AssetGroupResponse, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, assetGroupResponse(row))
+		result = append(result, assetGroupResponse(*row))
 	}
-	return result, nil
+	return &api.PageResponse[*api.AssetGroupResponse]{List: result, Total: total}, nil
 }
 
 func (b *AssetBiz) CreateGroup(req *api.AssetGroupRequest) (*api.AssetGroupResponse, error) {
@@ -222,20 +218,16 @@ func assetGroupResponse(row model.AssetGroup) *api.AssetGroupResponse {
 	return &api.AssetGroupResponse{ID: row.ID, Name: row.Name, Code: row.Code, ParentID: row.ParentID, Description: row.Description, SortOrder: row.SortOrder, Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
-func (b *AssetBiz) ListCredentials(req *api.CredentialListRequest) ([]*api.CredentialResponse, error) {
-	var rows []model.Credential
-	q := b.db.Order("id DESC")
-	if req.Keyword != "" {
-		q = q.Where("name LIKE ? OR username LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
-	}
-	if err := q.Find(&rows).Error; err != nil {
+func (b *AssetBiz) ListCredentials(ctx context.Context, req *api.CredentialListRequest) (*api.PageResponse[*api.CredentialResponse], error) {
+	rows, total, err := b.repo.ListCredentials(ctx, b.db, req.Keyword, req.Offset(), req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.CredentialResponse, 0, len(rows))
 	for _, r := range rows {
-		result = append(result, credentialResponse(r))
+		result = append(result, credentialResponse(*r))
 	}
-	return result, nil
+	return &api.PageResponse[*api.CredentialResponse]{List: result, Total: total}, nil
 }
 func (b *AssetBiz) CreateCredential(req *api.CredentialRequest) (*api.CredentialResponse, error) {
 	row, err := b.credentialModel(req)
@@ -308,20 +300,16 @@ func credentialResponse(row model.Credential) *api.CredentialResponse {
 	return &api.CredentialResponse{ID: row.ID, Name: row.Name, CredentialType: row.CredentialType, Username: row.Username, Description: row.Description, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
-func (b *AssetBiz) ListCloudAccounts(req *api.CloudAccountListRequest) ([]*api.CloudAccountResponse, error) {
-	var rows []model.CloudAccount
-	q := b.db.Order("id DESC")
-	if req.Keyword != "" {
-		q = q.Where("name LIKE ? OR provider LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
-	}
-	if err := q.Find(&rows).Error; err != nil {
+func (b *AssetBiz) ListCloudAccounts(ctx context.Context, req *api.CloudAccountListRequest) (*api.PageResponse[*api.CloudAccountResponse], error) {
+	rows, total, err := b.repo.ListCloudAccounts(ctx, b.db, req.Keyword, req.Offset(), req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.CloudAccountResponse, 0, len(rows))
 	for _, r := range rows {
-		result = append(result, cloudAccountResponse(r))
+		result = append(result, cloudAccountResponse(*r))
 	}
-	return result, nil
+	return &api.PageResponse[*api.CloudAccountResponse]{List: result, Total: total}, nil
 }
 func (b *AssetBiz) CreateCloudAccount(req *api.CloudAccountRequest) (*api.CloudAccountResponse, error) {
 	row, err := b.cloudAccountModel(req)
@@ -415,23 +403,16 @@ func cloudAccountResponse(row model.CloudAccount) *api.CloudAccountResponse {
 	return &api.CloudAccountResponse{ID: row.ID, Name: row.Name, Provider: row.Provider, Region: row.Region, Description: row.Description, Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
-func (b *AssetBiz) ListHosts(req *api.HostListRequest) ([]*api.HostResponse, error) {
-	var rows []model.Host
-	q := b.db.Order("id DESC")
-	if req.Keyword != "" {
-		q = q.Where("name LIKE ? OR ip LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
-	}
-	if req.GroupID > 0 {
-		q = q.Where("group_id = ?", req.GroupID)
-	}
-	if err := q.Find(&rows).Error; err != nil {
+func (b *AssetBiz) ListHosts(ctx context.Context, req *api.HostListRequest) (*api.PageResponse[*api.HostResponse], error) {
+	rows, total, err := b.repo.ListHosts(ctx, b.db, req.Keyword, req.GroupID, req.Offset(), req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.HostResponse, 0, len(rows))
 	for _, r := range rows {
-		result = append(result, hostResponse(r))
+		result = append(result, hostResponse(*r))
 	}
-	return result, nil
+	return &api.PageResponse[*api.HostResponse]{List: result, Total: total}, nil
 }
 func (b *AssetBiz) CreateHost(req *api.HostRequest) (*api.HostResponse, error) {
 	row := hostModel(req)
@@ -504,23 +485,16 @@ func hostResponse(r model.Host) *api.HostResponse {
 	return &api.HostResponse{ID: r.ID, Name: r.Name, GroupID: r.GroupID, HostType: r.HostType, IP: r.IP, Port: r.Port, SSHUser: r.SSHUser, CredentialID: r.CredentialID, CloudAccountID: r.CloudAccountID, Tags: r.Tags, Description: r.Description, Status: r.Status, LastSeenAt: r.LastSeenAt, OS: r.Os, Kernel: r.Kernel, Arch: r.Arch, CPUInfo: r.CPUInfo, CPUCores: r.CPUCores, CPUUsage: r.CPUUsage, MemoryTotal: r.MemoryTotal, MemoryUsed: r.MemoryUsed, MemoryUsage: r.MemoryUsage, DiskTotal: r.DiskTotal, DiskUsed: r.DiskUsed, DiskUsage: r.DiskUsage, Uptime: r.Uptime, Hostname: r.Hostname, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
-func (b *AssetBiz) ListDBInstances(req *api.DbInstanceListRequest) ([]*api.DbInstanceResponse, error) {
-	var rows []model.DbInstance
-	q := b.db.Order("id DESC")
-	if req.Keyword != "" {
-		q = q.Where("name LIKE ? OR host LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
-	}
-	if req.GroupID > 0 {
-		q = q.Where("group_id = ?", req.GroupID)
-	}
-	if err := q.Find(&rows).Error; err != nil {
+func (b *AssetBiz) ListDBInstances(ctx context.Context, req *api.DbInstanceListRequest) (*api.PageResponse[*api.DbInstanceResponse], error) {
+	rows, total, err := b.repo.ListDBInstances(ctx, b.db, req.Keyword, req.GroupID, req.Offset(), req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.DbInstanceResponse, 0, len(rows))
 	for _, r := range rows {
-		result = append(result, dbInstanceResponse(r))
+		result = append(result, dbInstanceResponse(*r))
 	}
-	return result, nil
+	return &api.PageResponse[*api.DbInstanceResponse]{List: result, Total: total}, nil
 }
 func (b *AssetBiz) CreateDBInstance(req *api.DbInstanceRequest) (*api.DbInstanceResponse, error) {
 	row, err := b.dbInstanceModel(req)

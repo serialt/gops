@@ -117,9 +117,9 @@ function closeSession(key: number) {
   if (activeKey.value === key) activeKey.value = sessions.value[Math.min(index, sessions.value.length - 1)]?.key ?? null
 }
 async function load() {
-  const [hostResult, groupResult] = await Promise.all([listHosts(), listAssetGroups()])
-  hosts.value = hostResult.data.data
-  groups.value = groupResult.data.data
+  const [hostResult, groupResult] = await Promise.all([listHosts('', 0, 1, 1000), listAssetGroups('', 1, 1000)])
+  hosts.value = hostResult.data.data.list
+  groups.value = groupResult.data.data.list
 }
 watch(keyword, value => treeRef.value?.filter(value))
 onMounted(() => { void systemConfig.fetchConfig(); void load().catch(() => ElMessage.error('读取资产失败')) })

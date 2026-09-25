@@ -1,6 +1,7 @@
 package biz
 
 import (
+	"context"
 	"fmt"
 	"gops/internal/data/api"
 
@@ -10,7 +11,8 @@ import (
 var hostExcelHeaders = []string{"名称", "主机", "状态", "类型", "CPU", "内存", "磁盘", "标签", "系统信息", "创建时间", "更新时间"}
 
 func (a *AssetBiz) ExportHosts(req *api.HostListRequest) (resp []*api.HostResponse, err error) {
-	rows, err := a.ListHosts(req)
+	req.Page, req.Limit = 1, api.MaxLimit
+	page, err := a.ListHosts(context.Background(), req)
 
 	if err != nil {
 		a.log.Error("ExportHosts: get list failed", "err", err)
@@ -24,7 +26,7 @@ func (a *AssetBiz) ExportHosts(req *api.HostListRequest) (resp []*api.HostRespon
 	_ = book.SetSheetRow(sheet, "A1", &monitorExcelHeaders)
 	_ = book.SetCellStyle(sheet, "A1", "Q1", headerStyle)
 	_ = book.SetPanes(sheet, &excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
-	for index, row := range rows {
+	for index, row := range page.List {
 		values := []any{row.Name, fmt.Sprintf("%v:%v", row.IP, row.Port), row.Status, row.HostType}
 		cell, _ := excelize.CoordinatesToCellName(1, index+2)
 		_ = book.SetSheetRow(sheet, cell, &values)

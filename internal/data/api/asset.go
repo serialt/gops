@@ -3,6 +3,7 @@ package api
 import "time"
 
 type AssetGroupListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type AssetGroupRequest struct {
@@ -30,6 +31,7 @@ type AssetGroupResponse struct {
 }
 
 type CredentialListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type CredentialRequest struct {
@@ -56,6 +58,7 @@ type CredentialResponse struct {
 }
 
 type CloudAccountListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type CloudProviderOptionResponse struct {
@@ -99,6 +102,7 @@ type DatabaseTypeOptionResponse struct {
 }
 
 type HostListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 	GroupID int64  `json:"group_id"`
 }
@@ -152,6 +156,7 @@ type HostResponse struct {
 }
 
 type DbInstanceListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 	GroupID int64  `json:"group_id"`
 }
@@ -197,6 +202,7 @@ type DbInstanceResponse struct {
 }
 
 type TerminalSessionListRequest struct {
+	PageRequest
 	Keyword     string `json:"keyword"`
 	SessionType string `json:"session_type"`
 }

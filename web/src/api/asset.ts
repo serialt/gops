@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import type { PageResponse } from '@/utils/request'
 
 export interface AssetGroup {
   id: number
@@ -24,14 +25,14 @@ export interface AssetGroupRequest {
 }
 export interface AssetGroupIDRequest { id: number }
 
-export const listAssetGroups = (keyword = '') => request.post<AssetGroup[]>('/assets/groups/list', { keyword } satisfies AssetGroupListRequest)
+export const listAssetGroups = (keyword = '', page = 1, limit = 1000) => request.post<PageResponse<AssetGroup>>('/assets/groups/list', { keyword, page, limit })
 export const createAssetGroup = (data: AssetGroupRequest) => request.post<AssetGroup>('/assets/groups/create', data)
 export const updateAssetGroup = (data: Required<Pick<AssetGroupRequest, 'id'>> & AssetGroupRequest) => request.post<AssetGroup>('/assets/groups/update', data)
 export const deleteAssetGroup = (id: number) => request.post<null>('/assets/groups/delete', { id } satisfies AssetGroupIDRequest)
 
 export interface Credential { id: number; name: string; credential_type: string; username: string; description: string; created_at: string; updated_at: string }
 export interface CredentialRequest { id?: number; name: string; credential_type: string; username: string; password: string; private_key: string; passphrase: string; description: string }
-export const listCredentials = (keyword = '') => request.post<Credential[]>('/assets/credentials/list', { keyword })
+export const listCredentials = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<Credential>>('/assets/credentials/list', { keyword, page, limit })
 export const createCredential = (data: CredentialRequest) => request.post<Credential>('/assets/credentials/create', data)
 export const updateCredential = (data: Required<Pick<CredentialRequest, 'id'>> & CredentialRequest) => request.post<Credential>('/assets/credentials/update', data)
 export const deleteCredential = (id: number) => request.post<null>('/assets/credentials/delete', { id })
@@ -40,7 +41,7 @@ export interface CloudAccount { id: number; name: string; provider: string; regi
 export interface CloudRegionOption { value: string; label: string }
 export interface CloudProviderOption { value: string; label: string; regions: CloudRegionOption[] }
 export interface CloudAccountRequest { id?: number; name: string; provider: string; access_key: string; secret_key: string; region: string; description: string; status: boolean }
-export const listCloudAccounts = (keyword = '') => request.post<CloudAccount[]>('/assets/cloud-accounts/list', { keyword })
+export const listCloudAccounts = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<CloudAccount>>('/assets/cloud-accounts/list', { keyword, page, limit })
 export const getCloudProviderOptions = () => request.post<CloudProviderOption[]>('/assets/cloud-accounts/options', {})
 export const createCloudAccount = (data: CloudAccountRequest) => request.post<CloudAccount>('/assets/cloud-accounts/create', data)
 export const updateCloudAccount = (data: Required<Pick<CloudAccountRequest, 'id'>> & CloudAccountRequest) => request.post<CloudAccount>('/assets/cloud-accounts/update', data)
@@ -48,7 +49,7 @@ export const deleteCloudAccount = (id: number) => request.post<null>('/assets/cl
 
 export interface Host { id:number; name:string; group_id:number; host_type:string; ip:string; port:number; ssh_user:string; credential_id:number; cloud_account_id:number; tags:string; description:string; status:number; last_seen_at:string; os:string; kernel:string; arch:string; cpu_info:string; cpu_cores:number; cpu_usage:number; memory_total:number; memory_used:number; memory_usage:number; disk_total:number; disk_used:number; disk_usage:number; uptime:string; hostname:string; created_at:string; updated_at:string }
 export interface HostRequest { id?:number; name:string; group_id:number; host_type:string; ip:string; port:number; ssh_user:string; credential_id:number; cloud_account_id:number; tags:string; description:string; status:number }
-export const listHosts = (keyword='', group_id=0) => request.post<Host[]>('/assets/hosts/list', { keyword, group_id })
+export const listHosts = (keyword='', group_id=0, page=1, limit=20) => request.post<PageResponse<Host>>('/assets/hosts/list', { keyword, group_id, page, limit })
 export const createHost = (data:HostRequest) => request.post<Host>('/assets/hosts/create',data)
 export const updateHost = (data:Required<Pick<HostRequest,'id'>>&HostRequest) => request.post<Host>('/assets/hosts/update',data)
 export const collectHostInfo = (id:number) => request.post<Host>('/assets/hosts/collect',{id})
@@ -59,7 +60,7 @@ export interface DatabaseTypeOption { value: string; label: string; default_port
 export interface DbInstanceRequest { id?:number; group_id:number; name:string; db_type:string; host:string; port:number; version:string; credential_id:number; tags:string; description:string; status:boolean }
 export interface DbInstanceTestRequest { db_type:string; host:string; port:number; credential_id:number }
 export interface DbInstanceTestResponse { version:string }
-export const listDBInstances = (keyword='', group_id=0) => request.post<DbInstance[]>('/assets/db-instances/list',{keyword,group_id})
+export const listDBInstances = (keyword='', group_id=0, page=1, limit=20) => request.post<PageResponse<DbInstance>>('/assets/db-instances/list',{keyword,group_id,page,limit})
 export const getDatabaseTypeOptions = () => request.post<DatabaseTypeOption[]>('/assets/db-instances/options', {})
 export const createDBInstance = (data:DbInstanceRequest) => request.post<DbInstance>('/assets/db-instances/create',data)
 export const updateDBInstance = (data:Required<Pick<DbInstanceRequest,'id'>>&DbInstanceRequest) => request.post<DbInstance>('/assets/db-instances/update',data)

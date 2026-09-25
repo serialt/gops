@@ -9,11 +9,17 @@ const props = defineProps<{
   rowData: unknown[]
   columnDefs: ColDef[]
   pagination?: boolean
+  serverPagination?: boolean
+  total?: number
+  currentPage?: number
+  pageSize?: number
   rowHeight?: number
   getRowId?: (row: unknown) => string
 }>()
 const emit = defineEmits<{
   selectionChanged: [rows: unknown[]]
+  pageChange: [page: number]
+  pageSizeChange: [pageSize: number]
 }>()
 
 const defaultColDef: ColDef = {
@@ -49,12 +55,12 @@ const localeText = {
   loadingOoo: '加载中…',
   pageSizeSelectorLabel: '每页',
 }
-const currentPage = ref(1)
-const pageSize = ref(20)
+const localCurrentPage = ref(1)
+const localPageSize = ref(20)
 const pagedRows = computed(() => {
-  if (!props.pagination) return props.rowData
-  const start = (currentPage.value - 1) * pageSize.value
-  return props.rowData.slice(start, start + pageSize.value)
+  if (!props.pagination || props.serverPagination) return props.rowData
+  const start = (localCurrentPage.value - 1) * localPageSize.value
+  return props.rowData.slice(start, start + localPageSize.value)
 })
 const domLayout = computed(() => props.pagination ? 'normal' : 'autoHeight')
 
@@ -88,7 +94,9 @@ const columnDefsWithTimestamps = computed<ColDef[]>(() => {
   return columns
 })
 
-watch(() => props.rowData, () => { currentPage.value = 1 })
+watch(() => props.rowData, () => { if (!props.serverPagination) localCurrentPage.value = 1 })
+const paginationPage = computed({ get: () => props.serverPagination ? (props.currentPage || 1) : localCurrentPage.value, set: value => { if (props.serverPagination) emit('pageChange', value); else localCurrentPage.value = value } })
+const paginationSize = computed({ get: () => props.serverPagination ? (props.pageSize || 20) : localPageSize.value, set: value => { if (props.serverPagination) emit('pageSizeChange', value); else localPageSize.value = value } })
 // 操作列保持固定宽度。仅其左侧最后一个数据列填充余量，其他列继续贴合实际内容。
 const normalizedColumnDefs = computed<ColDef[]>(() => {
   const isActionColumn = (column: ColDef) => column.headerName === '操作'
@@ -161,10 +169,10 @@ function handleSelectionChanged(event: any) {
     />
     <div v-if="pagination" class="grid-pagination">
       <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
+        v-model:current-page="paginationPage"
+        v-model:page-size="paginationSize"
         :page-sizes="[20, 50, 100, 500, 1000]"
-        :total="rowData.length"
+        :total="serverPagination ? (total || 0) : rowData.length"
         layout="total, sizes, prev, pager, next, jumper"
       />
     </div>

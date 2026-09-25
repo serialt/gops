@@ -144,7 +144,7 @@ func (h *AssetHandler) ListGroups(c *gin.Context) {
 		response.Error(c, 400, "invalid asset group query")
 		return
 	}
-	result, err := h.biz.ListGroups(req)
+	result, err := h.biz.ListGroups(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 500, "query asset groups failed")
 		return
@@ -207,7 +207,7 @@ func (h *AssetHandler) ListCredentials(c *gin.Context) {
 		response.Error(c, 400, "invalid credential query")
 		return
 	}
-	result, err := h.biz.ListCredentials(req)
+	result, err := h.biz.ListCredentials(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 500, "query credentials failed")
 		return
@@ -266,7 +266,7 @@ func (h *AssetHandler) ListCloudAccounts(c *gin.Context) {
 		response.Error(c, 400, "invalid cloud account query")
 		return
 	}
-	result, err := h.biz.ListCloudAccounts(req)
+	result, err := h.biz.ListCloudAccounts(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 500, "query cloud accounts failed")
 		return
@@ -330,7 +330,7 @@ func (h *AssetHandler) ListHosts(c *gin.Context) {
 		response.Error(c, 400, "invalid host query")
 		return
 	}
-	result, err := h.biz.ListHosts(req)
+	result, err := h.biz.ListHosts(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 500, "query hosts failed")
 		return
@@ -409,7 +409,7 @@ func (h *AssetHandler) ListDBInstances(c *gin.Context) {
 		response.Error(c, 400, "invalid database instance query")
 		return
 	}
-	result, err := h.biz.ListDBInstances(req)
+	result, err := h.biz.ListDBInstances(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 500, "query database instances failed")
 		return

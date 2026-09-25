@@ -89,7 +89,7 @@ function stopTreePaneDrag() {
   document.removeEventListener('pointerup', stopTreePaneDrag)
 }
 function toggleTreePane() { treePaneWidth.value = treePaneWidth.value === 0 ? 200 : 0 }
-async function load() { const { data } = await listAssetGroups(); rows.value = data.data }
+async function load() { const { data } = await listAssetGroups('', 1, 1000); rows.value = data.data.list }
 function openCreate() { editingID.value = null; Object.assign(form, { name: '', code: '', parent_id: selectedID.value ?? 0, description: '', sort_order: 0, status: true }); dialogVisible.value = true }
 function openEdit(row: AssetGroup) { editingID.value = row.id; Object.assign(form, row); dialogVisible.value = true }
 async function save() { if (!form.name || !form.code) return ElMessage.warning('请填写分组名称和编码'); if (editingID.value) await updateAssetGroup({ ...form, id: editingID.value }); else await createAssetGroup(form); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }

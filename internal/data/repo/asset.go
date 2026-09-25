@@ -6,12 +6,94 @@ import (
 	"gops/internal/data/model"
 	"gops/internal/data/query"
 
+	"gorm.io/gen/field"
 	"gorm.io/gorm"
 )
 
 type AssetRepo struct{}
 
 func NewAssetRepo() *AssetRepo { return &AssetRepo{} }
+
+func (r *AssetRepo) ListGroups(ctx context.Context, db *gorm.DB, keyword string, offset, limit int) ([]*model.AssetGroup, int64, error) {
+	q := query.Use(db).AssetGroup
+	do := q.WithContext(ctx)
+	if keyword != "" {
+		value := "%" + keyword + "%"
+		do = do.Where(field.Or(q.Name.Like(value), q.Code.Like(value)))
+	}
+	total, err := do.Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := do.Order(q.SortOrder, q.ID).Offset(offset).Limit(limit).Find()
+	return rows, total, err
+}
+
+func (r *AssetRepo) ListCredentials(ctx context.Context, db *gorm.DB, keyword string, offset, limit int) ([]*model.Credential, int64, error) {
+	q := query.Use(db).Credential
+	do := q.WithContext(ctx)
+	if keyword != "" {
+		value := "%" + keyword + "%"
+		do = do.Where(field.Or(q.Name.Like(value), q.Username.Like(value)))
+	}
+	total, err := do.Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := do.Order(q.ID.Desc()).Offset(offset).Limit(limit).Find()
+	return rows, total, err
+}
+
+func (r *AssetRepo) ListCloudAccounts(ctx context.Context, db *gorm.DB, keyword string, offset, limit int) ([]*model.CloudAccount, int64, error) {
+	q := query.Use(db).CloudAccount
+	do := q.WithContext(ctx)
+	if keyword != "" {
+		value := "%" + keyword + "%"
+		do = do.Where(field.Or(q.Name.Like(value), q.Provider.Like(value)))
+	}
+	total, err := do.Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := do.Order(q.ID.Desc()).Offset(offset).Limit(limit).Find()
+	return rows, total, err
+}
+
+func (r *AssetRepo) ListHosts(ctx context.Context, db *gorm.DB, keyword string, groupID int64, offset, limit int) ([]*model.Host, int64, error) {
+	q := query.Use(db).Host
+	do := q.WithContext(ctx)
+	if keyword != "" {
+		value := "%" + keyword + "%"
+		do = do.Where(field.Or(q.Name.Like(value), q.IP.Like(value)))
+	}
+	if groupID > 0 {
+		do = do.Where(q.GroupID.Eq(groupID))
+	}
+	total, err := do.Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := do.Order(q.ID.Desc()).Offset(offset).Limit(limit).Find()
+	return rows, total, err
+}
+
+func (r *AssetRepo) ListDBInstances(ctx context.Context, db *gorm.DB, keyword string, groupID int64, offset, limit int) ([]*model.DbInstance, int64, error) {
+	q := query.Use(db).DbInstance
+	do := q.WithContext(ctx)
+	if keyword != "" {
+		value := "%" + keyword + "%"
+		do = do.Where(field.Or(q.Name.Like(value), q.Host.Like(value)))
+	}
+	if groupID > 0 {
+		do = do.Where(q.GroupID.Eq(groupID))
+	}
+	total, err := do.Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := do.Order(q.ID.Desc()).Offset(offset).Limit(limit).Find()
+	return rows, total, err
+}
 
 func (r *AssetRepo) GetCredential(ctx context.Context, db *gorm.DB, id int64) (*model.Credential, error) {
 	q := query.Use(db)

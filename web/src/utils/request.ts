@@ -7,6 +7,9 @@ export interface ApiResponse<T = unknown> {
   data: T
 }
 
+export interface PageRequest { page: number; limit: number }
+export interface PageResponse<T> { list: T[]; total: number }
+
 // 扩展 Axios 实例方法，调用 API 时可直接声明响应数据泛型。
 declare module 'axios' {
   interface AxiosInstance {
