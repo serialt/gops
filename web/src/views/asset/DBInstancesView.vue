@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'; import { ElMessage, ElMessageBox } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Search } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { createCredential, createDBInstance, deleteDBInstance, getDatabaseTypeOptions, listAssetGroups, listCredentials, listDBInstances, type AssetGroup, type Credential, type DatabaseTypeOption, type DbInstance, updateDBInstance } from '@/api/asset'
+import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Delete, Edit, Refresh, Search } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectDBInstanceInfo, createCredential, createDBInstance, deleteDBInstance, getDatabaseTypeOptions, listAssetGroups, listCredentials, listDBInstances, type AssetGroup, type Credential, type DatabaseTypeOption, type DbInstance, updateDBInstance } from '@/api/asset'
+import { useAuthStore } from '@/stores/auth'
 interface AssetTreeNode { id: number; label: string; count: number; children: AssetTreeNode[] }
 const rows = ref<DbInstance[]>([]); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const databaseTypes = ref<DatabaseTypeOption[]>([]); const keyword = ref(''); const typeFilter = ref(''); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ group_id: number | null; name: string; db_type: string; host: string; port: number | null; version: string; credential_id: number | null; tags: string; description: string; status: boolean }>({ group_id: null, name: '', db_type: '', host: '', port: null, version: '', credential_id: null, tags: '', description: '', status: true })
+const auth = useAuthStore()
 const tagItems = computed(() => form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
 const visibleRows = computed(() => rows.value.filter(row => (!selectedGroupID.value || row.group_id === selectedGroupID.value) && (!typeFilter.value || row.db_type === typeFilter.value)))
 const treeData = computed<AssetTreeNode[]>(() => { const counts = new Map<number, number>(); rows.value.forEach(row => counts.set(row.group_id, (counts.get(row.group_id) || 0) + 1)); const nodes = new Map<number, AssetTreeNode>(); const roots: AssetTreeNode[] = []; groups.value.forEach(group => nodes.set(group.id, { id: group.id, label: group.name, count: counts.get(group.id) || 0, children: [] })); groups.value.forEach(group => { const node = nodes.get(group.id); const parent = nodes.get(group.parent_id); if (!node) return; if (group.parent_id && parent) parent.children.push(node); else roots.push(node) }); return roots })
-function action(text: string, kind: string, fn: () => void) { const el = document.createElement('button'); el.textContent = text; el.className = `db-action ${kind}`; el.onclick = fn; return el }; const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '实例名称', minWidth: 130 }, { field: 'db_type', headerName: '类型', width: 110, valueFormatter: p => databaseTypes.value.find(item => item.value === p.value)?.label ?? p.value }, { field: 'host', headerName: '地址', minWidth: 140 }, { field: 'port', headerName: '端口', width: 80, valueFormatter: p => p.value ? String(p.value) : '—' }, { field: 'version', headerName: '版本', width: 100 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value ? '' : ' is-disabled'}">${p.value ? '启用' : '禁用'}</span>` }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'db-actions'; wrap.append(action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
+function actionIcon(title: string, kind: string, icon: Component, fn: () => void) { const root = document.createElement('span'); render(h(ElTooltip, { content: title, placement: 'top', showAfter: 250 }, { default: () => h('button', { type: 'button', 'aria-label': title, class: `db-action-icon ${kind}`, onClick: fn }, [h('span', { class: 'el-icon' }, [h(icon)])]) }), root); return root }
+function actionRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'db-actions'; if (auth.hasPermission('POST /api/v1/assets/db-instances/collect')) wrap.append(actionIcon('采集信息', 'collect', Refresh, () => { void collect(p.data) })); if (auth.hasPermission('POST /api/v1/assets/db-instances/update')) wrap.append(actionIcon('编辑', 'edit', Edit, () => edit(p.data))); if (auth.hasPermission('POST /api/v1/assets/db-instances/delete')) wrap.append(actionIcon('删除', 'delete', Delete, () => remove(p.data))); return wrap }
+function badgeRenderer(kind: string, value: string) { const tag = document.createElement('span'); tag.className = `db-badge ${kind}`; tag.textContent = value || '-'; return tag }
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '实例名称', minWidth: 130 }, { field: 'db_type', headerName: '类型', width: 110, cellRenderer: (p: any) => badgeRenderer('type', databaseTypes.value.find(item => item.value === p.value)?.label ?? p.value) }, { field: 'host', headerName: '地址', minWidth: 140 }, { field: 'port', headerName: '端口', width: 80, valueFormatter: p => p.value ? String(p.value) : '—' }, { field: 'version', headerName: '版本', width: 150, cellRenderer: (p: any) => badgeRenderer('version', p.value) }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value ? '' : ' is-disabled'}">${p.value ? '在线' : '离线'}</span>` }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: actionRenderer }])
 async function load() { const { data } = await listDBInstances(keyword.value); rows.value = data.data }
 async function loadCredentials() { const { data } = await listCredentials(); credentials.value = data.data }
 async function loadDatabaseTypes() { const { data } = await getDatabaseTypeOptions(); databaseTypes.value = data.data }
@@ -18,6 +23,7 @@ async function saveCredential() { if (!credentialForm.name.trim()) return ElMess
 function applyDefaultPort(type: string) { const option = databaseTypes.value.find(item => item.value === type); if (option) form.port = option.default_port }
 async function save() { if (!form.name || !form.db_type || !form.host || !form.port || !form.credential_id) return ElMessage.warning('请填写数据库名称、类型、地址、端口并选择凭据'); const payload = { ...form, group_id: form.group_id ?? 0, port: form.port, credential_id: form.credential_id }; if (editingID.value) await updateDBInstance({ ...payload, id: editingID.value }); else await createDBInstance(payload); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
 async function remove(row: DbInstance) { await ElMessageBox.confirm(`确定删除数据库 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteDBInstance(row.id); ElMessage.success('删除成功'); await load() }
+async function collect(row: DbInstance) { await collectDBInstanceInfo(row.id); ElMessage.success(`${row.name} 状态和版本采集成功`); await load() }
 function selectTreeNode(node: AssetTreeNode) { selectedGroupID.value = node.id }
 function filterTreeNode(value: string, data: AssetTreeNode) { return !value || data.label.toLowerCase().includes(value.toLowerCase()) }
 function startTreePaneDrag(event: PointerEvent) { if (event.button !== 0) return; treePaneDragging.value = true; treePaneStartX.value = event.clientX; treePaneStartWidth.value = treePaneWidth.value; document.addEventListener('pointermove', moveTreePane); document.addEventListener('pointerup', stopTreePaneDrag) }
@@ -116,25 +122,12 @@ onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDataba
         padding-left: 12px
     }
 
-    :deep(.db-action) {
-        padding: 4px 9px;
-        border: 1px solid transparent;
-        border-radius: 8px;
-        background: #fff;
-        font-size: 11px;
-        box-shadow: 0 1px 3px rgba(24, 34, 53, .08)
-    }
-
-    :deep(.db-action.edit) {
-        border-color: var(--primary);
-        color: var(--primary);
-        background: #f7f8ff
-    }
-
-    :deep(.db-action.delete) {
-        border-color: #ffd5d5;
-        color: #ef6262;
-        background: #fff7f7
-    }
+    :deep(.db-action-icon) { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--text-soft); cursor: pointer; }
+    :deep(.db-action-icon .el-icon), :deep(.db-action-icon svg) { width: 16px; height: 16px; }
+    :deep(.db-action-icon:hover) { border-color: var(--line); background: #f6f7fa; color: var(--primary); }
+    :deep(.db-action-icon.delete:hover) { border-color: #ffd5d5; background: #fff7f7; color: #ef6262; }
+    :deep(.db-badge) { display: inline-flex; max-width: 100%; height: 23px; align-items: center; padding: 0 8px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: #f7f8fa; color: var(--text-soft); font-size: 10px; line-height: 21px; text-overflow: ellipsis; white-space: nowrap; }
+    :deep(.db-badge.type) { border-color: color-mix(in srgb, var(--primary) 24%, var(--line)); background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+    :deep(.db-badge.version) { background: #fff; color: var(--text-soft); font-variant-numeric: tabular-nums; }
     @media (max-width: 900px) { .db-layout { grid-template-columns: 1fr !important; } .asset-tree-panel { max-height: 220px; overflow: auto; } .content-divider { display: none; } }
 </style>

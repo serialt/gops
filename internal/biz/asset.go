@@ -1,22 +1,32 @@
 package biz
 
 import (
+	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net"
+	"net/url"
 	"strings"
 	"time"
 
 	"gops/internal/config"
 	"gops/internal/data/api"
 	"gops/internal/data/model"
+	"gops/internal/data/repo"
 	"gops/internal/pkg/collector"
 	"gops/internal/pkg/cryptox"
 
 	"gorm.io/gorm"
+
+	mysql "github.com/go-sql-driver/mysql"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type AssetBiz struct {
 	db     *gorm.DB
+	repo   *repo.AssetRepo
 	aesKey string
 	log    *slog.Logger
 }
@@ -57,8 +67,8 @@ func cloudRegions(values ...string) []*api.CloudRegionOptionResponse {
 	return regions
 }
 
-func NewAssetBiz(db *gorm.DB, cfg *config.Config, log *slog.Logger) *AssetBiz {
-	return &AssetBiz{db: db, aesKey: cfg.Server.AESKey, log: log}
+func NewAssetBiz(db *gorm.DB, assetRepo *repo.AssetRepo, cfg *config.Config, log *slog.Logger) *AssetBiz {
+	return &AssetBiz{db: db, repo: assetRepo, aesKey: cfg.Server.AESKey, log: log}
 }
 
 // CloudProviderOptions 返回后端定义的云服务商与区域枚举。
@@ -520,6 +530,7 @@ func (b *AssetBiz) CreateDBInstance(req *api.DbInstanceRequest) (*api.DbInstance
 	if err = b.db.Create(&row).Error; err != nil {
 		return nil, err
 	}
+	b.collectDBInstanceAsync(row.ID)
 	return dbInstanceResponse(row), nil
 }
 func (b *AssetBiz) UpdateDBInstance(req *api.DbInstanceRequest) (*api.DbInstanceResponse, error) {
@@ -542,6 +553,7 @@ func (b *AssetBiz) UpdateDBInstance(req *api.DbInstanceRequest) (*api.DbInstance
 	if err = b.db.Save(&updated).Error; err != nil {
 		return nil, err
 	}
+	b.collectDBInstanceAsync(updated.ID)
 	return dbInstanceResponse(updated), nil
 }
 func (b *AssetBiz) DeleteDBInstance(req *api.DbInstanceIDRequest) error {
@@ -553,6 +565,78 @@ func (b *AssetBiz) DeleteDBInstance(req *api.DbInstanceIDRequest) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (b *AssetBiz) CollectDBInstanceInfo(ctx context.Context, req *api.DbInstanceIDRequest) (*api.DbInstanceResponse, error) {
+	instance, credential, err := b.repo.GetDBInstanceAndCredential(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	if credential.CredentialType != "password" {
+		return nil, fmt.Errorf("数据库采集仅支持用户名密码凭据")
+	}
+	username, password := credential.Username, ""
+	password, err = cryptox.Decrypt(b.aesKey, credential.Password)
+	if err != nil {
+		return nil, fmt.Errorf("解密数据库凭据: %w", err)
+	}
+	collectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	version, err := collectDatabaseVersion(collectCtx, instance, username, password)
+	if err != nil {
+		_, _ = b.repo.UpdateDBInstanceCollectedInfo(ctx, instance.ID, false, "")
+		return nil, err
+	}
+	updated, err := b.repo.UpdateDBInstanceCollectedInfo(ctx, instance.ID, true, version)
+	if err != nil {
+		return nil, err
+	}
+	return dbInstanceResponse(*updated), nil
+}
+
+func (b *AssetBiz) collectDBInstanceAsync(id int64) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if _, err := b.CollectDBInstanceInfo(ctx, &api.DbInstanceIDRequest{ID: id}); err != nil {
+			b.log.Warn("异步采集数据库信息失败", "database_id", id, "error", err)
+		}
+	}()
+}
+
+func collectDatabaseVersion(ctx context.Context, instance *model.DbInstance, username, password string) (string, error) {
+	address := net.JoinHostPort(instance.Host, fmt.Sprintf("%d", instance.Port))
+	var driver, dsn, versionQuery string
+	switch instance.DbType {
+	case "mysql", "mariadb":
+		cfg := mysql.NewConfig()
+		cfg.User, cfg.Passwd, cfg.Net, cfg.Addr, cfg.DBName = username, password, "tcp", address, ""
+		cfg.Timeout, cfg.ReadTimeout, cfg.WriteTimeout = 8*time.Second, 8*time.Second, 8*time.Second
+		driver, dsn, versionQuery = "mysql", cfg.FormatDSN(), "SELECT VERSION()"
+	case "postgresql":
+		u := &url.URL{Scheme: "postgres", User: url.UserPassword(username, password), Host: address, Path: "/postgres"}
+		queryValues := u.Query()
+		queryValues.Set("sslmode", "disable")
+		u.RawQuery = queryValues.Encode()
+		driver, dsn, versionQuery = "pgx", u.String(), "SHOW server_version"
+	default:
+		connection, err := (&net.Dialer{Timeout: 8 * time.Second}).DialContext(ctx, "tcp", address)
+		if err != nil {
+			return "", fmt.Errorf("数据库连接失败: %w", err)
+		}
+		_ = connection.Close()
+		return instance.Version, nil
+	}
+	db, err := sql.Open(driver, dsn)
+	if err != nil {
+		return "", fmt.Errorf("创建数据库连接: %w", err)
+	}
+	defer db.Close()
+	var version string
+	if err = db.QueryRowContext(ctx, versionQuery).Scan(&version); err != nil {
+		return "", fmt.Errorf("采集数据库信息失败: %w", err)
+	}
+	return strings.TrimSpace(version), nil
 }
 func (b *AssetBiz) dbInstanceModel(req *api.DbInstanceRequest) (model.DbInstance, error) {
 	var databaseType *api.DatabaseTypeOptionResponse

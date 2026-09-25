@@ -61,6 +61,7 @@ export const listDBInstances = (keyword='', group_id=0) => request.post<DbInstan
 export const getDatabaseTypeOptions = () => request.post<DatabaseTypeOption[]>('/assets/db-instances/options', {})
 export const createDBInstance = (data:DbInstanceRequest) => request.post<DbInstance>('/assets/db-instances/create',data)
 export const updateDBInstance = (data:Required<Pick<DbInstanceRequest,'id'>>&DbInstanceRequest) => request.post<DbInstance>('/assets/db-instances/update',data)
+export const collectDBInstanceInfo = (id:number) => request.post<DbInstance>('/assets/db-instances/collect',{id})
 export const deleteDBInstance = (id:number) => request.post<null>('/assets/db-instances/delete',{id})
 
 export interface TerminalSession { id: number; user_id: number; host_id: number; db_instance_id: number; session_type: string; started_at: string; ended_at: string; duration_seconds: number; command_count: number }

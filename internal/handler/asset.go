@@ -55,6 +55,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/db-instances/list", h.ListDBInstances)
 	g.POST("/assets/db-instances/create", h.CreateDBInstance)
 	g.POST("/assets/db-instances/update", h.UpdateDBInstance)
+	g.POST("/assets/db-instances/collect", h.CollectDBInstanceInfo)
 	g.POST("/assets/db-instances/delete", h.DeleteDBInstance)
 
 	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
@@ -438,6 +439,21 @@ func (h *AssetHandler) UpdateDBInstance(c *gin.Context) {
 		return
 	}
 	result, err := h.biz.UpdateDBInstance(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// CollectDBInstanceInfo POST /api/v1/assets/db-instances/collect 采集数据库连接状态和版本。
+func (h *AssetHandler) CollectDBInstanceInfo(c *gin.Context) {
+	req := new(api.DbInstanceIDRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid database id")
+		return
+	}
+	result, err := h.biz.CollectDBInstanceInfo(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return

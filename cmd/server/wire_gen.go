@@ -10,6 +10,7 @@ import (
 	"gops/internal/biz"
 	"gops/internal/config"
 	"gops/internal/data"
+	"gops/internal/data/repo"
 	"gops/internal/data/repo/rbac"
 	"gops/internal/handler"
 	"gops/internal/pkg/auth"
@@ -45,7 +46,8 @@ func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(
 	roleHandler := handler.NewRoleHandler(roleBiz)
 	organizationBiz := biz.NewOrganizationBiz(db)
 	organizationHandler := handler.NewOrganizationHandler(organizationBiz)
-	assetBiz := biz.NewAssetBiz(db, cfg, log)
+	assetRepo := repo.NewAssetRepo(db)
+	assetBiz := biz.NewAssetBiz(db, assetRepo, cfg, log)
 	assetHandler := handler.NewAssetHandler(assetBiz)
 	systemConfigHandler := handler.NewSystemConfigHandler(systemConfigBiz)
 	monitorBiz := biz.NewMonitorBiz(db, cfg)
