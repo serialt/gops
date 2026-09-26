@@ -1,5 +1,0 @@
--- +goose Up
--- Kubernetes 集群连接配置。
-CREATE TABLE IF NOT EXISTS kubernetes_cluster (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', api_endpoint TEXT NOT NULL DEFAULT '', kube_config TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '', status INTEGER NOT NULL DEFAULT 0, node_count INTEGER NOT NULL DEFAULT 0, pod_count INTEGER NOT NULL DEFAULT 0, region TEXT NOT NULL DEFAULT '', provider TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at DATETIME); -- Kubernetes 集群
--- +goose Down
-DROP TABLE IF EXISTS kubernetes_cluster;

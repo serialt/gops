@@ -167,14 +167,16 @@ type MonitorAlertLogListRequest struct {
 	DomainID int64  `json:"domain_id"`
 	Status   string `json:"status"`
 	Keyword  string `json:"keyword"`
+	ReceiverName string `json:"receiver_name"`
 }
 type MonitorAlertLogResponse struct {
-	ID           int64     `json:"id"`
-	DomainID     int64     `json:"domain_id"`
-	AlertType    string    `json:"alert_type"`
-	Status       string    `json:"status"`
-	Message      string    `json:"message"`
-	ChannelType  string    `json:"channel_type"`
-	ErrorMessage string    `json:"error_message"`
-	SentAt       time.Time `json:"sent_at"`
+	ID            int64     `json:"id"`
+	DomainID      int64     `json:"domain_id"`
+	AlertType     string    `json:"alert_type"`
+	Status        string    `json:"status"`
+	Message       string    `json:"message"`
+	ChannelType   string    `json:"channel_type"`
+	ReceiverNames string    `json:"receiver_names"`
+	ErrorMessage  string    `json:"error_message"`
+	SentAt        time.Time `json:"sent_at"`
 }

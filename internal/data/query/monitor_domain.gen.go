@@ -30,12 +30,16 @@ func newMonitorDomain(db *gorm.DB, opts ...gen.DOOption) monitorDomain {
 	_monitorDomain.ID = field.NewInt64(tableName, "id")
 	_monitorDomain.Domain = field.NewString(tableName, "domain")
 	_monitorDomain.Port = field.NewInt64(tableName, "port")
+	_monitorDomain.RequestClient = field.NewString(tableName, "request_client")
 	_monitorDomain.Status = field.NewString(tableName, "status")
 	_monitorDomain.ResponseTime = field.NewInt64(tableName, "response_time")
 	_monitorDomain.SslValid = field.NewBool(tableName, "ssl_valid")
 	_monitorDomain.SslExpiry = field.NewTime(tableName, "ssl_expiry")
+	_monitorDomain.SslRootCa = field.NewString(tableName, "ssl_root_ca")
 	_monitorDomain.CheckInterval = field.NewInt64(tableName, "check_interval")
+	_monitorDomain.CheckJitter = field.NewInt64(tableName, "check_jitter")
 	_monitorDomain.EnableSsl = field.NewBool(tableName, "enable_ssl")
+	_monitorDomain.VerifyCertificate = field.NewBool(tableName, "verify_certificate")
 	_monitorDomain.EnableAlert = field.NewBool(tableName, "enable_alert")
 	_monitorDomain.ResponseThreshold = field.NewInt64(tableName, "response_threshold")
 	_monitorDomain.SslExpiryDays = field.NewInt64(tableName, "ssl_expiry_days")
@@ -45,10 +49,6 @@ func newMonitorDomain(db *gorm.DB, opts ...gen.DOOption) monitorDomain {
 	_monitorDomain.CreatedAt = field.NewTime(tableName, "created_at")
 	_monitorDomain.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_monitorDomain.DeletedAt = field.NewField(tableName, "deleted_at")
-	_monitorDomain.VerifyCertificate = field.NewBool(tableName, "verify_certificate")
-	_monitorDomain.SslRootCa = field.NewString(tableName, "ssl_root_ca")
-	_monitorDomain.RequestClient = field.NewString(tableName, "request_client")
-	_monitorDomain.CheckJitter = field.NewInt64(tableName, "check_jitter")
 
 	_monitorDomain.fillFieldMap()
 
@@ -62,12 +62,16 @@ type monitorDomain struct {
 	ID                field.Int64
 	Domain            field.String
 	Port              field.Int64
+	RequestClient     field.String
 	Status            field.String
 	ResponseTime      field.Int64
 	SslValid          field.Bool
 	SslExpiry         field.Time
+	SslRootCa         field.String
 	CheckInterval     field.Int64
+	CheckJitter       field.Int64
 	EnableSsl         field.Bool
+	VerifyCertificate field.Bool
 	EnableAlert       field.Bool
 	ResponseThreshold field.Int64
 	SslExpiryDays     field.Int64
@@ -77,10 +81,6 @@ type monitorDomain struct {
 	CreatedAt         field.Time
 	UpdatedAt         field.Time
 	DeletedAt         field.Field
-	VerifyCertificate field.Bool
-	SslRootCa         field.String
-	RequestClient     field.String
-	CheckJitter       field.Int64
 
 	fieldMap map[string]field.Expr
 }
@@ -100,12 +100,16 @@ func (m *monitorDomain) updateTableName(table string) *monitorDomain {
 	m.ID = field.NewInt64(table, "id")
 	m.Domain = field.NewString(table, "domain")
 	m.Port = field.NewInt64(table, "port")
+	m.RequestClient = field.NewString(table, "request_client")
 	m.Status = field.NewString(table, "status")
 	m.ResponseTime = field.NewInt64(table, "response_time")
 	m.SslValid = field.NewBool(table, "ssl_valid")
 	m.SslExpiry = field.NewTime(table, "ssl_expiry")
+	m.SslRootCa = field.NewString(table, "ssl_root_ca")
 	m.CheckInterval = field.NewInt64(table, "check_interval")
+	m.CheckJitter = field.NewInt64(table, "check_jitter")
 	m.EnableSsl = field.NewBool(table, "enable_ssl")
+	m.VerifyCertificate = field.NewBool(table, "verify_certificate")
 	m.EnableAlert = field.NewBool(table, "enable_alert")
 	m.ResponseThreshold = field.NewInt64(table, "response_threshold")
 	m.SslExpiryDays = field.NewInt64(table, "ssl_expiry_days")
@@ -115,10 +119,6 @@ func (m *monitorDomain) updateTableName(table string) *monitorDomain {
 	m.CreatedAt = field.NewTime(table, "created_at")
 	m.UpdatedAt = field.NewTime(table, "updated_at")
 	m.DeletedAt = field.NewField(table, "deleted_at")
-	m.VerifyCertificate = field.NewBool(table, "verify_certificate")
-	m.SslRootCa = field.NewString(table, "ssl_root_ca")
-	m.RequestClient = field.NewString(table, "request_client")
-	m.CheckJitter = field.NewInt64(table, "check_jitter")
 
 	m.fillFieldMap()
 
@@ -151,12 +151,16 @@ func (m *monitorDomain) fillFieldMap() {
 	m.fieldMap["id"] = m.ID
 	m.fieldMap["domain"] = m.Domain
 	m.fieldMap["port"] = m.Port
+	m.fieldMap["request_client"] = m.RequestClient
 	m.fieldMap["status"] = m.Status
 	m.fieldMap["response_time"] = m.ResponseTime
 	m.fieldMap["ssl_valid"] = m.SslValid
 	m.fieldMap["ssl_expiry"] = m.SslExpiry
+	m.fieldMap["ssl_root_ca"] = m.SslRootCa
 	m.fieldMap["check_interval"] = m.CheckInterval
+	m.fieldMap["check_jitter"] = m.CheckJitter
 	m.fieldMap["enable_ssl"] = m.EnableSsl
+	m.fieldMap["verify_certificate"] = m.VerifyCertificate
 	m.fieldMap["enable_alert"] = m.EnableAlert
 	m.fieldMap["response_threshold"] = m.ResponseThreshold
 	m.fieldMap["ssl_expiry_days"] = m.SslExpiryDays
@@ -166,10 +170,6 @@ func (m *monitorDomain) fillFieldMap() {
 	m.fieldMap["created_at"] = m.CreatedAt
 	m.fieldMap["updated_at"] = m.UpdatedAt
 	m.fieldMap["deleted_at"] = m.DeletedAt
-	m.fieldMap["verify_certificate"] = m.VerifyCertificate
-	m.fieldMap["ssl_root_ca"] = m.SslRootCa
-	m.fieldMap["request_client"] = m.RequestClient
-	m.fieldMap["check_jitter"] = m.CheckJitter
 }
 
 func (m monitorDomain) clone(db *gorm.DB) monitorDomain {

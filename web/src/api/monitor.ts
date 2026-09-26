@@ -12,7 +12,7 @@ export interface MonitorAlertChannel { id: number; name: string; channel_type: M
 export interface MonitorAlertChannelRequest { id?: number; name: string; channel_type: MonitorAlertChannelType; enabled: boolean; config: MonitorAlertChannelConfig }
 export interface MonitorAlertReceiver { id: number; name: string; email: string; phone: string; webhook: string; wechat_id: string; dingtalk_id: string; feishu_id: string; enable_email: boolean; enable_webhook: boolean; enable_wechat: boolean; enable_dingtalk: boolean; enable_feishu: boolean; enable_system_msg: boolean; enabled: boolean; created_at: string; updated_at: string }
 export interface MonitorAlertReceiverRequest { id?: number; name: string; email: string; phone: string; webhook: string; wechat_id: string; dingtalk_id: string; feishu_id: string; enable_email: boolean; enable_webhook: boolean; enable_wechat: boolean; enable_dingtalk: boolean; enable_feishu: boolean; enable_system_msg: boolean; enabled: boolean }
-export interface MonitorAlertLog { id: number; domain_id: number; alert_type: string; status: string; message: string; channel_type: string; error_message: string; sent_at: string }
+export interface MonitorAlertLog { id: number; domain_id: number; alert_type: string; status: string; message: string; channel_type: string; receiver_names: string; error_message: string; sent_at: string }
 export const listMonitorDomains = (keyword = '', status = '', page = 1, limit = 20) => request.post<PageResponse<MonitorDomain>>('/monitor/domains/list', { keyword, status, page, limit })
 export const createMonitorDomain = (data: MonitorDomainRequest) => request.post<MonitorDomain>('/monitor/domains/create', data)
 export const updateMonitorDomain = (data: MonitorDomainRequest & { id: number }) => request.post<MonitorDomain>('/monitor/domains/update', data)
@@ -30,4 +30,4 @@ export const testMonitorChannel = (data: MonitorAlertChannelTestRequest) => requ
 export const listMonitorReceivers = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<MonitorAlertReceiver>>('/monitor/receivers/list', { keyword, page, limit })
 export const saveMonitorReceiver = (data: MonitorAlertReceiverRequest) => request.post<MonitorAlertReceiver>('/monitor/receivers/save', data)
 export const deleteMonitorReceiver = (id: number) => request.post<null>('/monitor/receivers/delete', { id })
-export const listMonitorLogs = (page = 1, limit = 20, keyword = '', status = '', domain_id = 0) => request.post<PageResponse<MonitorAlertLog>>('/monitor/logs/list', { page, limit, keyword, status, domain_id })
+export const listMonitorLogs = (page = 1, limit = 20, keyword = '', status = '', domain_id = 0, receiver_name = '') => request.post<PageResponse<MonitorAlertLog>>('/monitor/logs/list', { page, limit, keyword, status, domain_id, receiver_name })

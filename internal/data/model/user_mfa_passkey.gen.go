@@ -17,10 +17,10 @@ type UserMfaPasskey struct {
 	Name               string    `gorm:"column:name;not null;default:''" json:"name"`
 	CredentialID       string    `gorm:"column:credential_id;not null" json:"credential_id"`
 	CredentialJSON     string    `gorm:"column:credential_json;not null" json:"credential_json"`
-	CreatedAt          time.Time `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt          time.Time `gorm:"column:updated_at;not null" json:"updated_at"`
 	Enabled            int64     `gorm:"column:enabled;not null;default:1" json:"enabled"`
 	DirectLoginEnabled int64     `gorm:"column:direct_login_enabled;not null" json:"direct_login_enabled"`
+	CreatedAt          time.Time `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt          time.Time `gorm:"column:updated_at;not null" json:"updated_at"`
 }
 
 // TableName UserMfaPasskey's table name

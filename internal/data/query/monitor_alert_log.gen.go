@@ -33,6 +33,7 @@ func newMonitorAlertLog(db *gorm.DB, opts ...gen.DOOption) monitorAlertLog {
 	_monitorAlertLog.Status = field.NewString(tableName, "status")
 	_monitorAlertLog.Message = field.NewString(tableName, "message")
 	_monitorAlertLog.ChannelType = field.NewString(tableName, "channel_type")
+	_monitorAlertLog.ReceiverNames = field.NewString(tableName, "receiver_names")
 	_monitorAlertLog.ErrorMessage = field.NewString(tableName, "error_message")
 	_monitorAlertLog.SentAt = field.NewTime(tableName, "sent_at")
 
@@ -44,15 +45,16 @@ func newMonitorAlertLog(db *gorm.DB, opts ...gen.DOOption) monitorAlertLog {
 type monitorAlertLog struct {
 	monitorAlertLogDo monitorAlertLogDo
 
-	ALL          field.Asterisk
-	ID           field.Int64
-	DomainID     field.Int64
-	AlertType    field.String
-	Status       field.String
-	Message      field.String
-	ChannelType  field.String
-	ErrorMessage field.String
-	SentAt       field.Time
+	ALL           field.Asterisk
+	ID            field.Int64
+	DomainID      field.Int64
+	AlertType     field.String
+	Status        field.String
+	Message       field.String
+	ChannelType   field.String
+	ReceiverNames field.String
+	ErrorMessage  field.String
+	SentAt        field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -75,6 +77,7 @@ func (m *monitorAlertLog) updateTableName(table string) *monitorAlertLog {
 	m.Status = field.NewString(table, "status")
 	m.Message = field.NewString(table, "message")
 	m.ChannelType = field.NewString(table, "channel_type")
+	m.ReceiverNames = field.NewString(table, "receiver_names")
 	m.ErrorMessage = field.NewString(table, "error_message")
 	m.SentAt = field.NewTime(table, "sent_at")
 
@@ -105,13 +108,14 @@ func (m *monitorAlertLog) GetFieldByName(fieldName string) (field.OrderExpr, boo
 }
 
 func (m *monitorAlertLog) fillFieldMap() {
-	m.fieldMap = make(map[string]field.Expr, 8)
+	m.fieldMap = make(map[string]field.Expr, 9)
 	m.fieldMap["id"] = m.ID
 	m.fieldMap["domain_id"] = m.DomainID
 	m.fieldMap["alert_type"] = m.AlertType
 	m.fieldMap["status"] = m.Status
 	m.fieldMap["message"] = m.Message
 	m.fieldMap["channel_type"] = m.ChannelType
+	m.fieldMap["receiver_names"] = m.ReceiverNames
 	m.fieldMap["error_message"] = m.ErrorMessage
 	m.fieldMap["sent_at"] = m.SentAt
 }

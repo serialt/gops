@@ -70,6 +70,9 @@ const shellRef = ref<HTMLElement>()
 const bulkActionTarget = ref<HTMLElement>()
 let gridApi: any
 let bulkActionHost: HTMLElement | undefined
+let filterWidthObserver: MutationObserver | undefined
+let filterWidthFrame = 0
+const originalFilterWidths = new Map<HTMLElement, { width: string; flex: string }>()
 const pagedRows = computed(() => {
   if (!props.pagination || props.serverPagination) return props.rowData
   const start = (localCurrentPage.value - 1) * localPageSize.value
@@ -142,7 +145,67 @@ function resizeColumns(event: any) {
   })
 }
 
+function fitFilterInputWidths() {
+  const shell = shellRef.value
+  if (!shell) return
+  const pageRoot = shell.closest<HTMLElement>('.page-container, .page, .section-card, .page-content') ?? shell.parentElement
+  if (!pageRoot) return
+
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')
+  if (!context) return
+
+  for (const input of pageRoot.querySelectorAll<HTMLInputElement>('input[placeholder]')) {
+    if (input.closest('.el-form, .el-form-item, .el-dialog, [role="dialog"]')) continue
+    if (input.type === 'password' || input.type === 'hidden' || input.disabled) continue
+    const inputRoot = input.closest<HTMLElement>('.el-input')
+    const wrapper = input.closest<HTMLElement>('.el-input__wrapper')
+    if (!inputRoot || !wrapper || !input.placeholder) continue
+
+    const inputStyle = getComputedStyle(input)
+    context.font = inputStyle.font
+    const textWidth = context.measureText(input.placeholder).width
+    const wrapperStyle = getComputedStyle(wrapper)
+    const inputSpace = ['paddingLeft', 'paddingRight'].reduce(
+      (total, property) => total + (Number.parseFloat(inputStyle[property as 'paddingLeft']) || 0),
+      0,
+    )
+    const wrapperSpace = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce(
+      (total, property) => total + (Number.parseFloat(wrapperStyle[property as 'paddingLeft']) || 0),
+      0,
+    )
+    const prefixWidth = wrapper.querySelector<HTMLElement>('.el-input__prefix')?.getBoundingClientRect().width ?? 0
+    const suffixWidth = wrapper.querySelector<HTMLElement>('.el-input__suffix')?.getBoundingClientRect().width ?? 0
+    const width = `${Math.ceil(textWidth + inputSpace + wrapperSpace + prefixWidth + suffixWidth)}px`
+
+    if (!originalFilterWidths.has(inputRoot)) {
+      originalFilterWidths.set(inputRoot, {
+        width: inputRoot.style.width,
+        flex: inputRoot.style.flex,
+      })
+    }
+    if (inputRoot.style.width !== width) inputRoot.style.setProperty('width', width, 'important')
+    if (inputRoot.style.flex !== `0 0 ${width}`) inputRoot.style.setProperty('flex', `0 0 ${width}`, 'important')
+  }
+}
+
+function scheduleFilterWidthFit() {
+  cancelAnimationFrame(filterWidthFrame)
+  filterWidthFrame = requestAnimationFrame(fitFilterInputWidths)
+}
+
 onMounted(() => {
+  scheduleFilterWidthFit()
+  const pageRoot = shellRef.value?.closest<HTMLElement>('.page-container, .page, .section-card, .page-content')
+  if (pageRoot) {
+    filterWidthObserver = new MutationObserver(scheduleFilterWidthFit)
+    filterWidthObserver.observe(pageRoot, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['placeholder'],
+    })
+  }
   if (!props.bulkDelete && !props.bulkCollect) return
   let container = shellRef.value?.parentElement
   let toolbar: HTMLElement | null = null
@@ -165,6 +228,15 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(resizeFrame)
+  cancelAnimationFrame(filterWidthFrame)
+  filterWidthObserver?.disconnect()
+  for (const [element, original] of originalFilterWidths) {
+    if (original.width) element.style.setProperty('width', original.width)
+    else element.style.removeProperty('width')
+    if (original.flex) element.style.setProperty('flex', original.flex)
+    else element.style.removeProperty('flex')
+  }
+  originalFilterWidths.clear()
   bulkActionHost?.remove()
 })
 

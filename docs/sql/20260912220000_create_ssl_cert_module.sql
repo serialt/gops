@@ -1,8 +1,0 @@
--- +goose Up
--- SSL 证书与 DNS 验证配置。
-CREATE TABLE IF NOT EXISTS ssl_certificate (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, domain TEXT NOT NULL, san_domains TEXT NOT NULL DEFAULT '', source_type TEXT NOT NULL DEFAULT 'manual', ca_provider TEXT NOT NULL DEFAULT 'letsencrypt', certificate TEXT NOT NULL DEFAULT '', private_key TEXT NOT NULL DEFAULT '', issuer TEXT NOT NULL DEFAULT '', not_after DATETIME, status TEXT NOT NULL DEFAULT 'pending', auto_renew BOOLEAN NOT NULL DEFAULT 1, renew_days_before INTEGER NOT NULL DEFAULT 30, last_error TEXT NOT NULL DEFAULT '', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at DATETIME); -- SSL 证书
-CREATE TABLE IF NOT EXISTS ssl_dns_provider (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, provider TEXT NOT NULL, config TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', enabled BOOLEAN NOT NULL DEFAULT 1, last_test_at DATETIME, last_test_ok BOOLEAN NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at DATETIME); -- DNS 验证配置
-CREATE INDEX IF NOT EXISTS idx_ssl_certificate_domain ON ssl_certificate(domain);
--- +goose Down
-DROP TABLE IF EXISTS ssl_dns_provider;
-DROP TABLE IF EXISTS ssl_certificate;

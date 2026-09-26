@@ -13,13 +13,13 @@ const TableNameMonitorCheckHistory = "monitor_check_history"
 // MonitorCheckHistory mapped from table <monitor_check_history>
 type MonitorCheckHistory struct {
 	ID           int64     `gorm:"column:id;primaryKey" json:"id"`
-	DomainID     int64     `gorm:"column:domain_id;type:INTEGER" json:"domain_id"`
-	Status       string    `gorm:"column:status;type:VARCHAR(20)" json:"status"`
-	ResponseTime int64     `gorm:"column:response_time;type:INTEGER" json:"response_time"`
-	SslValid     bool      `gorm:"column:ssl_valid;type:BOOLEAN" json:"ssl_valid"`
-	SslExpiry    time.Time `gorm:"column:ssl_expiry;type:DATETIME" json:"ssl_expiry"`
-	StatusCode   int64     `gorm:"column:status_code;type:INTEGER" json:"status_code"`
-	ErrorMessage string    `gorm:"column:error_message;type:TEXT" json:"error_message"`
+	DomainID     int64     `gorm:"column:domain_id;not null" json:"domain_id"`
+	Status       string    `gorm:"column:status;not null" json:"status"`
+	ResponseTime int64     `gorm:"column:response_time;not null" json:"response_time"`
+	SslValid     bool      `gorm:"column:ssl_valid;not null;default:FALSE" json:"ssl_valid"`
+	SslExpiry    time.Time `gorm:"column:ssl_expiry" json:"ssl_expiry"`
+	StatusCode   int64     `gorm:"column:status_code;not null" json:"status_code"`
+	ErrorMessage string    `gorm:"column:error_message;not null;default:''" json:"error_message"`
 	CheckedAt    time.Time `gorm:"column:checked_at;type:DATETIME" json:"checked_at"`
 }
 

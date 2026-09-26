@@ -1,14 +1,22 @@
 package biz
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"mime"
+	"net"
 	"net/http"
+	"net/mail"
+	"net/smtp"
 	"net/url"
 	"strconv"
 	"strings"
@@ -26,6 +34,11 @@ type MonitorBiz struct {
 	db     *gorm.DB
 	client *http.Client
 	aesKey string
+}
+
+type monitorAlertEvent struct {
+	typeName string
+	message  string
 }
 
 func NewMonitorBiz(db *gorm.DB, cfg *config.Config) *MonitorBiz {
@@ -191,17 +204,313 @@ func (b *MonitorBiz) checkDomain(row *model.MonitorDomain) error {
 	if err := b.pruneCheckHistory(row.ID); err != nil {
 		return err
 	}
+	var alerts []monitorAlertEvent
 	if row.Status == "abnormal" && row.EnableAlert {
-		_ = b.db.Create(&model.MonitorAlertLog{DomainID: row.ID, AlertType: "availability", Status: "pending", Message: row.LastError, SentAt: time.Now()}).Error
+		alerts = append(alerts, monitorAlertEvent{typeName: "availability", message: row.LastError})
 	}
 	if row.EnableAlert && row.ResponseThreshold > 0 && row.ResponseTime > row.ResponseThreshold {
-		_ = b.db.Create(&model.MonitorAlertLog{DomainID: row.ID, AlertType: "response_time", Status: "pending", Message: fmt.Sprintf("响应时间 %dms 超过阈值 %dms", row.ResponseTime, row.ResponseThreshold), SentAt: time.Now()}).Error
+		alerts = append(alerts, monitorAlertEvent{typeName: "response_time", message: fmt.Sprintf("响应时间 %dms 超过阈值 %dms", row.ResponseTime, row.ResponseThreshold)})
 	}
 	if row.EnableAlert && row.EnableSsl && !row.SslExpiry.IsZero() && time.Until(row.SslExpiry) <= time.Duration(row.SslExpiryDays)*24*time.Hour {
-		_ = b.db.Create(&model.MonitorAlertLog{DomainID: row.ID, AlertType: "ssl_expiry", Status: "pending", Message: fmt.Sprintf("SSL 证书将于 %s 到期", row.SslExpiry.Format("2006-01-02 15:04:05")), SentAt: time.Now()}).Error
+		alerts = append(alerts, monitorAlertEvent{typeName: "ssl_expiry", message: fmt.Sprintf("SSL 证书将于 %s 到期", row.SslExpiry.Format("2006-01-02 15:04:05"))})
+	}
+	if len(alerts) > 0 {
+		if err := b.dispatchMonitorAlerts(row, alerts); err != nil {
+			return err
+		}
 	}
 	return nil
 }
+
+func (b *MonitorBiz) dispatchMonitorAlerts(domain *model.MonitorDomain, alerts []monitorAlertEvent) error {
+	var channels []model.MonitorAlertChannel
+	if err := b.db.Where("enabled = ?", true).Find(&channels).Error; err != nil {
+		return err
+	}
+	var receivers []model.MonitorAlertReceiver
+	if err := b.db.Where("enabled = ?", true).Find(&receivers).Error; err != nil {
+		return err
+	}
+	for _, alert := range alerts {
+		routed := false
+		for _, channel := range channels {
+			channelReceivers := make([]model.MonitorAlertReceiver, 0, len(receivers))
+			for _, receiver := range receivers {
+				if monitorReceiverUsesChannel(receiver, channel.ChannelType) {
+					channelReceivers = append(channelReceivers, receiver)
+				}
+			}
+			if len(channelReceivers) == 0 {
+				continue
+			}
+			routed = true
+			alertData := monitorAlertTemplateData{
+				Title:      "监控告警通知",
+				Target:     fmt.Sprintf("%s:%d", domain.Domain, domain.Port),
+				AlertType:  monitorAlertTypeLabel(alert.typeName),
+				Message:    alert.message,
+				OccurredAt: time.Now().Format("2006-01-02 15:04:05"),
+			}
+			err := b.sendMonitorAlert(channel, channelReceivers, alertData)
+			receiverNames := make([]string, 0, len(channelReceivers))
+			for _, receiver := range channelReceivers {
+				receiverNames = append(receiverNames, receiver.Name)
+			}
+			status, errorMessage := "sent", ""
+			if err != nil {
+				status, errorMessage = "failed", err.Error()
+			}
+			log := model.MonitorAlertLog{DomainID: domain.ID, AlertType: alert.typeName, Status: status, Message: alert.message, ChannelType: channel.ChannelType, ReceiverNames: strings.Join(receiverNames, "、"), ErrorMessage: errorMessage, SentAt: time.Now()}
+			if createErr := b.db.Create(&log).Error; createErr != nil {
+				return createErr
+			}
+		}
+		if !routed {
+			log := model.MonitorAlertLog{
+				DomainID:     domain.ID,
+				AlertType:    alert.typeName,
+				Status:       "pending",
+				Message:      alert.message,
+				ErrorMessage: "没有启用的告警接收人通知方式与告警通道匹配",
+				SentAt:       time.Now(),
+			}
+			if err := b.db.Create(&log).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func monitorAlertTypeLabel(alertType string) string {
+	switch alertType {
+	case "availability":
+		return "可用性异常"
+	case "response_time":
+		return "响应时间超阈值"
+	case "ssl_expiry":
+		return "SSL 证书即将过期"
+	default:
+		return alertType
+	}
+}
+
+func (b *MonitorBiz) sendMonitorAlert(channel model.MonitorAlertChannel, receivers []model.MonitorAlertReceiver, alertData monitorAlertTemplateData) error {
+	config := new(api.MonitorAlertChannelConfig)
+	if err := json.Unmarshal([]byte(channel.Config), config); err != nil {
+		return fmt.Errorf("解析通道配置失败: %w", err)
+	}
+	if config.SMTPPassword != "" {
+		password, err := cryptox.Decrypt(b.aesKey, config.SMTPPassword)
+		if err != nil {
+			return fmt.Errorf("解密 SMTP 密码失败: %w", err)
+		}
+		config.SMTPPassword = password
+	}
+	if config.DingTalkSecret != "" {
+		secret, err := cryptox.Decrypt(b.aesKey, config.DingTalkSecret)
+		if err != nil {
+			return fmt.Errorf("解密钉钉加签密钥失败: %w", err)
+		}
+		config.DingTalkSecret = secret
+	}
+
+	textReceivers := make([]model.MonitorAlertReceiver, 0, len(receivers))
+	for _, receiver := range receivers {
+		if monitorReceiverUsesChannel(receiver, channel.ChannelType) {
+			textReceivers = append(textReceivers, receiver)
+		}
+	}
+	if len(textReceivers) == 0 {
+		return errors.New("没有启用此通知方式的告警接收人")
+	}
+
+	switch channel.ChannelType {
+	case "email":
+		to := make([]string, 0, len(textReceivers))
+		for _, receiver := range textReceivers {
+			if receiver.Email != "" {
+				to = append(to, receiver.Email)
+			}
+		}
+		if len(to) == 0 {
+			return errors.New("没有配置邮箱地址的告警接收人")
+		}
+		htmlBody, err := renderMonitorAlertEmail(alertData)
+		if err != nil {
+			return err
+		}
+		from := (&mail.Address{Name: config.FromName, Address: config.FromEmail}).String()
+		subject := mime.QEncoding.Encode("UTF-8", "监控告警")
+		body := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s", from, strings.Join(to, ", "), subject, htmlBody)
+		auth := smtp.PlainAuth("", config.SMTPUser, config.SMTPPassword, config.SMTPHost)
+		address := net.JoinHostPort(config.SMTPHost, strconv.FormatInt(config.SMTPPort, 10))
+		if config.SMTPPort == 465 {
+			return sendMonitorMailTLS(address, config.SMTPHost, auth, config.FromEmail, to, []byte(body))
+		}
+		return smtp.SendMail(address, auth, config.FromEmail, to, []byte(body))
+	case "webhook":
+		payload, err := json.Marshal(map[string]string{
+			"title":       alertData.Title,
+			"target":      alertData.Target,
+			"alert_type":  alertData.AlertType,
+			"message":     alertData.Message,
+			"occurred_at": alertData.OccurredAt,
+		})
+		if err != nil {
+			return err
+		}
+		var sendErrors []error
+		sentEndpoints := make(map[string]struct{})
+		for _, receiver := range textReceivers {
+			endpoint := receiver.Webhook
+			if endpoint == "" {
+				endpoint = config.WebhookURL
+			}
+			if endpoint == "" {
+				sendErrors = append(sendErrors, fmt.Errorf("接收人 %s 未配置 Webhook 地址", receiver.Name))
+				continue
+			}
+			if _, exists := sentEndpoints[endpoint]; exists {
+				continue
+			}
+			sentEndpoints[endpoint] = struct{}{}
+			if err := b.postMonitorWebhook(endpoint, payload); err != nil {
+				sendErrors = append(sendErrors, fmt.Errorf("接收人 %s: %w", receiver.Name, err))
+			}
+		}
+		return errors.Join(sendErrors...)
+	case "wechat", "dingtalk", "feishu":
+		webhook := config.WeChatWebhook
+		payload := map[string]any{"msgtype": "text", "text": map[string]string{"content": fmt.Sprintf("%s\n监控对象：%s\n告警类型：%s\n告警详情：%s\n发生时间：%s", alertData.Title, alertData.Target, alertData.AlertType, alertData.Message, alertData.OccurredAt)}}
+		if channel.ChannelType == "dingtalk" {
+			webhook = config.DingTalkWebhook
+			markdown, err := renderMonitorAlertDingTalk(alertData)
+			if err != nil {
+				return err
+			}
+			payload = map[string]any{"msgtype": "markdown", "markdown": map[string]string{"title": "监控告警通知", "text": markdown}}
+			atMobiles, atUserIDs := make([]string, 0), make([]string, 0)
+			for _, receiver := range textReceivers {
+				if receiver.Phone != "" {
+					atMobiles = append(atMobiles, receiver.Phone)
+				}
+				if receiver.DingtalkID != "" {
+					atUserIDs = append(atUserIDs, receiver.DingtalkID)
+				}
+			}
+			payload["at"] = map[string]any{"atMobiles": atMobiles, "atUserIds": atUserIDs, "isAtAll": false}
+		} else if channel.ChannelType == "feishu" {
+			webhook = config.FeishuWebhook
+			postText, err := renderMonitorAlertFeishu(alertData)
+			if err != nil {
+				return err
+			}
+			payload = map[string]any{"msg_type": "post", "content": map[string]any{"post": map[string]any{"zh_cn": map[string]any{"title": "监控告警通知", "content": [][]map[string]string{{{"tag": "text", "text": postText}}}}}}}
+		}
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		if channel.ChannelType == "dingtalk" && config.DingTalkSecret != "" {
+			webhook, err = signDingTalkWebhook(webhook, config.DingTalkSecret)
+			if err != nil {
+				return err
+			}
+		}
+		return b.postMonitorWebhook(webhook, encoded)
+	default:
+		return fmt.Errorf("不支持的告警通道类型: %s", channel.ChannelType)
+	}
+}
+
+func monitorReceiverUsesChannel(receiver model.MonitorAlertReceiver, channelType string) bool {
+	switch channelType {
+	case "email":
+		return receiver.EnableEmail && receiver.Email != ""
+	case "webhook":
+		return receiver.EnableWebhook
+	case "wechat":
+		return receiver.EnableWechat
+	case "dingtalk":
+		return receiver.EnableDingtalk
+	case "feishu":
+		return receiver.EnableFeishu
+	default:
+		return false
+	}
+}
+
+func sendMonitorMailTLS(address, host string, auth smtp.Auth, from string, to []string, message []byte) error {
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	connection, err := tls.DialWithDialer(dialer, "tcp", address, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+	if err != nil {
+		return err
+	}
+	client, err := smtp.NewClient(connection, host)
+	if err != nil {
+		_ = connection.Close()
+		return err
+	}
+	defer client.Close()
+	if err := client.Auth(auth); err != nil {
+		return err
+	}
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	for _, recipient := range to {
+		if err := client.Rcpt(recipient); err != nil {
+			return err
+		}
+	}
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write(message); err != nil {
+		_ = writer.Close()
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	return client.Quit()
+}
+
+func (b *MonitorBiz) postMonitorWebhook(endpoint string, payload []byte) error {
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := b.client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("Webhook 返回 HTTP %d", response.StatusCode)
+	}
+	return nil
+}
+
+func signDingTalkWebhook(endpoint, secret string) (string, error) {
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(timestamp + "\n" + secret))
+	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	query := parsed.Query()
+	query.Set("timestamp", timestamp)
+	query.Set("sign", signature)
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
+}
+
 func (b *MonitorBiz) DomainStats(req *api.MonitorStatsRequest) (*api.MonitorStatsResponse, error) {
 	out := &api.MonitorStatsResponse{}
 	filteredQuery := func() *gorm.DB {
@@ -604,9 +913,12 @@ func (b *MonitorBiz) ListLogs(req *api.MonitorAlertLogListRequest) (*api.PageRes
 	if req.Status != "" {
 		q = q.Where("status = ?", req.Status)
 	}
+	if receiverName := strings.TrimSpace(req.ReceiverName); receiverName != "" {
+		q = q.Where("receiver_names LIKE ?", "%"+receiverName+"%")
+	}
 	if keyword := strings.TrimSpace(req.Keyword); keyword != "" {
 		pattern := "%" + keyword + "%"
-		q = q.Where("alert_type LIKE ? OR message LIKE ? OR channel_type LIKE ? OR error_message LIKE ?", pattern, pattern, pattern, pattern)
+		q = q.Where("alert_type LIKE ? OR message LIKE ? OR channel_type LIKE ? OR receiver_names LIKE ? OR error_message LIKE ?", pattern, pattern, pattern, pattern, pattern)
 	}
 	rows, total, err := queryPage[model.MonitorAlertLog](q, req.Page, req.Limit)
 	if err != nil {
@@ -614,7 +926,7 @@ func (b *MonitorBiz) ListLogs(req *api.MonitorAlertLogListRequest) (*api.PageRes
 	}
 	out := make([]*api.MonitorAlertLogResponse, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, &api.MonitorAlertLogResponse{ID: r.ID, DomainID: r.DomainID, AlertType: r.AlertType, Status: r.Status, Message: r.Message, ChannelType: r.ChannelType, ErrorMessage: r.ErrorMessage, SentAt: r.SentAt})
+		out = append(out, &api.MonitorAlertLogResponse{ID: r.ID, DomainID: r.DomainID, AlertType: r.AlertType, Status: r.Status, Message: r.Message, ChannelType: r.ChannelType, ReceiverNames: r.ReceiverNames, ErrorMessage: r.ErrorMessage, SentAt: r.SentAt})
 	}
 	return &api.PageResponse[*api.MonitorAlertLogResponse]{List: out, Total: total}, nil
 }

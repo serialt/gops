@@ -12,14 +12,15 @@ const TableNameMonitorAlertLog = "monitor_alert_log"
 
 // MonitorAlertLog mapped from table <monitor_alert_log>
 type MonitorAlertLog struct {
-	ID           int64     `gorm:"column:id;primaryKey" json:"id"`
-	DomainID     int64     `gorm:"column:domain_id;type:INTEGER" json:"domain_id"`
-	AlertType    string    `gorm:"column:alert_type;type:VARCHAR(50)" json:"alert_type"`
-	Status       string    `gorm:"column:status;type:VARCHAR(20)" json:"status"`
-	Message      string    `gorm:"column:message;type:TEXT" json:"message"`
-	ChannelType  string    `gorm:"column:channel_type;type:VARCHAR(20)" json:"channel_type"`
-	ErrorMessage string    `gorm:"column:error_message;type:TEXT" json:"error_message"`
-	SentAt       time.Time `gorm:"column:sent_at;type:DATETIME" json:"sent_at"`
+	ID            int64     `gorm:"column:id;primaryKey" json:"id"`
+	DomainID      int64     `gorm:"column:domain_id" json:"domain_id"`
+	AlertType     string    `gorm:"column:alert_type;not null" json:"alert_type"`
+	Status        string    `gorm:"column:status;not null" json:"status"`
+	Message       string    `gorm:"column:message;not null;default:''" json:"message"`
+	ChannelType   string    `gorm:"column:channel_type;not null;default:''" json:"channel_type"`
+	ReceiverNames string    `gorm:"column:receiver_names;not null;default:''" json:"receiver_names"`
+	ErrorMessage  string    `gorm:"column:error_message;not null;default:''" json:"error_message"`
+	SentAt        time.Time `gorm:"column:sent_at;not null;default:CURRENT_TIMESTAMP" json:"sent_at"`
 }
 
 // TableName MonitorAlertLog's table name
