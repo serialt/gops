@@ -239,6 +239,10 @@ onBeforeUnmount(stopPlayback)
 }
 
 .page-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
   margin-bottom: 8px;
 }
 
