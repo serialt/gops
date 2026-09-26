@@ -37,6 +37,13 @@ async function batchRemove(selectedRows: unknown[]) {
     ElMessage.success('批量删除成功')
     await load()
 }
+async function batchCollect(selectedRows: unknown[]) {
+    const instances = selectedRows as DbInstance[]
+    if (!instances.length) return
+    await Promise.all(instances.map(instance => collectDBInstanceInfo(instance.id)))
+    ElMessage.success(`已完成 ${instances.length} 个数据库实例的状态和版本采集`)
+    await load()
+}
 async function exportExcel() {
     if (!auth.hasPermission('POST /api/v1/assets/db-instances/export')) return
     excelBusy.value = true
@@ -126,6 +133,7 @@ onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDataba
                 </div>
                 <AppDataGrid class="db-grid" :row-data="rows" :column-defs="columns" pagination server-pagination
                     :bulk-delete="auth.hasPermission('POST /api/v1/assets/db-instances/delete') ? batchRemove : undefined"
+                    :bulk-collect="auth.hasPermission('POST /api/v1/assets/db-instances/collect') ? batchCollect : undefined"
                     :total="total" :current-page="page" :page-size="pageSize" @page-change="changePage"
                     @page-size-change="changePageSize"
                     @selection-changed="selectedInstances = $event as DbInstance[]" />

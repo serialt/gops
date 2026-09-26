@@ -2,6 +2,7 @@
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef, type RowSelectionOptions, type SelectionColumnDef } from 'ag-grid-community'
+import { ArrowDown, Delete, Refresh } from '@element-plus/icons-vue'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
@@ -17,6 +18,7 @@ const props = defineProps<{
   rowHeight?: number
   getRowId?: (row: unknown) => string
   bulkDelete?: (rows: unknown[]) => Promise<void>
+  bulkCollect?: (rows: unknown[]) => Promise<void>
 }>()
 const emit = defineEmits<{
   selectionChanged: [rows: unknown[]]
@@ -24,7 +26,7 @@ const emit = defineEmits<{
   pageSizeChange: [pageSize: number]
 }>()
 const instance = getCurrentInstance()
-const selectable = computed(() => Boolean(props.bulkDelete || instance?.vnode.props?.onSelectionChanged))
+const selectable = computed(() => Boolean(props.bulkDelete || props.bulkCollect || instance?.vnode.props?.onSelectionChanged))
 
 const defaultColDef: ColDef = {
   minWidth: 10,
@@ -62,6 +64,8 @@ const localeText = {
 const localCurrentPage = ref(1)
 const localPageSize = ref(20)
 const selectedRows = ref<unknown[]>([])
+const collectingRows = ref(false)
+const bulkOperationCount = computed(() => Number(Boolean(props.bulkCollect)) + Number(Boolean(props.bulkDelete)))
 const shellRef = ref<HTMLElement>()
 const bulkActionTarget = ref<HTMLElement>()
 let gridApi: any
@@ -139,7 +143,7 @@ function resizeColumns(event: any) {
 }
 
 onMounted(() => {
-  if (!props.bulkDelete) return
+  if (!props.bulkDelete && !props.bulkCollect) return
   let container = shellRef.value?.parentElement
   let toolbar: HTMLElement | null = null
   while (container && container !== document.body) {
@@ -186,6 +190,24 @@ async function handleBulkDelete() {
   emit('selectionChanged', [])
 }
 
+async function handleBulkCollect() {
+  if (!props.bulkCollect || !selectedRows.value.length) return
+  collectingRows.value = true
+  try {
+    await props.bulkCollect([...selectedRows.value])
+    gridApi?.deselectAll()
+    selectedRows.value = []
+    emit('selectionChanged', [])
+  } finally {
+    collectingRows.value = false
+  }
+}
+
+function handleBulkCommand(command: string) {
+  if (command === 'collect') void handleBulkCollect()
+  if (command === 'delete') void handleBulkDelete()
+}
+
 function handleGridReady(event: any) {
   gridApi = event.api
   resizeColumns(event)
@@ -195,8 +217,33 @@ function handleGridReady(event: any) {
 <template>
   <div ref="shellRef" class="app-data-grid-shell">
     <Teleport v-if="bulkActionTarget" :to="bulkActionTarget">
-      <el-button v-if="bulkDelete && selectedRows.length" class="app-data-grid-bulk-button" type="danger" plain
-        @click="handleBulkDelete">批量删除（{{ selectedRows.length }}）</el-button>
+      <template v-if="selectedRows.length && bulkOperationCount === 1">
+        <el-button v-if="bulkCollect" class="app-data-grid-bulk-collect-button" type="primary" plain :icon="Refresh"
+          :loading="collectingRows" @click="handleBulkCollect">{{ selectedRows.length > 1 ?
+            `批量采集（${selectedRows.length}）` : '采集信息' }}</el-button>
+        <el-button v-if="bulkDelete" class="app-data-grid-bulk-button" type="danger" plain @click="handleBulkDelete">{{
+          selectedRows.length > 1 ? `批量删除（${selectedRows.length}）` : '删除' }}</el-button>
+      </template>
+      <el-dropdown v-else-if="selectedRows.length && bulkOperationCount > 1" trigger="click"
+        popper-class="app-data-grid-bulk-popper" @command="handleBulkCommand">
+        <el-button type="primary" plain>批量操作（{{ selectedRows.length }}）<el-icon class="el-icon--right">
+            <ArrowDown />
+          </el-icon></el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item v-if="bulkCollect" class="app-data-grid-bulk-menu-item" command="collect">
+              <el-icon>
+                <Refresh />
+              </el-icon>批量采集
+            </el-dropdown-item>
+            <el-dropdown-item v-if="bulkDelete" class="app-data-grid-bulk-menu-item is-danger" command="delete">
+              <el-icon>
+                <Delete />
+              </el-icon>批量删除
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </Teleport>
     <AgGridVue class="app-data-grid" :theme="themeQuartz" :row-data="pagedRows" :column-defs="normalizedColumnDefs"
       :default-col-def="defaultColDef" :row-selection="selectable ? rowSelection : undefined"
@@ -227,6 +274,72 @@ function handleGridReady(event: any) {
   border-radius: 8px;
   background: #fff3f1;
   font-weight: 700;
+}
+
+.app-data-grid-bulk-collect-button {
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+:global(.app-data-grid-bulk-popper .el-dropdown-menu) {
+  display: flex;
+  width: max-content;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+:global(.app-data-grid-bulk-popper.el-popper) {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+:global(.app-data-grid-bulk-popper.el-popper .el-popper__arrow) {
+  display: none;
+}
+
+:global(.app-data-grid-bulk-popper .el-dropdown-menu__item) {
+  height: auto;
+  padding: 0;
+  line-height: normal;
+}
+
+:global(.app-data-grid-bulk-popper .el-dropdown-menu__item.app-data-grid-bulk-menu-item) {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--line) !important;
+  border-radius: 8px !important;
+  background: #fff;
+  color: var(--text);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+:global(.app-data-grid-bulk-popper .app-data-grid-bulk-menu-item .el-icon) {
+  font-size: 10px;
+}
+
+:global(.app-data-grid-bulk-popper .el-dropdown-menu__item.app-data-grid-bulk-menu-item:not(.is-disabled):hover) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, white);
+  color: var(--primary);
+}
+
+:global(.app-data-grid-bulk-popper .el-dropdown-menu__item.app-data-grid-bulk-menu-item.is-danger) {
+  color: #d94848 !important;
+}
+
+:global(.app-data-grid-bulk-popper .el-dropdown-menu__item.app-data-grid-bulk-menu-item.is-danger:not(.is-disabled):hover) {
+  border-color: #efb1b1 !important;
+  background: #fff5f5;
+  color: #d94848 !important;
 }
 
 .app-data-grid {

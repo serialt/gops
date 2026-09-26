@@ -52,6 +52,13 @@ async function batchRemove(selectedRows: unknown[]) {
     ElMessage.success('批量删除成功')
     await load()
 }
+async function batchCollect(selectedRows: unknown[]) {
+    const hosts = selectedRows as Host[]
+    if (!hosts.length) return
+    await Promise.all(hosts.map(host => collectHostInfo(host.id)))
+    ElMessage.success(`已完成 ${hosts.length} 台主机的信息采集`)
+    await load()
+}
 async function exportExcel() {
     if (!auth.hasPermission('POST /api/v1/assets/hosts/export')) return
     excelBusy.value = true
@@ -143,6 +150,7 @@ onMounted(() => { void load(); void loadFormOptions() })
                 </div>
                 <AppDataGrid class="host-grid" :row-data="rows" :column-defs="columns" pagination
                     :bulk-delete="auth.hasPermission('POST /api/v1/assets/hosts/delete') ? batchRemove : undefined"
+                    :bulk-collect="auth.hasPermission('POST /api/v1/assets/hosts/collect') ? batchCollect : undefined"
                     server-pagination :total="total" :current-page="page" :page-size="pageSize"
                     @page-change="changePage" @page-size-change="changePageSize"
                     @selection-changed="selectedHosts = $event as Host[]" />
