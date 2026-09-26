@@ -238,7 +238,7 @@ onBeforeUnmount(stopPlayback)
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  padding: 12px 16px 16px;
+  padding-top: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg-card);

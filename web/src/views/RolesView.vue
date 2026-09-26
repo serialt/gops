@@ -183,7 +183,7 @@ onMounted(load)
             </el-checkbox>
             <span class="group-count">{{groupKeys(group).filter(key => checkedKeys.includes(key)).length}}/{{
               items.length
-            }}</span>
+              }}</span>
           </div>
           <div class="permission-list">
             <el-checkbox v-for="item in items" :key="item.key" :model-value="checkedKeys.includes(item.key)"
@@ -211,7 +211,7 @@ onMounted(load)
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px 2px 0 16px;
+  padding-top: 16px;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;

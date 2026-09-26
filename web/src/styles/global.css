@@ -82,6 +82,11 @@ select {
   min-height: 0;
 }
 
+.page-container.table-shell .section-card {
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
 .page-container.table-shell .app-data-grid-shell {
   display: flex;
   flex: 1;
