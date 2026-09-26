@@ -238,7 +238,7 @@ onBeforeUnmount(stopPlayback)
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  padding-top: 12px;
+  padding: 4px 8px 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg-card);
@@ -248,9 +248,9 @@ onBeforeUnmount(stopPlayback)
 .page-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   min-height: 32px;
-  margin-bottom: 8px;
+  margin-bottom: 0px;
 }
 
 .filters {

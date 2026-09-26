@@ -135,7 +135,8 @@ watch(
               <h3>登录安全</h3>
               <div class="security-grid">
                 <el-form-item label="Session 超时" required>
-                  <el-input-number v-model="form.session_timeout_minutes" :min="1" :max="10080" controls-position="right" />
+                  <el-input-number v-model="form.session_timeout_minutes" :min="1" :max="10080"
+                    controls-position="right" />
                   <span class="form-hint">分钟，最长 7 天</span>
                 </el-form-item>
                 <el-form-item label="登录失败上限" required>
@@ -143,7 +144,8 @@ watch(
                   <span class="form-hint">达到上限后锁定账户</span>
                 </el-form-item>
                 <el-form-item label="账户锁定时长" required>
-                  <el-input-number v-model="form.account_lock_minutes" :min="1" :max="10080" controls-position="right" />
+                  <el-input-number v-model="form.account_lock_minutes" :min="1" :max="10080"
+                    controls-position="right" />
                   <span class="form-hint">分钟</span>
                 </el-form-item>
               </div>
@@ -177,7 +179,9 @@ watch(
                     <el-option v-if="form.verification_passkey_enabled" label="Passkey" value="passkey" />
                     <el-option v-if="form.verification_totp_enabled" label="TOTP" value="totp" />
                   </el-select>
-                  <span v-if="!form.verification_email_enabled && !form.verification_webhook_enabled && !form.verification_passkey_enabled && !form.verification_totp_enabled" class="form-hint">
+                  <span
+                    v-if="!form.verification_email_enabled && !form.verification_webhook_enabled && !form.verification_passkey_enabled && !form.verification_totp_enabled"
+                    class="form-hint">
                     请先在“验证配置”中启用至少一种方式
                   </span>
                   <span v-else class="form-hint">仅显示已在“验证配置”中启用的方式</span>
@@ -198,8 +202,8 @@ watch(
                   <span class="form-hint">控制登录页 Passkey 直接登录入口</span>
                 </el-form-item>
                 <el-form-item label="TOTP">
-                  <el-switch v-model="form.direct_verification_totp_enabled"
-                    :disabled="!form.verification_totp_enabled" active-text="开启" inactive-text="关闭" />
+                  <el-switch v-model="form.direct_verification_totp_enabled" :disabled="!form.verification_totp_enabled"
+                    active-text="开启" inactive-text="关闭" />
                   <span class="form-hint">控制登录页 TOTP 直接登录入口</span>
                 </el-form-item>
               </div>
@@ -312,7 +316,7 @@ watch(
 
 .section-card {
   min-height: 100%;
-  padding: 20px 22px;
+  padding: 8px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg-card);

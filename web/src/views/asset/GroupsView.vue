@@ -191,7 +191,7 @@ onMounted(load)
 .asset-tree-panel {
   min-width: 0;
   overflow: hidden;
-  padding: 12px 8px;
+  padding: 4px 8px;
 }
 
 .tree-title {
@@ -277,7 +277,7 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  padding: 16px 16px 0;
+  padding: 6px 8px 0;
 }
 
 .page-toolbar {

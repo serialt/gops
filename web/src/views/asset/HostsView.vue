@@ -126,9 +126,9 @@ onMounted(() => { void load(); void loadFormOptions() })
                     <div class="toolbar-actions"><el-button :icon="Monitor"
                             @click="openTerminal">终端</el-button><el-dropdown
                             v-if="auth.hasPermission('POST /api/v1/assets/hosts/export') || auth.hasPermission('POST /api/v1/assets/hosts/import') || auth.hasPermission('POST /api/v1/assets/hosts/template')"
-                            split-button class="host-excel-dropdown" :loading="excelBusy"
-                            :disabled="!auth.hasPermission('POST /api/v1/assets/hosts/export')" @click="exportExcel"
-                            @command="handleExcelCommand">导出 Excel
+                            split-button class="excel-transfer-dropdown" popper-class="excel-transfer-popper"
+                            :loading="excelBusy" :disabled="!auth.hasPermission('POST /api/v1/assets/hosts/export')"
+                            @click="exportExcel" @command="handleExcelCommand">导出 Excel
                             <template #dropdown><el-dropdown-menu>
                                     <el-dropdown-item v-if="auth.hasPermission('POST /api/v1/assets/hosts/template')"
                                         command="template" :icon="Download">下载 Excel
@@ -245,7 +245,7 @@ onMounted(() => { void load(); void loadFormOptions() })
 .asset-tree-panel {
     min-width: 0;
     overflow: hidden;
-    padding: 12px 8px;
+    padding: 4px 8px;
 }
 
 .tree-title {
@@ -331,7 +331,7 @@ onMounted(() => { void load(); void loadFormOptions() })
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    padding: 12px 16px 0;
+    padding: 4px 8px 0;
 }
 
 .page-toolbar {
@@ -361,14 +361,6 @@ onMounted(() => { void load(); void loadFormOptions() })
 
 .toolbar-actions :deep(.el-button + .el-button) {
     margin-left: 0;
-}
-
-.host-excel-dropdown :deep(.el-button-group > .el-button:first-child) {
-    border-radius: 8px 0 0 8px;
-}
-
-.host-excel-dropdown :deep(.el-button-group > .el-button:last-child) {
-    border-radius: 0 8px 8px 0;
 }
 
 .status-filter {

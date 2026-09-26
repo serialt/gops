@@ -82,7 +82,7 @@ onMounted(load)
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    padding-top: 12px;
+    padding: 2px 8px 0;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--bg-card);
@@ -90,7 +90,7 @@ onMounted(load)
 }
 
 .page-toolbar {
-    margin-bottom: 4px;
+    margin-bottom: 0px;
 }
 
 .toolbar-actions {

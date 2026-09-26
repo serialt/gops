@@ -102,7 +102,8 @@ onMounted(load)
         <div class="toolbar"><el-input v-model="keyword" placeholder="搜索域名" clearable />
             <div class="toolbar-actions"><el-dropdown
                     v-if="auth.hasPermission('POST /api/v1/monitor/domains/export') || auth.hasPermission('POST /api/v1/monitor/domains/import')"
-                    split-button :loading="exporting || importing"
+                    split-button class="excel-transfer-dropdown" popper-class="excel-transfer-popper"
+                    :loading="exporting || importing"
                     :disabled="!auth.hasPermission('POST /api/v1/monitor/domains/export')" @click="exportExcel"
                     @command="chooseImport">导出 Excel
                     <template #dropdown><el-dropdown-menu><el-dropdown-item
@@ -137,7 +138,7 @@ onMounted(load)
             <template v-if="detailMonitor">
                 <div class="detail-overview">
                     <div class="detail-item"><span>域名：</span><strong class="domain-value">{{ detailMonitor.domain
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>状态：</span><strong class="detail-status"
                             :class="`is-${detailMonitor.status}`">{{ statusText(detailMonitor.status) }}</strong></div>
                     <div class="detail-item"><span>端口：</span><strong>{{ detailMonitor.port }}</strong></div>
@@ -151,16 +152,16 @@ onMounted(load)
                     <div class="detail-item"><span>根 CA：</span><strong>{{ detailMonitor.ssl_root_ca || '—' }}</strong>
                     </div>
                     <div class="detail-item"><span>SSL到期：</span><strong>{{ formatDate(detailMonitor.ssl_expiry)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>检查间隔：</span><strong>{{ intervalText(detailMonitor.check_interval)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>抖动：</span><strong>0～{{ detailMonitor.check_jitter }}秒</strong></div>
                     <div class="detail-item"><span>最后检查：</span><strong>{{ formatDate(detailMonitor.last_check)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>创建时间：</span><strong>{{ formatDate(detailMonitor.created_at)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>更新时间：</span><strong>{{ formatDate(detailMonitor.updated_at)
-                            }}</strong></div>
+                    }}</strong></div>
                 </div>
                 <div class="history-panel">
                     <h3>检查历史 <small>最近 {{ historyRows.length }} 条</small></h3>
@@ -170,7 +171,7 @@ onMounted(load)
                             <div class="history-time">{{ formatDate(item.checked_at) }}</div>
                             <div class="history-result">
                                 <span class="detail-status" :class="`is-${item.status}`">{{ statusText(item.status)
-                                    }}</span>
+                                }}</span>
                                 <strong>{{ item.response_time }}ms</strong>
                                 <span v-if="item.status_code" class="history-code">HTTP {{ item.status_code }}</span>
                             </div>

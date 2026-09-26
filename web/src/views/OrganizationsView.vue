@@ -203,7 +203,7 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
 .tree-panel {
   min-width: 0;
   overflow: hidden;
-  padding: 12px 8px;
+  padding: 2px 8px 0;
 }
 
 .content-divider {
@@ -306,7 +306,7 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
   display: flex;
   flex: 1;
   flex-direction: column;
-  padding: 16px 2px 0 16px;
+  padding: 4px 2px 0;
   min-width: 0;
   min-height: 0;
 }

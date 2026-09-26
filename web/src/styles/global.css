@@ -322,6 +322,23 @@ select {
   transition: all 0.2s ease;
 }
 
+.excel-transfer-dropdown .el-button-group > .el-button:first-child {
+  border-radius: 8px 0 0 8px !important;
+}
+
+.excel-transfer-dropdown .el-button-group > .el-button:last-child {
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.excel-transfer-popper.el-dropdown__popper,
+.excel-transfer-popper .el-dropdown-menu {
+  border-radius: 8px;
+}
+
+.excel-transfer-popper .el-dropdown-menu__item {
+  border-radius: 6px;
+}
+
 .el-button--primary:not(.is-plain):not(.is-text):not(.is-link) {
   background: linear-gradient(135deg, #536fe8, #6c5ce7) !important;
   border-color: var(--primary) !important;

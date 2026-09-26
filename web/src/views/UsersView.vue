@@ -336,7 +336,7 @@ function toggleOrganizationPane() {
 .organization-tree {
   min-width: 0;
   overflow: hidden;
-  padding: 14px 8px;
+  padding: 4px 8px 0;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--bg-card);
@@ -443,6 +443,7 @@ function toggleOrganizationPane() {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding-top: 16px;
+  padding: 4px 8px 0;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -450,7 +451,7 @@ function toggleOrganizationPane() {
 }
 
 .page-toolbar {
-  margin-bottom: 4px;
+  margin-bottom: 0px;
   display: flex;
   justify-content: space-between;
   align-items: center;

@@ -211,7 +211,7 @@ onMounted(load)
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding-top: 16px;
+  padding: 2px 8px 0;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
