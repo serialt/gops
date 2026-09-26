@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Filter, Upload } from '@element-plus/icons-vue'
@@ -9,10 +9,41 @@ import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
 const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const statusFilter = ref(''); const sslStatusFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const filtersExpanded = ref(false); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
 const activeFilterCount = () => Number(Boolean(statusFilter.value)) + Number(Boolean(sslStatusFilter.value)) + Number(Boolean(sslExpiryRange.value))
+const filterPanelRef = ref<HTMLElement>()
 function clearFilters() {
     statusFilter.value = ''
     sslStatusFilter.value = ''
     sslExpiryRange.value = null
+}
+async function fitSelectFilters() {
+    await nextTick()
+    const panel = filterPanelRef.value
+    if (!panel) return
+    const context = document.createElement('canvas').getContext('2d')
+    if (!context) return
+    const selects = [
+        { selector: '.status-filter', placeholder: '全部状态', labels: ['正常', '异常', '暂停', '未知'] },
+        { selector: '.ssl-filter', placeholder: 'SSL 证书', labels: ['有效', '无效', '未启用'] },
+    ]
+    for (const select of selects) {
+        const root = panel.querySelector<HTMLElement>(select.selector)
+        const wrapper = root?.querySelector<HTMLElement>('.el-select__wrapper')
+        if (!root || !wrapper) continue
+        const placeholderElement = wrapper.querySelector<HTMLElement>('.el-select__placeholder')
+        const selectedElement = wrapper.querySelector<HTMLElement>('.el-select__selected-item')
+        const textStyle = getComputedStyle(placeholderElement || selectedElement || wrapper)
+        context.font = textStyle.font
+        const labels = [select.placeholder, ...select.labels, selectedElement?.textContent?.trim() || '']
+        const contentWidth = Math.max(...labels.map(label => context.measureText(label).width))
+        const wrapperStyle = getComputedStyle(wrapper)
+        const wrapperSpace = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+            .reduce((sum, property) => sum + (Number.parseFloat(wrapperStyle[property as 'paddingLeft']) || 0), 0)
+        const suffixWidth = wrapper.querySelector<HTMLElement>('.el-select__suffix')?.getBoundingClientRect().width || 18
+        const width = Math.min(Math.ceil(contentWidth + wrapperSpace + suffixWidth + 16), panel.clientWidth - 2)
+        root.style.setProperty('--filter-content-width', `${width}px`)
+        root.style.width = `${width}px`
+        root.style.flexBasis = `${width}px`
+    }
 }
 const importInput = ref<HTMLInputElement>(); const exporting = ref(false); const importing = ref(false)
 const auth = useAuthStore()
@@ -67,6 +98,7 @@ async function importExcel(event: Event) {
     } finally { importing.value = false; input.value = '' }
 }
 watch([keyword, statusFilter, sslStatusFilter, sslExpiryRange], () => { page.value = 1; void load() })
+watch([filtersExpanded, statusFilter, sslStatusFilter], () => { void fitSelectFilters() })
 function formatDate(value?: string) { return value && !value.startsWith('0001-') ? value.replace('T', ' ').slice(0, 19) : '—' }
 function statusText(status?: string) { return status === 'normal' ? '正常' : status === 'abnormal' ? '异常' : status === 'paused' ? '暂停' : '未知' }
 function intervalText(seconds?: number) { if (!seconds) return '—'; return seconds % 60 === 0 ? `${seconds / 60}分钟` : `${seconds}秒` }
@@ -133,14 +165,16 @@ onMounted(load)
                 </el-dropdown><input ref="importInput" type="file" accept=".xlsx" hidden
                     @change="importExcel" /><el-button type="primary" @click="open()">新增监控</el-button></div>
         </div>
-        <div v-if="filtersExpanded" class="monitor-filter-panel">
-            <el-select v-model="statusFilter" class="status-filter" placeholder="全部状态" clearable>
+        <div v-if="filtersExpanded" ref="filterPanelRef" class="monitor-filter-panel">
+            <el-select v-model="statusFilter" class="status-filter content-adaptive-select"
+                popper-class="monitor-filter-select-popper" placeholder="全部状态" clearable>
                 <el-option label="正常" value="normal" />
                 <el-option label="异常" value="abnormal" />
                 <el-option label="暂停" value="paused" />
                 <el-option label="未知" value="unknown" />
             </el-select>
-            <el-select v-model="sslStatusFilter" class="ssl-filter" placeholder="SSL 证书" clearable>
+            <el-select v-model="sslStatusFilter" class="ssl-filter content-adaptive-select"
+                popper-class="monitor-filter-select-popper" placeholder="SSL 证书" clearable>
                 <el-option label="有效" value="valid" />
                 <el-option label="无效" value="invalid" />
                 <el-option label="未启用" value="disabled" />
@@ -293,14 +327,18 @@ onMounted(load)
     background: var(--bg-card);
 }
 
-.monitor-filter-panel :deep(.status-filter) {
-    flex: 0 0 140px;
-    width: 140px;
+.monitor-filter-panel :deep(.content-adaptive-select) {
+    flex: 0 0 var(--filter-content-width, auto);
+    width: var(--filter-content-width, max-content);
+    max-width: 100%;
 }
 
-.monitor-filter-panel :deep(.ssl-filter) {
-    flex: 0 0 150px;
-    width: 150px;
+.monitor-filter-panel :deep(.content-adaptive-select .el-select__placeholder) {
+    font-size: 10px;
+}
+
+:global(.monitor-filter-select-popper .el-select-dropdown__item) {
+    font-size: 11px;
 }
 
 .monitor-filter-panel :deep(.expiry-filter) {
