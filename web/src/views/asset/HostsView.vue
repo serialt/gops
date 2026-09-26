@@ -24,7 +24,7 @@ function actionRenderer(p: any) { const wrap = document.createElement('div'); wr
 function formatBytes(value: number) { if (!value) return '-'; const units = ['B', 'K', 'M', 'G', 'T']; let size = value; let index = 0; while (size >= 1024 && index < units.length - 1) { size /= 1024; index++ }; return `${size.toFixed(index > 2 ? 1 : 0)}${units[index]}` }
 function metricRenderer(kind: 'cpu' | 'memory' | 'disk') { return (p: any) => { const row = p.data as Host; const usage = kind === 'cpu' ? row.cpu_usage : kind === 'memory' ? row.memory_usage : row.disk_usage; const headline = kind === 'cpu' ? (row.cpu_cores ? `${row.cpu_cores}核` : '-') : `${formatBytes(kind === 'memory' ? row.memory_used : row.disk_used)} / ${formatBytes(kind === 'memory' ? row.memory_total : row.disk_total)}`; const wrap = document.createElement('div'); wrap.className = `host-metric${usage >= 70 ? ' is-warning' : ''}`; const text = document.createElement('span'); text.textContent = headline; const details = document.createElement('div'); const bar = document.createElement('i'); const fill = document.createElement('b'); fill.style.width = `${Math.max(0, Math.min(100, usage || 0))}%`; bar.append(fill); const percent = document.createElement('small'); percent.textContent = usage ? `${usage.toFixed(1)}%` : '-'; details.append(bar, percent); wrap.append(text, details); return wrap } }
 function systemRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-system'; const os = document.createElement('span'); os.append(componentIcon(Monitor)); const osText = document.createElement('em'); osText.textContent = p.data.os || '-'; os.append(osText); const arch = document.createElement('small'); arch.append(componentIcon(Cpu)); const archText = document.createElement('em'); archText.textContent = p.data.arch || '-'; arch.append(archText); wrap.append(os, arch); return wrap }
-const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((page.value - 1) * pageSize.value + (p.node?.rowIndex ?? 0) + 1), width: 58 }, { field: 'name', headerName: '主机', minWidth: 190, cellRenderer: hostRenderer }, { field: 'status', headerName: '状态', width: 86, cellRenderer: statusRenderer }, { field: 'host_type', headerName: '类型', width: 90, cellRenderer: typeRenderer }, { headerName: 'CPU', width: 132, cellRenderer: metricRenderer('cpu') }, { headerName: '内存', width: 160, cellRenderer: metricRenderer('memory') }, { headerName: '磁盘', width: 160, cellRenderer: metricRenderer('disk') }, { field: 'tags', headerName: '标签', width: 115, cellRenderer: tagsRenderer }, { headerName: '系统信息', minWidth: 170, flex: 1, cellRenderer: systemRenderer }, { headerName: '操作', pinned: 'right', width: 170, cellRenderer: actionRenderer }])
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((page.value - 1) * pageSize.value + (p.node?.rowIndex ?? 0) + 1), width: 58 }, { field: 'name', headerName: '主机', minWidth: 190, cellRenderer: hostRenderer }, { field: 'status', headerName: '状态', width: 86, cellRenderer: statusRenderer }, { field: 'host_type', headerName: '类型', width: 90, cellRenderer: typeRenderer }, { headerName: 'CPU', width: 132, cellRenderer: metricRenderer('cpu') }, { headerName: '内存', width: 160, cellRenderer: metricRenderer('memory') }, { headerName: '磁盘', width: 160, cellRenderer: metricRenderer('disk') }, { field: 'tags', headerName: '标签', width: 115, cellClass: 'host-tags-cell', cellRenderer: tagsRenderer }, { headerName: '系统信息', minWidth: 170, flex: 1, cellRenderer: systemRenderer }, { headerName: '操作', pinned: 'right', width: 170, cellRenderer: actionRenderer }])
 async function load(reset = false) { if (reset) page.value = 1; const { data } = await listHosts(keyword.value, selectedGroupID.value || 0, page.value, pageSize.value, statusFilter.value); rows.value = data.data.list; total.value = data.data.total }
 function changePage(value: number) { page.value = value; void load() }
 function changePageSize(value: number) { pageSize.value = value; page.value = 1; void load() }
@@ -572,6 +572,7 @@ onMounted(() => { void load(); void loadFormOptions() })
     overflow: hidden;
     color: var(--text);
     font-size: 13px;
+    font-weight: 400;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -628,6 +629,13 @@ onMounted(() => { void load(); void loadFormOptions() })
     gap: 4px;
     height: 100%;
     color: var(--text-muted);
+}
+
+:deep(.host-tags-cell .ag-cell-wrapper),
+:deep(.host-tags-cell .ag-cell-value) {
+    display: flex;
+    height: 100%;
+    align-items: center;
 }
 
 :deep(.host-tags span),

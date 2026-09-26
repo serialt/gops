@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -70,11 +71,13 @@ func (b *KubernetesBiz) runInspection(record *model.KubernetesClusterInspection)
 		return
 	}
 	ended := time.Now()
-	_ = b.db.Model(&model.KubernetesClusterInspection{}).Where("id = ?", record.ID).Updates(map[string]any{
+	if err := b.db.Model(&model.KubernetesClusterInspection{}).Where("id = ?", record.ID).Updates(map[string]any{
 		"status": "completed", "score": report.Score, "check_count": report.Summary.Total, "pass_count": report.Summary.Passed,
 		"warning_count": report.Summary.Warning, "fail_count": report.Summary.Failed, "duration": report.Summary.Duration,
 		"report_data": string(data), "ended_at": ended, "updated_at": ended,
-	}).Error
+	}).Error; err != nil {
+		b.failInspection(record.ID, fmt.Errorf("save inspection report: %w", err))
+	}
 }
 
 func collectInspectionSnapshot(ctx context.Context, client *kubernetes.Clientset) (*inspectionSnapshot, error) {
@@ -384,7 +387,9 @@ func buildInspectionReport(clusterID int64, clusterName string, s *inspectionSna
 func (b *KubernetesBiz) failInspection(id int64, cause error) {
 	now := time.Now()
 	data, _ := json.Marshal(map[string]string{"error": cause.Error()})
-	_ = b.db.Model(&model.KubernetesClusterInspection{}).Where("id = ?", id).Updates(map[string]any{"status": "failed", "report_data": string(data), "ended_at": now, "updated_at": now}).Error
+	if err := b.db.Model(&model.KubernetesClusterInspection{}).Where("id = ?", id).Updates(map[string]any{"status": "failed", "report_data": string(data), "ended_at": now, "updated_at": now}).Error; err != nil {
+		slog.Error("failed to persist Kubernetes inspection failure", "inspection_id", id, "cause", cause, "err", err)
+	}
 }
 
 func (b *KubernetesBiz) InspectionProgress(r *api.KubernetesInspectionIDRequest) (*api.KubernetesInspectionProgressResponse, error) {
