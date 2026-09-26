@@ -31,7 +31,8 @@ const selectable = computed(() => Boolean(props.bulkDelete || props.bulkCollect 
 const defaultColDef: ColDef = {
   minWidth: 10,
   resizable: true,
-  sortable: false,
+  sortable: true,
+  unSortIcon: true,
   suppressHeaderMenuButton: true,
 }
 const rowSelection: RowSelectionOptions = {
@@ -126,7 +127,8 @@ const normalizedColumnDefs = computed<ColDef[]>(() => {
     if (index === fillIndex) {
       return { ...column, width: undefined, flex: undefined, minWidth: column.minWidth ?? 100, maxWidth: undefined, suppressSizeToFit: false }
     }
-    if (isActionColumn(column) || column.width) return { ...column, suppressSizeToFit: true }
+    if (isActionColumn(column)) return { ...column, sortable: false, suppressSizeToFit: true }
+    if (column.width) return { ...column, suppressSizeToFit: true }
     return { ...column, minWidth: column.minWidth ?? 10, maxWidth: column.maxWidth ?? 320, suppressSizeToFit: true }
   })
 })
@@ -357,6 +359,22 @@ function handleGridReady(event: any) {
   width: 100%;
   min-width: 0;
   min-height: 0;
+}
+
+.app-data-grid :deep(.ag-header-cell-label) {
+  gap: 0;
+}
+
+.app-data-grid :deep(.ag-sort-indicator-container) {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.app-data-grid :deep(.ag-sort-indicator-icon) {
+  padding: 0;
 }
 
 .app-data-grid-bulk-button {
