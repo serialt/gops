@@ -4,6 +4,7 @@ import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppDataGrid from '@/components/AppDataGrid.vue'
 import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
+import { downloadAttachment } from '@/utils/download'
 const rows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
 const importInput = ref<HTMLInputElement>(); const exporting = ref(false); const importing = ref(false)
 const requestClientOptions: Array<{ label: string; value: MonitorRequestClient }> = [{ label: 'Google Chrome', value: 'chrome' }, { label: 'Mozilla Firefox', value: 'firefox' }, { label: 'Microsoft Edge', value: 'edge' }, { label: 'Apple Safari', value: 'safari' }, { label: 'curl', value: 'curl' }]
@@ -39,12 +40,8 @@ async function detail(row: MonitorDomain) { const { data } = await listMonitorCh
 async function exportExcel() {
     exporting.value = true
     try {
-        const { data } = await exportMonitorDomains(keyword.value)
-        const binary = atob(data.data.content)
-        const bytes = new Uint8Array(binary.length)
-        for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
-        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
-        const link = document.createElement('a'); link.href = url; link.download = data.data.file_name; link.click(); URL.revokeObjectURL(url)
+        const response = await exportMonitorDomains(keyword.value)
+        downloadAttachment(response.data, response.headers['content-disposition'], '域名监控.xlsx')
         ElMessage.success(`已导出 ${rows.value.length} 条监控配置`)
     } finally { exporting.value = false }
 }
@@ -55,10 +52,7 @@ async function importExcel(event: Event) {
     if (!file) return
     importing.value = true
     try {
-        const bytes = new Uint8Array(await file.arrayBuffer())
-        let binary = ''; const chunkSize = 0x8000
-        for (let offset = 0; offset < bytes.length; offset += chunkSize) binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
-        const { data } = await importMonitorDomains(file.name, btoa(binary))
+        const { data } = await importMonitorDomains(file)
         await load()
         ElMessage.success(`导入完成：新增 ${data.data.created} 条，更新 ${data.data.updated} 条`)
     } finally { importing.value = false; input.value = '' }
@@ -133,7 +127,7 @@ onMounted(load)
             <template v-if="detailMonitor">
                 <div class="detail-overview">
                     <div class="detail-item"><span>域名：</span><strong class="domain-value">{{ detailMonitor.domain
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>状态：</span><strong class="detail-status"
                             :class="`is-${detailMonitor.status}`">{{ statusText(detailMonitor.status) }}</strong></div>
                     <div class="detail-item"><span>端口：</span><strong>{{ detailMonitor.port }}</strong></div>
@@ -147,16 +141,16 @@ onMounted(load)
                     <div class="detail-item"><span>根 CA：</span><strong>{{ detailMonitor.ssl_root_ca || '—' }}</strong>
                     </div>
                     <div class="detail-item"><span>SSL到期：</span><strong>{{ formatDate(detailMonitor.ssl_expiry)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>检查间隔：</span><strong>{{ intervalText(detailMonitor.check_interval)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>抖动：</span><strong>0～{{ detailMonitor.check_jitter }}秒</strong></div>
                     <div class="detail-item"><span>最后检查：</span><strong>{{ formatDate(detailMonitor.last_check)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>创建时间：</span><strong>{{ formatDate(detailMonitor.created_at)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>更新时间：</span><strong>{{ formatDate(detailMonitor.updated_at)
-                    }}</strong></div>
+                            }}</strong></div>
                 </div>
                 <div class="history-panel">
                     <h3>检查历史 <small>最近 {{ historyRows.length }} 条</small></h3>
@@ -166,7 +160,7 @@ onMounted(load)
                             <div class="history-time">{{ formatDate(item.checked_at) }}</div>
                             <div class="history-result">
                                 <span class="detail-status" :class="`is-${item.status}`">{{ statusText(item.status)
-                                }}</span>
+                                    }}</span>
                                 <strong>{{ item.response_time }}ms</strong>
                                 <span v-if="item.status_code" class="history-code">HTTP {{ item.status_code }}</span>
                             </div>

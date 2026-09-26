@@ -131,11 +131,17 @@ func (h *AssetHandler) DownloadSFTP(c *gin.Context) {
 		response.Error(c, 400, "invalid SFTP download request")
 		return
 	}
-	c.Header("Content-Type", "application/zip")
-	c.Header("Content-Disposition", `attachment; filename="sftp-download.zip"`)
-	if err := h.biz.DownloadSFTP(req, c.Writer); err != nil {
-		return
-	}
+	reader, writer := io.Pipe()
+	go func() {
+		if err := h.biz.DownloadSFTP(req, writer); err != nil {
+			_ = writer.CloseWithError(err)
+			return
+		}
+		_ = writer.Close()
+	}()
+	c.DataFromReader(http.StatusOK, -1, "application/zip", reader, map[string]string{
+		"Content-Disposition": `attachment; filename="sftp-download.zip"`,
+	})
 }
 
 // ConnectTerminal GET /api/v1/assets/terminal/connect/:id 建立 SSH WebSocket 终端连接。
@@ -585,7 +591,7 @@ func (h *AssetHandler) ExportHosts(c *gin.Context) {
 		response.Error(c, 500, "export hosts failed")
 		return
 	}
-	writeHostExcel(c, fileName, content)
+	writeExcelAttachment(c, fileName, content)
 }
 
 // HostImportTemplate POST /api/v1/assets/hosts/template 下载主机导入模板。
@@ -595,7 +601,7 @@ func (h *AssetHandler) HostImportTemplate(c *gin.Context) {
 		response.Error(c, 500, "create host import template failed")
 		return
 	}
-	writeHostExcel(c, fileName, content)
+	writeExcelAttachment(c, fileName, content)
 }
 
 // ImportHosts POST /api/v1/assets/hosts/import 导入主机 Excel。
@@ -619,7 +625,7 @@ func (h *AssetHandler) ImportHosts(c *gin.Context) {
 	response.OK(c, result)
 }
 
-func writeHostExcel(c *gin.Context, fileName string, content []byte) {
+func writeExcelAttachment(c *gin.Context, fileName string, content []byte) {
 	c.DataFromReader(http.StatusOK, int64(len(content)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes.NewReader(content), map[string]string{
 		"Content-Disposition": mime.FormatMediaType("attachment", map[string]string{"filename": fileName}),
 	})

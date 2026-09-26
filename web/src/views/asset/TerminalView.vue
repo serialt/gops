@@ -8,6 +8,7 @@ import 'xterm/css/xterm.css'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { downloadSftp, getTerminalAssetTree, listSftp, uploadSftp, type AssetTreeNode, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
 import { useSystemConfigStore } from '@/stores/system-config'
+import { downloadAttachment } from '@/utils/download'
 
 type TreeNode = AssetTreeNode
 interface Session { key: string; kind: 'host' | 'database'; label: string; host?: Host; database?: DbInstance }
@@ -260,13 +261,7 @@ async function handleSftpUpload(event: Event) {
 async function downloadSelectedSftp() {
   if (sftpOriginKey.value === null || !sftpSelected.value.length) return
   const response = await downloadSftp(sftpOriginKey.value, sftpCommittedPath.value, sftpSelected.value)
-  const blob = response.data as unknown as Blob
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = 'sftp-download.zip'
-  anchor.click()
-  URL.revokeObjectURL(url)
+  downloadAttachment(response.data as unknown as Blob, response.headers['content-disposition'], 'sftp-download.zip')
 }
 async function loadSftpDirectory(path = sftpPath.value) {
   if (sftpOriginKey.value === null) return

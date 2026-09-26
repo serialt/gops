@@ -128,18 +128,30 @@ func (h *MonitorHandler) DomainStats(c *gin.Context) {
 func (h *MonitorHandler) ExportDomains(c *gin.Context) {
 	req := new(api.MonitorDomainListRequest)
 	if monitorBind(c, req) {
-		data, err := h.biz.ExportDomains(req)
-		monitorResult(c, data, err)
+		fileName, content, err := h.biz.ExportDomains(req)
+		if err != nil {
+			monitorResult(c, nil, err)
+			return
+		}
+		writeExcelAttachment(c, fileName, content)
 	}
 }
 
 // ImportDomains POST /api/v1/monitor/domains/import 导入域名监控 Excel。
 func (h *MonitorHandler) ImportDomains(c *gin.Context) {
-	req := new(api.MonitorDomainExcelImportRequest)
-	if monitorBind(c, req) {
-		data, err := h.biz.ImportDomains(req)
-		monitorResult(c, data, err)
+	header, err := c.FormFile("file")
+	if err != nil {
+		monitorResult(c, nil, errors.New("Excel 文件不能为空"))
+		return
 	}
+	file, err := header.Open()
+	if err != nil {
+		monitorResult(c, nil, errors.New("无法读取上传的 Excel 文件"))
+		return
+	}
+	defer func() { _ = file.Close() }()
+	data, err := h.biz.ImportDomains(header.Filename, file)
+	monitorResult(c, data, err)
 }
 
 // ListChannels POST /api/v1/monitor/channels/list 查询告警通道。

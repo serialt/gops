@@ -2,9 +2,10 @@ package biz
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -18,10 +19,10 @@ import (
 
 var monitorExcelHeaders = []string{"域名", "端口", "请求客户端", "检测间隔(秒)", "抖动(秒)", "HTTPS", "证书校验", "启用告警", "响应阈值(毫秒)", "SSL到期提醒(天)", "状态", "响应时间(毫秒)", "SSL有效", "SSL到期时间", "根CA", "最后检测", "最近错误"}
 
-func (b *MonitorBiz) ExportDomains(req *api.MonitorDomainListRequest) (*api.MonitorDomainExcelExportResponse, error) {
+func (b *MonitorBiz) ExportDomains(req *api.MonitorDomainListRequest) (string, []byte, error) {
 	rows, err := b.ListDomains(req)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	book := excelize.NewFile()
 	defer func() { _ = book.Close() }()
@@ -41,17 +42,16 @@ func (b *MonitorBiz) ExportDomains(req *api.MonitorDomainListRequest) (*api.Moni
 	}
 	buffer, err := book.WriteToBuffer()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	return &api.MonitorDomainExcelExportResponse{FileName: "域名监控_" + time.Now().Format("20060102_150405") + ".xlsx", Content: base64.StdEncoding.EncodeToString(buffer.Bytes())}, nil
+	return "域名监控_" + time.Now().Format("20060102_150405") + ".xlsx", bytes.Clone(buffer.Bytes()), nil
 }
 
-func (b *MonitorBiz) ImportDomains(req *api.MonitorDomainExcelImportRequest) (*api.MonitorDomainExcelImportResponse, error) {
-	data, err := base64.StdEncoding.DecodeString(req.Content)
-	if err != nil {
-		return nil, errors.New("Excel 文件内容无效")
+func (b *MonitorBiz) ImportDomains(fileName string, source io.Reader) (*api.MonitorDomainExcelImportResponse, error) {
+	if strings.ToLower(filepath.Ext(fileName)) != ".xlsx" {
+		return nil, errors.New("仅支持 .xlsx 格式的 Excel 文件")
 	}
-	book, err := excelize.OpenReader(bytes.NewReader(data))
+	book, err := excelize.OpenReader(source)
 	if err != nil {
 		return nil, errors.New("无法解析 Excel 文件，请使用导出的 .xlsx 模板")
 	}

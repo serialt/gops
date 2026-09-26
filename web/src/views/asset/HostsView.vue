@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Cpu, Delete, Download, Edit, Folder, Monitor, Refresh, Search, Upload } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectHostInfo, createCredential, createHost, deleteHost, downloadHostImportTemplate, exportHosts, importHosts, listAssetGroups, listCloudAccounts, listCredentials, listHosts, testHostConnection, type AssetGroup, type CloudAccount, type Credential, type Host, updateHost } from '@/api/asset'
 import { useAuthStore } from '@/stores/auth'
+import { downloadAttachment } from '@/utils/download'
 interface AssetTreeNode { id: number; label: string; count: number; children: AssetTreeNode[] }
 const rows = ref<Host[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const cloudAccounts = ref<CloudAccount[]>([]); const keyword = ref(''); const statusFilter = ref<number | null>(null); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const testingConnection = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ name: string; group_id: number | null; host_type: string; ip: string; port: number; credential_id: number | null; cloud_account_id: number | null; tags: string; description: string; status: number }>({ name: '', group_id: null, host_type: '', ip: '', port: 22, credential_id: null, cloud_account_id: null, tags: '', description: '', status: -1 })
 const auth = useAuthStore()
@@ -51,22 +52,12 @@ async function batchRemove(selectedRows: unknown[]) {
     ElMessage.success('批量删除成功')
     await load()
 }
-function downloadExcelFile(blob: Blob, contentDisposition: string | undefined, fallbackName: string) {
-    const encodedName = contentDisposition?.match(/filename\*=utf-8''([^;]+)/i)?.[1]
-    const fileName = encodedName ? decodeURIComponent(encodedName) : fallbackName
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = fileName
-    link.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
-}
 async function exportExcel() {
     if (!auth.hasPermission('POST /api/v1/assets/hosts/export')) return
     excelBusy.value = true
     try {
         const response = await exportHosts(keyword.value, selectedGroupID.value || 0)
-        downloadExcelFile(response.data, response.headers['content-disposition'], '主机管理.xlsx')
+        downloadAttachment(response.data, response.headers['content-disposition'], '主机管理.xlsx')
         ElMessage.success('主机 Excel 已导出')
     } finally { excelBusy.value = false }
 }
@@ -76,7 +67,7 @@ async function handleExcelCommand(command: string) {
         excelBusy.value = true
         try {
             const response = await downloadHostImportTemplate()
-            downloadExcelFile(response.data, response.headers['content-disposition'], '主机导入模板.xlsx')
+            downloadAttachment(response.data, response.headers['content-disposition'], '主机导入模板.xlsx')
         } finally { excelBusy.value = false }
     } else if (command === 'import') excelInput.value?.click()
 }
