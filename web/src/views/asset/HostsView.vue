@@ -331,7 +331,7 @@ onMounted(() => { void load(); void loadFormOptions() })
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    padding: 12px 16px 16px;
+    padding: 12px 16px 0;
 }
 
 .page-toolbar {

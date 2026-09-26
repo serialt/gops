@@ -38,7 +38,7 @@ onMounted(async () => { await loadProviderOptions(); await load() })
             <div class="page-toolbar">
                 <h2 class="page-title">云账号</h2>
                 <div class="toolbar-actions"><el-button v-permission="'POST /api/v1/assets/cloud-accounts/create'"
-                    type="primary" class="primary-btn" @click="openCreate">新增云账号</el-button></div>
+                        type="primary" class="primary-btn" @click="openCreate">新增云账号</el-button></div>
             </div><el-input v-model="keyword" class="cloud-search" placeholder="搜索账号名称或云服务商" clearable
                 @input="load(true)" />
             <AppDataGrid :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
@@ -78,7 +78,7 @@ onMounted(async () => { await loadProviderOptions(); await load() })
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    padding: 12px 16px 16px;
+    padding: 12px 16px 0;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--bg-card);

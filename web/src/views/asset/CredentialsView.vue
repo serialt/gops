@@ -38,7 +38,7 @@ onMounted(load)
             <div class="page-toolbar">
                 <h2 class="page-title">凭证管理</h2>
                 <div class="toolbar-actions"><el-button v-permission="'POST /api/v1/assets/credentials/create'"
-                    type="primary" class="primary-btn" @click="create">新增凭证</el-button></div>
+                        type="primary" class="primary-btn" @click="create">新增凭证</el-button></div>
             </div><el-input v-model="keyword" class="credential-search" placeholder="搜索凭证名称或用户名" clearable
                 @input="load(true)" />
             <AppDataGrid :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
@@ -82,7 +82,7 @@ onMounted(load)
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    padding: 12px 16px 16px;
+    padding: 12px 16px 0;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--bg-card);

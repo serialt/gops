@@ -236,7 +236,7 @@ onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDataba
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    padding: 12px 16px 16px;
+    padding: 12px 16px 0;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--bg-card);
