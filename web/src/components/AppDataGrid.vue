@@ -73,6 +73,7 @@ let bulkActionHost: HTMLElement | undefined
 let filterWidthObserver: MutationObserver | undefined
 let filterWidthFrame = 0
 const originalFilterWidths = new Map<HTMLElement, { width: string; flex: string }>()
+const originalFilterMargins = new Map<HTMLElement, string>()
 const pagedRows = computed(() => {
   if (!props.pagination || props.serverPagination) return props.rowData
   const start = (localCurrentPage.value - 1) * localPageSize.value
@@ -185,8 +186,19 @@ function fitFilterInputWidths() {
       })
     }
     if (inputRoot.style.width !== width) inputRoot.style.setProperty('width', width, 'important')
-    if (inputRoot.style.flex !== `0 0 ${width}`) inputRoot.style.setProperty('flex', `0 0 ${width}`, 'important')
+    if (inputRoot.style.flex !== '0 0 auto') inputRoot.style.setProperty('flex', '0 0 auto', 'important')
   }
+
+  const filterBar = shell.previousElementSibling as HTMLElement | null
+  if (!filterBar?.querySelector('input[placeholder]')) return
+  const parent = filterBar.parentElement
+  if (!parent) return
+  if (!originalFilterMargins.has(filterBar)) originalFilterMargins.set(filterBar, filterBar.style.marginBottom)
+  const parentStyle = getComputedStyle(parent)
+  const rowGap = Number.parseFloat(parentStyle.rowGap) || 0
+  const originalMargin = Number.parseFloat(originalFilterMargins.get(filterBar) || '0') || 0
+  const adjustedMargin = originalMargin + 2 - rowGap
+  filterBar.style.setProperty('margin-bottom', `${adjustedMargin}px`, 'important')
 }
 
 function scheduleFilterWidthFit() {
@@ -237,6 +249,11 @@ onBeforeUnmount(() => {
     else element.style.removeProperty('flex')
   }
   originalFilterWidths.clear()
+  for (const [element, marginBottom] of originalFilterMargins) {
+    if (marginBottom) element.style.setProperty('margin-bottom', marginBottom)
+    else element.style.removeProperty('margin-bottom')
+  }
+  originalFilterMargins.clear()
   bulkActionHost?.remove()
 })
 
