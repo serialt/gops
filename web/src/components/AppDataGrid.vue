@@ -47,9 +47,9 @@ const rowSelection: RowSelectionOptions = {
   enableClickSelection: false,
 }
 const selectionColumnDef: SelectionColumnDef = {
-  width: 42,
-  minWidth: 42,
-  maxWidth: 42,
+  width: 36,
+  minWidth: 36,
+  maxWidth: 36,
   pinned: 'left',
   resizable: false,
   suppressHeaderMenuButton: true,
@@ -127,12 +127,21 @@ const paginationSize = computed({ get: () => props.serverPagination ? (props.pag
 // 操作列保持固定宽度。仅其左侧最后一个数据列填充余量，其他列继续贴合实际内容。
 const normalizedColumnDefs = computed<ColDef[]>(() => {
   const isActionColumn = (column: ColDef) => column.headerName === '操作'
+  const isIndexColumn = (column: ColDef) => column.headerName === '序号'
   const fillIndex = columnDefsWithTimestamps.value.reduce(
     (lastIndex, column, index) => isActionColumn(column) ? lastIndex : index,
     -1,
   )
   return columnDefsWithTimestamps.value.map((column, index) => {
     if (isActionColumn(column)) return { ...column, sortable: false, suppressSizeToFit: true }
+    if (isIndexColumn(column)) {
+      return {
+        ...column,
+        sortable: false,
+        headerClass: 'app-data-grid-index-header',
+        cellClass: 'app-data-grid-index-cell',
+      }
+    }
     if (index === fillIndex) {
       return {
         ...column,
@@ -401,6 +410,65 @@ function handleGridReady(event: any) {
 
 .app-data-grid :deep(.ag-sort-indicator-icon) {
   padding: 0;
+}
+
+.app-data-grid :deep(.ag-cell) {
+  padding-inline: 4px;
+}
+
+.app-data-grid :deep(.ag-header-cell[col-id='ag-Grid-SelectionColumn']) {
+  position: relative;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.app-data-grid :deep(.ag-header-cell[col-id='ag-Grid-SelectionColumn'] .ag-header-cell-comp-wrapper),
+.app-data-grid :deep(.ag-header-cell[col-id='ag-Grid-SelectionColumn'] .ag-header-select-all),
+.app-data-grid :deep(.app-data-grid-index-header .ag-header-cell-comp-wrapper),
+.app-data-grid :deep(.app-data-grid-index-header .ag-header-cell-label) {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.app-data-grid :deep(.ag-header-cell[col-id='ag-Grid-SelectionColumn'] .ag-header-select-all) {
+  position: absolute;
+  left: 50%;
+  margin-left: 0;
+  margin-right: 0;
+  transform: translateX(-50%);
+}
+
+.app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn']) {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 0;
+}
+
+.app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn'] .ag-cell-wrapper),
+.app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn'] .ag-cell-value) {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn'] .ag-selection-checkbox) {
+  position: absolute;
+  left: 50%;
+  margin-left: 0;
+  margin-right: 0;
+  transform: translateX(-50%);
+}
+
+.app-data-grid :deep(.app-data-grid-index-cell),
+.app-data-grid :deep(.app-data-grid-index-cell .ag-cell-wrapper),
+.app-data-grid :deep(.app-data-grid-index-cell .ag-cell-value) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .app-data-grid :deep(.ag-cell-value) {
