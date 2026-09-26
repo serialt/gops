@@ -2,12 +2,18 @@
 import { onMounted, ref, watch } from 'vue'
 import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Upload } from '@element-plus/icons-vue'
+import { ArrowDown, Filter, Upload } from '@element-plus/icons-vue'
 import AppDataGrid from '@/components/AppDataGrid.vue'
 import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
 import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
-const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const statusFilter = ref(''); const sslStatusFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
+const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const statusFilter = ref(''); const sslStatusFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const filtersExpanded = ref(false); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
+const activeFilterCount = () => Number(Boolean(statusFilter.value)) + Number(Boolean(sslStatusFilter.value)) + Number(Boolean(sslExpiryRange.value))
+function clearFilters() {
+    statusFilter.value = ''
+    sslStatusFilter.value = ''
+    sslExpiryRange.value = null
+}
 const importInput = ref<HTMLInputElement>(); const exporting = ref(false); const importing = ref(false)
 const auth = useAuthStore()
 const requestClientOptions: Array<{ label: string; value: MonitorRequestClient }> = [{ label: 'Google Chrome', value: 'chrome' }, { label: 'Mozilla Firefox', value: 'firefox' }, { label: 'Microsoft Edge', value: 'edge' }, { label: 'Apple Safari', value: 'safari' }, { label: 'curl', value: 'curl' }]
@@ -101,7 +107,33 @@ onMounted(load)
             <div class="stat-card is-abnormal"><span>异常</span><strong>{{ stats.abnormal }}</strong></div>
             <div class="stat-card is-paused"><span>暂停</span><strong>{{ stats.paused }}</strong></div>
         </div>
-        <div class="toolbar"><el-input v-model="keyword" class="domain-search" placeholder="搜索域名、端口或根 CA" clearable />
+        <div class="toolbar">
+            <div class="toolbar-filters">
+                <el-input v-model="keyword" class="domain-search" placeholder="搜索域名、端口或根 CA" clearable />
+                <el-button class="filter-toggle" :type="filtersExpanded ? 'primary' : 'default'"
+                    :plain="filtersExpanded" :icon="Filter" @click="filtersExpanded = !filtersExpanded">
+                    筛选<span v-if="activeFilterCount()" class="filter-count">{{ activeFilterCount() }}</span>
+                    <el-icon class="filter-toggle-chevron" :class="{ expanded: filtersExpanded }">
+                        <ArrowDown />
+                    </el-icon>
+                </el-button>
+                <el-button class="clear-filter-button" :disabled="!activeFilterCount()" @click="clearFilters">
+                    清除筛选
+                </el-button>
+            </div>
+            <div class="toolbar-actions"><el-dropdown
+                    v-if="auth.hasPermission('POST /api/v1/monitor/domains/export') || auth.hasPermission('POST /api/v1/monitor/domains/import')"
+                    split-button class="excel-transfer-dropdown" popper-class="excel-transfer-popper"
+                    :loading="exporting || importing"
+                    :disabled="!auth.hasPermission('POST /api/v1/monitor/domains/export')" @click="exportExcel"
+                    @command="chooseImport">导出 Excel
+                    <template #dropdown><el-dropdown-menu><el-dropdown-item
+                                v-if="auth.hasPermission('POST /api/v1/monitor/domains/import')" command="import"
+                                :icon="Upload">从 Excel 导入</el-dropdown-item></el-dropdown-menu></template>
+                </el-dropdown><input ref="importInput" type="file" accept=".xlsx" hidden
+                    @change="importExcel" /><el-button type="primary" @click="open()">新增监控</el-button></div>
+        </div>
+        <div v-if="filtersExpanded" class="monitor-filter-panel">
             <el-select v-model="statusFilter" class="status-filter" placeholder="全部状态" clearable>
                 <el-option label="正常" value="normal" />
                 <el-option label="异常" value="abnormal" />
@@ -115,17 +147,6 @@ onMounted(load)
             </el-select>
             <el-date-picker v-model="sslExpiryRange" class="expiry-filter" type="daterange" value-format="YYYY-MM-DD"
                 start-placeholder="到期开始" end-placeholder="到期结束" range-separator="至" clearable />
-            <div class="toolbar-actions"><el-dropdown
-                    v-if="auth.hasPermission('POST /api/v1/monitor/domains/export') || auth.hasPermission('POST /api/v1/monitor/domains/import')"
-                    split-button class="excel-transfer-dropdown" popper-class="excel-transfer-popper"
-                    :loading="exporting || importing"
-                    :disabled="!auth.hasPermission('POST /api/v1/monitor/domains/export')" @click="exportExcel"
-                    @command="chooseImport">导出 Excel
-                    <template #dropdown><el-dropdown-menu><el-dropdown-item
-                                v-if="auth.hasPermission('POST /api/v1/monitor/domains/import')" command="import"
-                                :icon="Upload">从 Excel 导入</el-dropdown-item></el-dropdown-menu></template>
-                </el-dropdown><input ref="importInput" type="file" accept=".xlsx" hidden
-                    @change="importExcel" /><el-button type="primary" @click="open()">新增监控</el-button></div>
         </div>
         <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
             :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove"
@@ -216,24 +237,89 @@ onMounted(load)
     flex-wrap: wrap;
 }
 
+.toolbar-filters {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+}
+
+.toolbar-filters :deep(.el-button + .el-button) {
+    margin-left: 0;
+}
+
 .toolbar :deep(.domain-search) {
     flex: 0 0 260px;
     width: 260px;
 }
 
-.toolbar :deep(.status-filter) {
+.filter-toggle {
+    flex: 0 0 auto;
+}
+
+.filter-count {
+    display: inline-flex;
+    min-width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--primary) 12%, white);
+    color: var(--primary);
+    font-size: 10px;
+}
+
+.filter-toggle-chevron {
+    margin-left: 4px;
+    transition: transform 150ms ease;
+}
+
+.filter-toggle-chevron.expanded {
+    transform: rotate(180deg);
+}
+
+.monitor-filter-panel {
+    display: flex;
+    width: calc(100% - 1px);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-right: 1px;
+    padding: 1px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-card);
+}
+
+.monitor-filter-panel :deep(.status-filter) {
     flex: 0 0 140px;
     width: 140px;
 }
 
-.toolbar :deep(.ssl-filter) {
+.monitor-filter-panel :deep(.ssl-filter) {
     flex: 0 0 150px;
     width: 150px;
 }
 
-.toolbar :deep(.expiry-filter) {
+.monitor-filter-panel :deep(.expiry-filter) {
     flex: 0 0 280px;
     width: 280px;
+}
+
+.clear-filter-button {
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text-soft);
+}
+
+.clear-filter-button:not(.is-disabled):hover {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 6%, white);
+    color: var(--primary);
 }
 
 .toolbar-actions {
@@ -539,6 +625,24 @@ onMounted(load)
 }
 
 @media (max-width: 720px) {
+    .toolbar {
+        align-items: flex-start;
+    }
+
+    .toolbar-filters {
+        flex: 1 1 100%;
+    }
+
+    .toolbar-actions {
+        margin-left: 0;
+    }
+
+    .toolbar :deep(.domain-search) {
+        flex: 1 1 180px;
+        width: auto;
+        max-width: 260px;
+    }
+
     .detail-overview {
         grid-template-columns: 1fr;
     }
