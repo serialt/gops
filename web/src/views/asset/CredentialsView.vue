@@ -90,7 +90,7 @@ onMounted(load)
 }
 
 .page-toolbar {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 .toolbar-actions {
@@ -105,7 +105,7 @@ onMounted(load)
 
 .credential-search {
     width: 260px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 .credential-form :deep(.el-form-item) {

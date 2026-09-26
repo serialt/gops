@@ -1196,7 +1196,7 @@ function toggleCollapse() {
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--bg);
-  padding: 0 8px 1px 0;
+  padding: 0 2px 1px 0;
 }
 
 .main :deep(.page-container) {

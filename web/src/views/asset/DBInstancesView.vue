@@ -248,7 +248,7 @@ onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDataba
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 .db-grid {

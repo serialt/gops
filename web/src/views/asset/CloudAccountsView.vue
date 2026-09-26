@@ -86,7 +86,7 @@ onMounted(async () => { await loadProviderOptions(); await load() })
 }
 
 .page-toolbar {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 .toolbar-actions {
@@ -101,7 +101,7 @@ onMounted(async () => { await loadProviderOptions(); await load() })
 
 .cloud-search {
     width: 260px;
-    margin-bottom: 8px
+    margin-bottom: 4px
 }
 
 .cloud-form :deep(.el-form-item) {

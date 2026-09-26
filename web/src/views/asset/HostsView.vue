@@ -339,7 +339,7 @@ onMounted(() => { void load(); void loadFormOptions() })
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 .search-input {

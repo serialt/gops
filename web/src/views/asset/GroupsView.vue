@@ -285,7 +285,7 @@ onMounted(load)
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 
 .toolbar-left {
