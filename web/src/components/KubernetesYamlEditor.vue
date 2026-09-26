@@ -3,9 +3,9 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
 
-;(self as typeof self & { MonacoEnvironment?: unknown }).MonacoEnvironment = {
-  getWorker: () => new EditorWorker(),
-}
+  ; (self as typeof self & { MonacoEnvironment?: unknown }).MonacoEnvironment = {
+    getWorker: () => new EditorWorker(),
+  }
 
 const props = withDefaults(defineProps<{ modelValue: string; minHeight?: string }>(), { minHeight: '500px' })
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -46,7 +46,7 @@ onMounted(() => {
     model,
     theme: 'kubernetes-yaml-light',
     automaticLayout: true,
-    minimap: { enabled: true },
+    minimap: { enabled: true, maxColumn: 30 },
     lineNumbers: 'on',
     glyphMargin: false,
     folding: true,
@@ -87,5 +87,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.kubernetes-yaml-editor{width:100%;min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#fff}.kubernetes-yaml-editor:focus-within{border-color:var(--primary);box-shadow:0 0 0 1px color-mix(in srgb,var(--primary) 15%,transparent)}
+.kubernetes-yaml-editor {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff
+}
+
+.kubernetes-yaml-editor:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 15%, transparent)
+}
 </style>
