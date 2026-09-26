@@ -9,6 +9,7 @@ const props = defineProps<{
   rowData: unknown[]
   columnDefs: ColDef[]
   pagination?: boolean
+  fillHeight?: boolean
   serverPagination?: boolean
   total?: number
   currentPage?: number
@@ -70,7 +71,7 @@ const pagedRows = computed(() => {
   const start = (localCurrentPage.value - 1) * localPageSize.value
   return props.rowData.slice(start, start + localPageSize.value)
 })
-const domLayout = computed(() => props.pagination ? 'normal' : 'autoHeight')
+const domLayout = computed(() => props.pagination || props.fillHeight ? 'normal' : 'autoHeight')
 
 const firstDataRow = computed<Record<string, unknown> | undefined>(() =>
   props.rowData.find((row): row is Record<string, unknown> => typeof row === 'object' && row !== null),
@@ -199,11 +200,11 @@ function handleGridReady(event: any) {
     </Teleport>
     <AgGridVue class="app-data-grid" :theme="themeQuartz" :row-data="pagedRows" :column-defs="normalizedColumnDefs"
       :default-col-def="defaultColDef" :row-selection="selectable ? rowSelection : undefined"
-      :selection-column-def="selectable ? selectionColumnDef : undefined"
-      :locale-text="localeText" :animate-rows="false" :get-row-id="getRowId ? resolveRowId : undefined"
-      :row-height="rowHeight" :row-buffer="5" :dom-layout="domLayout" :enable-cell-text-selection="true"
-      :ensure-dom-order="false" :tooltip-show-delay="200" :tooltip-hide-delay="10000" @grid-ready="handleGridReady"
-      @first-data-rendered="resizeColumns" @column-resized="fillRemainingSpace" @grid-size-changed="fillRemainingSpace"
+      :selection-column-def="selectable ? selectionColumnDef : undefined" :locale-text="localeText"
+      :animate-rows="false" :get-row-id="getRowId ? resolveRowId : undefined" :row-height="rowHeight" :row-buffer="5"
+      :dom-layout="domLayout" :enable-cell-text-selection="true" :ensure-dom-order="false" :tooltip-show-delay="200"
+      :tooltip-hide-delay="10000" @grid-ready="handleGridReady" @first-data-rendered="resizeColumns"
+      @column-resized="fillRemainingSpace" @grid-size-changed="fillRemainingSpace"
       @selection-changed="handleSelectionChanged" />
     <div v-if="pagination" class="grid-pagination">
       <el-pagination v-model:current-page="paginationPage" v-model:page-size="paginationSize"

@@ -147,7 +147,8 @@ onMounted(load)
         </div>
       </div>
 
-      <AppDataGrid :row-data="roles" :column-defs="roleColumnDefs" @selection-changed="handleRoleSelectionChanged" />
+      <AppDataGrid fill-height :row-data="roles" :column-defs="roleColumnDefs"
+        @selection-changed="handleRoleSelectionChanged" />
       <div class="pagination-bar">
         <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
           :page-sizes="[20, 50, 100, 500, 1000]" :total="totalRoles" layout="total, sizes, prev, pager, next, jumper"
@@ -210,7 +211,7 @@ onMounted(load)
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px;
+  padding: 16px 2px 0 16px;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -222,7 +223,7 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
   gap: 12px;
 }
 
@@ -267,7 +268,7 @@ onMounted(load)
   display: flex;
   justify-content: flex-end;
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 4px;
   overflow-x: auto;
 }
 

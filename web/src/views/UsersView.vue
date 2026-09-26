@@ -239,7 +239,7 @@ function toggleOrganizationPane() {
           </div>
         </div>
 
-        <AppDataGrid v-loading="loading" :row-data="users" :column-defs="userColumnDefs"
+        <AppDataGrid v-loading="loading" fill-height :row-data="users" :column-defs="userColumnDefs"
           @selection-changed="handleUserSelectionChanged" />
         <!--
         <el-table-column label="序号" type="index" :index="userIndex" width="70" :resizable="true" />
@@ -442,7 +442,7 @@ function toggleOrganizationPane() {
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px;
+  padding: 16px 2px 0 16px;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -450,7 +450,7 @@ function toggleOrganizationPane() {
 }
 
 .page-toolbar {
-  margin-bottom: 16px;
+  margin-bottom: 4px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -497,7 +497,7 @@ function toggleOrganizationPane() {
   display: flex;
   justify-content: flex-end;
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 4px;
   overflow-x: auto;
 }
 

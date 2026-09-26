@@ -154,7 +154,7 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
           <div class="list-toolbar">
             <el-input v-model="keyword" placeholder="搜索组织名称或编码" clearable :prefix-icon="Search" />
           </div>
-          <AppDataGrid :row-data="tableRows" :column-defs="organizationColumnDefs"
+          <AppDataGrid class="organization-grid" fill-height :row-data="tableRows" :column-defs="organizationColumnDefs"
             @selection-changed="handleOrganizationSelectionChanged" />
           <div class="pagination-bar">
             <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
@@ -184,6 +184,12 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
   gap: 0;
   height: 100%;
   min-height: 100%;
+}
+
+.organization-content {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
 }
 
 .tree-panel,
@@ -298,14 +304,15 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
 
 .section-card {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  padding: 16px;
+  padding: 16px 2px 0 16px;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
 }
 
 .page-toolbar {
-  margin-bottom: 14px;
+  margin-bottom: 4px;
 }
 
 .toolbar-actions {
@@ -323,7 +330,7 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
 .list-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 14px;
+  margin-bottom: 4px;
 }
 
 .list-toolbar :deep(.el-input) {
@@ -332,6 +339,15 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
 
 .data-table {
   width: 100%;
+}
+
+.organization-grid {
+  flex: 1;
+  min-height: 0;
+}
+
+.organization-grid :deep(.app-data-grid-shell) {
+  height: 100%;
 }
 
 :deep(.grid-action-group) {
@@ -389,7 +405,7 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
   display: flex;
   justify-content: flex-end;
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 4px;
   overflow-x: auto;
 }
 
