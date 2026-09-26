@@ -13,6 +13,7 @@ export interface PageResponse<T> { list: T[]; total: number }
 // 扩展 Axios 实例方法，调用 API 时可直接声明响应数据泛型。
 declare module 'axios' {
   interface AxiosInstance {
+    post<T = unknown>(url: string, data: unknown, config: AxiosRequestConfig & { responseType: 'blob' }): Promise<AxiosResponse<Blob>>
     get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<ApiResponse<T>>>
     post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<ApiResponse<T>>>
     put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<ApiResponse<T>>>
@@ -38,7 +39,7 @@ async function renewAccessToken() {
   if (refreshPromise) return refreshPromise
   const refreshToken = localStorage.getItem('refresh_token')
   if (!refreshToken) throw new Error('missing refresh token')
-  refreshPromise = axios.post<{token:string;access_token:string;refresh_token:string}>('/api/v1/auth/refresh', { refresh_token: refreshToken })
+  refreshPromise = axios.post<{ token: string; access_token: string; refresh_token: string }>('/api/v1/auth/refresh', { refresh_token: refreshToken })
     .then(({ data }) => {
       const accessToken = data.data.access_token || data.data.token
       localStorage.setItem('token', accessToken)

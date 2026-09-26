@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -578,37 +580,49 @@ func (h *AssetHandler) ExportHosts(c *gin.Context) {
 		response.Error(c, 400, "invalid host export request")
 		return
 	}
-	result, err := h.biz.ExportHosts(c.Request.Context(), req)
+	fileName, content, err := h.biz.ExportHosts(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 500, "export hosts failed")
 		return
 	}
-	response.OK(c, result)
+	writeHostExcel(c, fileName, content)
 }
 
 // HostImportTemplate POST /api/v1/assets/hosts/template 下载主机导入模板。
 func (h *AssetHandler) HostImportTemplate(c *gin.Context) {
-	result, err := h.biz.HostImportTemplate()
+	fileName, content, err := h.biz.HostImportTemplate()
 	if err != nil {
 		response.Error(c, 500, "create host import template failed")
 		return
 	}
-	response.OK(c, result)
+	writeHostExcel(c, fileName, content)
 }
 
 // ImportHosts POST /api/v1/assets/hosts/import 导入主机 Excel。
 func (h *AssetHandler) ImportHosts(c *gin.Context) {
-	req := new(api.HostExcelImportRequest)
-	if c.ShouldBindJSON(req) != nil {
-		response.Error(c, 400, "invalid host import request")
+	header, err := c.FormFile("file")
+	if err != nil {
+		response.Error(c, 400, "Excel 文件不能为空")
 		return
 	}
-	result, err := h.biz.ImportHosts(c.Request.Context(), req)
+	file, err := header.Open()
+	if err != nil {
+		response.Error(c, 400, "无法读取上传的 Excel 文件")
+		return
+	}
+	defer func() { _ = file.Close() }()
+	result, err := h.biz.ImportHosts(c.Request.Context(), header.Filename, file)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
 	response.OK(c, result)
+}
+
+func writeHostExcel(c *gin.Context, fileName string, content []byte) {
+	c.DataFromReader(http.StatusOK, int64(len(content)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes.NewReader(content), map[string]string{
+		"Content-Disposition": mime.FormatMediaType("attachment", map[string]string{"filename": fileName}),
+	})
 }
 
 // CreateHost POST /api/v1/assets/hosts/create 创建主机资产。

@@ -47,6 +47,7 @@
 - 所有业务接口统一使用 HTTP `POST`，不使用 `GET`、`PUT`、`PATCH` 或 `DELETE`。
 - 接口路径采用动作式命名，避免同一路径的查询与写入冲突，例如：`/users/list`、`/users/create`、`/users/update`、`/users/delete`。
 - 查询条件与写入参数均通过 JSON 请求体传递；删除和更新操作的资源 ID 也放在请求体中。
+- 文件上传和下载是 JSON 请求体约定的例外：上传使用 `multipart/form-data`，Gin handler 通过 `c.FormFile`/`c.Request.FormFile` 获取文件并传给 Biz 处理，不得将文件名和 base64/二进制内容包装进 JSON；下载由 Gin 直接返回文件流或附件（例如 `c.File`、`c.FileAttachment` 或 `c.DataFromReader`），设置正确的 `Content-Type` 和 `Content-Disposition`，不得把文件名和 base64/二进制内容放入 JSON 响应。前端上传使用 `FormData`，下载以 `Blob` 接收并从响应头解析文件名。
 - 新增或调整接口时，必须同步修改 Gin 路由、Casbin 权限目录、前端 API 封装、页面调用及 `v-permission` 权限键。
 - 每个对外 Gin handler 方法必须紧邻方法声明前添加 Go 文档注释，格式为：`// 方法名 POST /api/v1/完整路由 功能说明。`；方法与路由变更时必须同步更新该注释。
 - 所有数据列表接口必须接收 `page`、`limit`，由后端查询层执行 `Count` 和 `Offset/Limit`，并统一返回 `{ "list": [...], "total": n }`；前端不得获取全量数据后自行分页。树形选项、关联下拉等非列表展示场景也必须显式传分页参数，并根据业务需要设置受控的 `limit`。

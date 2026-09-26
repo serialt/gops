@@ -3,9 +3,9 @@ package biz
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,10 +19,10 @@ import (
 
 var hostExcelHeaders = []string{"主机名称", "IP", "SSH端口", "主机类型", "所属分组ID", "凭据ID", "云账号ID", "标签", "备注"}
 
-func (b *AssetBiz) ExportHosts(ctx context.Context, req *api.HostListRequest) (*api.HostExcelExportResponse, error) {
+func (b *AssetBiz) ExportHosts(ctx context.Context, req *api.HostListRequest) (string, []byte, error) {
 	book, sheet, err := newHostExcelBook()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	defer func() { _ = book.Close() }()
 	pageRequest := *req
@@ -31,13 +31,13 @@ func (b *AssetBiz) ExportHosts(ctx context.Context, req *api.HostListRequest) (*
 	for {
 		page, listErr := b.ListHosts(ctx, &pageRequest)
 		if listErr != nil {
-			return nil, listErr
+			return "", nil, listErr
 		}
 		for _, row := range page.List {
 			values := []any{row.Name, row.IP, row.Port, row.HostType, row.GroupID, row.CredentialID, row.CloudAccountID, row.Tags, row.Description}
 			cell, _ := excelize.CoordinatesToCellName(1, rowIndex)
 			if err = book.SetSheetRow(sheet, cell, &values); err != nil {
-				return nil, err
+				return "", nil, err
 			}
 			rowIndex++
 		}
@@ -49,25 +49,21 @@ func (b *AssetBiz) ExportHosts(ctx context.Context, req *api.HostListRequest) (*
 	return hostExcelResponse(book, "主机管理_"+time.Now().Format("20060102_150405")+".xlsx")
 }
 
-func (b *AssetBiz) HostImportTemplate() (*api.HostExcelExportResponse, error) {
+func (b *AssetBiz) HostImportTemplate() (string, []byte, error) {
 	book, _, err := newHostExcelBook()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	defer func() { _ = book.Close() }()
 	return hostExcelResponse(book, "主机导入模板.xlsx")
 }
 
-func (b *AssetBiz) ImportHosts(ctx context.Context, req *api.HostExcelImportRequest) (*api.HostExcelImportResponse, error) {
-	extension := strings.ToLower(filepath.Ext(req.FileName))
+func (b *AssetBiz) ImportHosts(ctx context.Context, fileName string, content io.Reader) (*api.HostExcelImportResponse, error) {
+	extension := strings.ToLower(filepath.Ext(fileName))
 	if extension != ".xlsx" {
 		return nil, errors.New("仅支持 .xlsx 格式的 Excel 文件")
 	}
-	content, err := base64.StdEncoding.DecodeString(req.Content)
-	if err != nil {
-		return nil, errors.New("Excel 文件内容无效")
-	}
-	book, err := excelize.OpenReader(bytes.NewReader(content))
+	book, err := excelize.OpenReader(content)
 	if err != nil {
 		return nil, errors.New("无法解析 Excel 文件，请使用主机导入模板")
 	}
@@ -169,12 +165,12 @@ func newHostExcelBook() (*excelize.File, string, error) {
 	return book, sheet, nil
 }
 
-func hostExcelResponse(book *excelize.File, fileName string) (*api.HostExcelExportResponse, error) {
+func hostExcelResponse(book *excelize.File, fileName string) (string, []byte, error) {
 	buffer, err := book.WriteToBuffer()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	return &api.HostExcelExportResponse{FileName: fileName, Content: base64.StdEncoding.EncodeToString(buffer.Bytes())}, nil
+	return fileName, bytes.Clone(buffer.Bytes()), nil
 }
 
 func hostRequestFromExcel(row []string, header map[string]int) (*api.HostRequest, error) {

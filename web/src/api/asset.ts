@@ -49,7 +49,6 @@ export const deleteCloudAccount = (id: number) => request.post<null>('/assets/cl
 
 export interface Host { id: number; name: string; group_id: number; host_type: string; ip: string; port: number; credential_id: number; cloud_account_id: number; tags: string; description: string; status: number; last_seen_at: string; os: string; kernel: string; arch: string; cpu_info: string; cpu_cores: number; cpu_usage: number; memory_total: number; memory_used: number; memory_usage: number; disk_total: number; disk_used: number; disk_usage: number; uptime: string; hostname: string; created_at: string; updated_at: string }
 export interface HostRequest { id?: number; name: string; group_id: number; host_type: string; ip: string; port: number; credential_id: number; cloud_account_id: number; tags: string; description: string; status: number }
-export interface HostExcelFile { file_name: string; content: string }
 export interface HostExcelImportResult { created: number; updated: number }
 export const listHosts = (keyword = '', group_id = 0, page = 1, limit = 20) => request.post<PageResponse<Host>>('/assets/hosts/list', { keyword, group_id, page, limit })
 export const createHost = (data: HostRequest) => request.post<Host>('/assets/hosts/create', data)
@@ -57,9 +56,13 @@ export const updateHost = (data: Required<Pick<HostRequest, 'id'>> & HostRequest
 export const testHostConnection = (data: { ip: string; port: number; credential_id: number }) => request.post<null>('/assets/hosts/test', data)
 export const collectHostInfo = (id: number) => request.post<Host>('/assets/hosts/collect', { id })
 export const deleteHost = (id: number) => request.post<null>('/assets/hosts/delete', { id })
-export const exportHosts = (keyword = '', group_id = 0) => request.post<HostExcelFile>('/assets/hosts/export', { keyword, group_id })
-export const downloadHostImportTemplate = () => request.post<HostExcelFile>('/assets/hosts/template', {})
-export const importHosts = (file_name: string, content: string) => request.post<HostExcelImportResult>('/assets/hosts/import', { file_name, content })
+export const exportHosts = (keyword = '', group_id = 0) => request.post<Blob>('/assets/hosts/export', { keyword, group_id }, { responseType: 'blob' })
+export const downloadHostImportTemplate = () => request.post<Blob>('/assets/hosts/template', {}, { responseType: 'blob' })
+export const importHosts = (file: File) => {
+  const form = new FormData()
+  form.append('file', file, file.name)
+  return request.post<HostExcelImportResult>('/assets/hosts/import', form)
+}
 export interface SftpEntry { name: string; type: 'directory' | 'file'; size: number; modified: string; permissions: string }
 export const listSftp = (host_id: number, path: string) => request.post<SftpEntry[]>('/assets/terminal/sftp/list', { host_id, path })
 export const uploadSftp = (host_id: number, path: string, files: File[]) => {

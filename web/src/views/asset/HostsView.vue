@@ -51,23 +51,22 @@ async function batchRemove(selectedRows: unknown[]) {
     ElMessage.success('批量删除成功')
     await load()
 }
-function downloadExcelFile(fileName: string, content: string) {
-    const binary = atob(content)
-    const bytes = new Uint8Array(binary.length)
-    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+function downloadExcelFile(blob: Blob, contentDisposition: string | undefined, fallbackName: string) {
+    const encodedName = contentDisposition?.match(/filename\*=utf-8''([^;]+)/i)?.[1]
+    const fileName = encodedName ? decodeURIComponent(encodedName) : fallbackName
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = fileName
     link.click()
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 async function exportExcel() {
     if (!auth.hasPermission('POST /api/v1/assets/hosts/export')) return
     excelBusy.value = true
     try {
-        const { data } = await exportHosts(keyword.value, selectedGroupID.value || 0)
-        downloadExcelFile(data.data.file_name, data.data.content)
+        const response = await exportHosts(keyword.value, selectedGroupID.value || 0)
+        downloadExcelFile(response.data, response.headers['content-disposition'], '主机管理.xlsx')
         ElMessage.success('主机 Excel 已导出')
     } finally { excelBusy.value = false }
 }
@@ -76,8 +75,8 @@ async function handleExcelCommand(command: string) {
         if (!auth.hasPermission('POST /api/v1/assets/hosts/template')) return
         excelBusy.value = true
         try {
-            const { data } = await downloadHostImportTemplate()
-            downloadExcelFile(data.data.file_name, data.data.content)
+            const response = await downloadHostImportTemplate()
+            downloadExcelFile(response.data, response.headers['content-disposition'], '主机导入模板.xlsx')
         } finally { excelBusy.value = false }
     } else if (command === 'import') excelInput.value?.click()
 }
@@ -91,11 +90,7 @@ async function importExcel(event: Event) {
     }
     excelBusy.value = true
     try {
-        const bytes = new Uint8Array(await file.arrayBuffer())
-        let binary = ''
-        const chunkSize = 0x8000
-        for (let offset = 0; offset < bytes.length; offset += chunkSize) binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
-        const { data } = await importHosts(file.name, btoa(binary))
+        const { data } = await importHosts(file)
         await load()
         ElMessage.success(`导入完成：新增 ${data.data.created} 台，更新 ${data.data.updated} 台`)
     } finally {
