@@ -135,17 +135,17 @@ loadClusters().then(async () => { await loadNamespaces(); initialized = true; aw
     <div v-if="isConfig" class="network-types config-types"><button v-for="item in configCards" :key="item.key"
         :class="['network-card', 'config-card', { active: resource === item.key }]"
         @click="switchResource(item.key)"><span>{{ item.label }}</span><strong>{{ item.count
-          }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
+        }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
           v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" /></el-select></div>
     <div v-if="isStorage" class="network-types storage-types"><button v-for="item in storageCards" :key="item.key"
         :class="['network-card', 'storage-card', { active: resource === item.key }]"
         @click="switchResource(item.key)"><span>{{ item.label }}</span><strong>{{ item.count
-          }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
+        }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
           v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" /></el-select></div>
     <div v-if="isAccess" class="network-types access-types"><button v-for="item in accessCards" :key="item.key"
         :class="['network-card', 'access-card', { active: resource === item.key }]"
         @click="switchResource(item.key)"><span>{{ item.label }}</span><strong>{{ item.count
-          }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
+        }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
           v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" /></el-select></div>
     <div class="toolbar">
       <div class="filters"><el-select v-if="!isNetwork && !isWorkload && !isConfig && !isStorage && !isAccess"

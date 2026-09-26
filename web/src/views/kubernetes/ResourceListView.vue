@@ -7,7 +7,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import AppDataGrid from '@/components/AppDataGrid.vue'
 import KubernetesLabelDialog from '@/components/KubernetesLabelDialog.vue'
 import KubernetesYamlEditor from '@/components/KubernetesYamlEditor.vue'
-import { applyKubernetesObject, deleteKubernetesNode, deleteKubernetesObject, drainKubernetesNode, getKubernetesClusterStats, getKubernetesObject, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
+import { applyKubernetesObject, deleteKubernetesNode, deleteKubernetesObject, drainKubernetesNode, getKubernetesClusterStats, getKubernetesObject, getKubernetesResourceTemplate, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
 const route = useRoute(); const kind = computed(() => String(route.meta.kubernetesResource || 'nodes')); const title = computed(() => kind.value === 'nodes' ? '节点管理' : kind.value === 'namespaces' ? '命名空间' : '工作负载'); const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), keyword = ref(''), rows = ref<any[]>([]), page = ref(1), pageSize = ref(20), total = ref(0)
 const statusFilter = ref(''), roleFilter = ref(''), namespaceStatus = ref(''), refreshing = ref(false)
 const cloudTTYDialog = ref(false)
@@ -57,7 +57,7 @@ const namespaceLabelDialog = ref(false), namespaceLabelSaving = ref(false), sele
 const nodeLabelDialog = ref(false), nodeLabelSaving = ref(false), selectedLabelNode = ref<KubernetesNode | null>(null)
 const nodeTaintDialog = ref(false), nodeTaintEditing = ref(false), nodeTaintSaving = ref(false), selectedTaintNode = ref<KubernetesNode | null>(null), nodeTaintRows = ref<KubernetesTaint[]>([])
 const nodeMenu = ref({ visible: false, x: 0, y: 0, node: null as KubernetesNode | null }), nodeYamlDialog = ref(false), nodeYamlSaving = ref(false), nodeYaml = ref('')
-const namespaceMenu = ref({ visible: false, x: 0, y: 0, namespace: null as KubernetesNamespace | null }), namespaceYamlDialog = ref(false), namespaceYamlSaving = ref(false), namespaceYaml = ref('')
+const namespaceMenu = ref({ visible: false, x: 0, y: 0, namespace: null as KubernetesNamespace | null }), namespaceYamlDialog = ref(false), namespaceYamlSaving = ref(false), namespaceYamlCreate = ref(false), namespaceYaml = ref('')
 const nodeStats = ref({ total: 0, healthy: 0, pods: 0, podCapacity: 0, cpu: 0 })
 const namespaceStats = ref({ total: 0, healthy: 0, labels: 0, averageAge: '0d' })
 const isNodeReady = (status: unknown) => ['ready', '就绪', '正常'].includes(String(status || '').toLowerCase())
@@ -123,10 +123,11 @@ async function drainNode() { const node = nodeMenu.value.node; closeNodeMenu(); 
 function openNamespaceActionMenu(namespace: KubernetesNamespace, button: HTMLElement) { const rect = button.getBoundingClientRect(); namespaceMenu.value = { visible: true, x: Math.max(8, rect.right - 150), y: rect.bottom + 4, namespace } }
 function closeNamespaceMenu() { namespaceMenu.value.visible = false }
 function modifyNamespace() { const namespace = namespaceMenu.value.namespace; closeNamespaceMenu(); if (!namespace) return; openNamespaceLabels(namespace) }
-async function openNamespaceYaml() { const namespace = namespaceMenu.value.namespace; closeNamespaceMenu(); if (!namespace) return; const { data } = await getKubernetesObject({ cluster_id: clusterID.value, resource: 'namespaces', name: namespace.name }); namespaceYaml.value = data.data.yaml; namespaceYamlDialog.value = true }
+async function openNamespaceYaml() { const namespace = namespaceMenu.value.namespace; closeNamespaceMenu(); if (!namespace) return; const { data } = await getKubernetesObject({ cluster_id: clusterID.value, resource: 'namespaces', name: namespace.name }); namespaceYaml.value = data.data.yaml; namespaceYamlCreate.value = false; namespaceYamlDialog.value = true }
 async function openNamespaceYamlFor(namespace: KubernetesNamespace) { namespaceMenu.value = { ...namespaceMenu.value, visible: false, namespace }; await openNamespaceYaml() }
-async function saveNamespaceYaml() { namespaceYamlSaving.value = true; try { await applyKubernetesObject({ cluster_id: clusterID.value, resource: 'namespaces', yaml: namespaceYaml.value }); ElMessage.success('命名空间 YAML 保存成功'); namespaceYamlDialog.value = false; await load() } finally { namespaceYamlSaving.value = false } }
-async function reloadNamespaceYaml() { const namespace = namespaceMenu.value.namespace; if (!namespace) return; namespaceYamlSaving.value = true; try { const { data } = await getKubernetesObject({ cluster_id: clusterID.value, resource: 'namespaces', name: namespace.name }); namespaceYaml.value = data.data.yaml; ElMessage.success('已重新拉取最新 YAML') } finally { namespaceYamlSaving.value = false } }
+async function openNamespaceYamlCreate() { namespaceYamlSaving.value = true; try { const { data } = await getKubernetesResourceTemplate({ cluster_id: clusterID.value, resource: 'namespaces' }); namespaceMenu.value.namespace = null; namespaceYaml.value = data.data.yaml; namespaceYamlCreate.value = true; namespaceYamlDialog.value = true } finally { namespaceYamlSaving.value = false } }
+async function saveNamespaceYaml() { namespaceYamlSaving.value = true; try { await applyKubernetesObject({ cluster_id: clusterID.value, resource: 'namespaces', yaml: namespaceYaml.value }); ElMessage.success(namespaceYamlCreate.value ? '命名空间创建成功' : '命名空间 YAML 保存成功'); namespaceYamlDialog.value = false; await load() } finally { namespaceYamlSaving.value = false } }
+async function reloadNamespaceYaml() { namespaceYamlSaving.value = true; try { if (namespaceYamlCreate.value) { const { data } = await getKubernetesResourceTemplate({ cluster_id: clusterID.value, resource: 'namespaces' }); namespaceYaml.value = data.data.yaml } else { const namespace = namespaceMenu.value.namespace; if (!namespace) return; const { data } = await getKubernetesObject({ cluster_id: clusterID.value, resource: 'namespaces', name: namespace.name }); namespaceYaml.value = data.data.yaml } ElMessage.success('已重新拉取最新 YAML') } finally { namespaceYamlSaving.value = false } }
 async function removeNamespace(namespace: KubernetesNamespace) { try { await ElMessageBox.confirm(`删除命名空间“${namespace.name}”将同时删除其中的全部资源，且无法恢复。确定继续吗？`, '删除命名空间', { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }) } catch { return }; await deleteKubernetesObject({ cluster_id: clusterID.value, resource: 'namespaces', name: namespace.name }); ElMessage.success('命名空间删除成功'); await load() }
 async function batchRemove(selectedRows: unknown[]) {
     if (!selectedRows.length || !['nodes', 'namespaces'].includes(kind.value)) return
@@ -204,7 +205,8 @@ const adaptiveColumns = computed<ColDef[]>(() => {
             <div class="node-header-actions"><el-select v-model="clusterID" placeholder="选择集群"><el-option
                         v-for="item in clusters" :key="item.id" :label="item.alias || item.name"
                         :value="item.id" /></el-select><el-button type="primary" :icon="Refresh" :loading="refreshing"
-                    @click="refresh">刷新</el-button></div>
+                    @click="refresh">刷新</el-button><el-button class="yaml-create-button" :loading="namespaceYamlSaving"
+                    @click="openNamespaceYamlCreate">YAML 创建</el-button></div>
         </div>
         <div v-else class="toolbar">
             <div class="filters"><el-select v-model="clusterID" placeholder="选择集群"><el-option v-for="item in clusters"
@@ -264,9 +266,9 @@ const adaptiveColumns = computed<ColDef[]>(() => {
             :bulk-delete="['nodes', 'namespaces'].includes(kind) ? batchRemove : undefined"
             @page-change="value => { page = value; void load() }"
             @page-size-change="value => { pageSize = value; page = 1; void load() }" />
-        <div v-if="nodeMenu.visible" class="node-action-menu" :style="{ left: `${nodeMenu.x}px`, top: `${nodeMenu.y}px` }"
-            @mouseleave="closeNodeMenu"><button @click="openNodeShell">Shell</button><button
-                @click="openNodeYaml">YAML</button>
+        <div v-if="nodeMenu.visible" class="node-action-menu"
+            :style="{ left: `${nodeMenu.x}px`, top: `${nodeMenu.y}px` }" @mouseleave="closeNodeMenu"><button
+                @click="openNodeShell">Shell</button><button @click="openNodeYaml">YAML</button>
             <div class="menu-divider"></div><button @click="drainNode">节点排空</button><button
                 @click="setNodeSchedulable(false)">设为不可调度</button><button
                 @click="setNodeSchedulable(true)">设为可调度</button>
@@ -281,13 +283,15 @@ const adaptiveColumns = computed<ColDef[]>(() => {
                 </div>
             </template>
         </el-dialog>
-        <el-dialog v-model="namespaceYamlDialog" :title="`命名空间 YAML · ${namespaceMenu.namespace?.name || ''}`"
+        <el-dialog v-model="namespaceYamlDialog"
+            :title="namespaceYamlCreate ? '创建命名空间 YAML' : `命名空间 YAML · ${namespaceMenu.namespace?.name || ''}`"
             width="min(1080px,calc(100vw - 16px))" class="yaml-editor-dialog" align-center destroy-on-close>
             <KubernetesYamlEditor v-model="namespaceYaml" /><template #footer>
                 <div class="yaml-dialog-footer"><el-button :loading="namespaceYamlSaving"
                         @click="reloadNamespaceYaml">重新拉取</el-button>
                     <div><el-button @click="namespaceYamlDialog = false">取消</el-button><el-button type="primary"
-                            :loading="namespaceYamlSaving" @click="saveNamespaceYaml">保存</el-button></div>
+                            :loading="namespaceYamlSaving" @click="saveNamespaceYaml">{{ namespaceYamlCreate ? '创建' :
+                            '保存' }}</el-button></div>
                 </div>
             </template>
         </el-dialog>
@@ -334,12 +338,12 @@ const adaptiveColumns = computed<ColDef[]>(() => {
                 <div class="node-taint-head"><strong>Key</strong><strong>Value</strong><strong>Effect</strong></div>
                 <div v-for="item in nodeTaintRows" :key="`${item.key}:${item.effect}`" class="node-taint-view-row">
                     <code>{{
-                item.key }}</code><span>{{ item.value || '-' }}</span><span>{{ item.effect }}</span></div><el-empty
-                    v-if="!nodeTaintRows.length" description="暂无污点" :image-size="54" />
+                        item.key }}</code><span>{{ item.value || '-' }}</span><span>{{ item.effect }}</span>
+                </div><el-empty v-if="!nodeTaintRows.length" description="暂无污点" :image-size="54" />
             </div>
             <div v-else class="namespace-label-editor">
                 <div class="namespace-label-editor-title"><span>编辑 {{ selectedTaintNode?.name }} 的污点</span><strong>共 {{
-                        nodeTaintRows.length }} 个污点</strong></div>
+                    nodeTaintRows.length }} 个污点</strong></div>
                 <div v-for="(item, index) in nodeTaintRows" :key="index" class="node-taint-edit-row"><span
                         class="taint-row-index">{{ index + 1 }}</span>
                     <div class="taint-field"><label>KEY</label><el-input v-model="item.key" placeholder="如: key1" />
@@ -519,6 +523,12 @@ const adaptiveColumns = computed<ColDef[]>(() => {
 
 .node-header-actions .el-button {
     margin-left: 0
+}
+
+.yaml-create-button {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: #fff
 }
 
 .node-filters {
