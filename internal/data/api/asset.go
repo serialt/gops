@@ -106,6 +106,18 @@ type HostListRequest struct {
 	Keyword string `json:"keyword"`
 	GroupID int64  `json:"group_id"`
 }
+type HostExcelExportResponse struct {
+	FileName string `json:"file_name"`
+	Content  string `json:"content"`
+}
+type HostExcelImportRequest struct {
+	FileName string `json:"file_name" binding:"required"`
+	Content  string `json:"content" binding:"required"`
+}
+type HostExcelImportResponse struct {
+	Created int `json:"created"`
+	Updated int `json:"updated"`
+}
 type HostRequest struct {
 	ID             int64  `json:"id"`
 	Name           string `json:"name" binding:"required"`

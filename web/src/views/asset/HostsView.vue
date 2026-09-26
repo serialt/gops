@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Cpu, Delete, Edit, Folder, Monitor, Refresh, Search } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectHostInfo, createCredential, createHost, deleteHost, listAssetGroups, listCloudAccounts, listCredentials, listHosts, testHostConnection, type AssetGroup, type CloudAccount, type Credential, type Host, updateHost } from '@/api/asset'
+import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Cpu, Delete, Download, Edit, Folder, Monitor, Refresh, Search, Upload } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectHostInfo, createCredential, createHost, deleteHost, downloadHostImportTemplate, exportHosts, importHosts, listAssetGroups, listCloudAccounts, listCredentials, listHosts, testHostConnection, type AssetGroup, type CloudAccount, type Credential, type Host, updateHost } from '@/api/asset'
 import { useAuthStore } from '@/stores/auth'
 interface AssetTreeNode { id: number; label: string; count: number; children: AssetTreeNode[] }
 const rows = ref<Host[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const cloudAccounts = ref<CloudAccount[]>([]); const keyword = ref(''); const statusFilter = ref<number | null>(null); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const testingConnection = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ name: string; group_id: number | null; host_type: string; ip: string; port: number; credential_id: number | null; cloud_account_id: number | null; tags: string; description: string; status: number }>({ name: '', group_id: null, host_type: '', ip: '', port: 22, credential_id: null, cloud_account_id: null, tags: '', description: '', status: -1 })
 const auth = useAuthStore()
+const excelInput = ref<HTMLInputElement>()
+const excelBusy = ref(false)
 const tagItems = computed(() => form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
 const hostTypeLabels: Record<string, string> = { self: '自建主机', cloud: '云主机' }
 const visibleRows = computed(() => rows.value.filter(row => (selectedGroupID.value === null || row.group_id === selectedGroupID.value) && (statusFilter.value === null || row.status === statusFilter.value)))
@@ -49,6 +51,58 @@ async function batchRemove(selectedRows: unknown[]) {
     ElMessage.success('批量删除成功')
     await load()
 }
+function downloadExcelFile(fileName: string, content: string) {
+    const binary = atob(content)
+    const bytes = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.click()
+    URL.revokeObjectURL(url)
+}
+async function exportExcel() {
+    if (!auth.hasPermission('POST /api/v1/assets/hosts/export')) return
+    excelBusy.value = true
+    try {
+        const { data } = await exportHosts(keyword.value, selectedGroupID.value || 0)
+        downloadExcelFile(data.data.file_name, data.data.content)
+        ElMessage.success('主机 Excel 已导出')
+    } finally { excelBusy.value = false }
+}
+async function handleExcelCommand(command: string) {
+    if (command === 'template') {
+        if (!auth.hasPermission('POST /api/v1/assets/hosts/template')) return
+        excelBusy.value = true
+        try {
+            const { data } = await downloadHostImportTemplate()
+            downloadExcelFile(data.data.file_name, data.data.content)
+        } finally { excelBusy.value = false }
+    } else if (command === 'import') excelInput.value?.click()
+}
+async function importExcel(event: Event) {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0]
+    if (!file) return
+    if (!auth.hasPermission('POST /api/v1/assets/hosts/import')) {
+        input.value = ''
+        return
+    }
+    excelBusy.value = true
+    try {
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        let binary = ''
+        const chunkSize = 0x8000
+        for (let offset = 0; offset < bytes.length; offset += chunkSize) binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+        const { data } = await importHosts(file.name, btoa(binary))
+        await load()
+        ElMessage.success(`导入完成：新增 ${data.data.created} 台，更新 ${data.data.updated} 台`)
+    } finally {
+        excelBusy.value = false
+        input.value = ''
+    }
+}
 watch(treeKeyword, value => assetTreeRef.value?.filter(value))
 watch(() => form.host_type, type => { if (type !== 'cloud') form.cloud_account_id = null })
 onMounted(() => { void load(); void loadFormOptions() })
@@ -83,8 +137,22 @@ onMounted(() => { void load(); void loadFormOptions() })
                                 :value="1" /><el-option label="离线" :value="0" /><el-option label="未知"
                                 :value="-1" /></el-select></div>
                     <div class="toolbar-actions"><el-button :icon="Monitor"
-                            @click="openTerminal">终端</el-button><el-button type="primary" class="primary-btn"
-                            @click="create">新增主机</el-button></div>
+                            @click="openTerminal">终端</el-button><el-dropdown
+                            v-if="auth.hasPermission('POST /api/v1/assets/hosts/export') || auth.hasPermission('POST /api/v1/assets/hosts/import') || auth.hasPermission('POST /api/v1/assets/hosts/template')"
+                            split-button class="host-excel-dropdown" :loading="excelBusy"
+                            :disabled="!auth.hasPermission('POST /api/v1/assets/hosts/export')" @click="exportExcel"
+                            @command="handleExcelCommand">导出 Excel
+                            <template #dropdown><el-dropdown-menu>
+                                    <el-dropdown-item v-if="auth.hasPermission('POST /api/v1/assets/hosts/template')"
+                                        command="template" :icon="Download">下载 Excel
+                                        导入模板</el-dropdown-item>
+                                    <el-dropdown-item v-if="auth.hasPermission('POST /api/v1/assets/hosts/import')"
+                                        command="import" :icon="Upload">从 Excel 导入</el-dropdown-item>
+                                </el-dropdown-menu></template>
+                        </el-dropdown><input ref="excelInput" class="host-excel-input" type="file" accept=".xlsx" hidden
+                            @change="importExcel" /><el-button type="primary" class="primary-btn"
+                            @click="create">新增主机</el-button>
+                    </div>
                 </div>
                 <AppDataGrid class="host-grid" :row-data="visibleRows" :column-defs="columns" pagination
                     :bulk-delete="auth.hasPermission('POST /api/v1/assets/hosts/delete') ? batchRemove : undefined"
@@ -305,6 +373,14 @@ onMounted(() => { void load(); void loadFormOptions() })
 
 .toolbar-actions :deep(.el-button + .el-button) {
     margin-left: 0;
+}
+
+.host-excel-dropdown :deep(.el-button-group > .el-button:first-child) {
+    border-radius: 8px 0 0 8px;
+}
+
+.host-excel-dropdown :deep(.el-button-group > .el-button:last-child) {
+    border-radius: 0 8px 8px 0;
 }
 
 .status-filter {

@@ -52,6 +52,9 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/cloud-accounts/delete", h.DeleteCloudAccount)
 
 	g.POST("/assets/hosts/list", h.ListHosts)
+	g.POST("/assets/hosts/export", h.ExportHosts)
+	g.POST("/assets/hosts/template", h.HostImportTemplate)
+	g.POST("/assets/hosts/import", h.ImportHosts)
 	g.POST("/assets/terminal/tree", h.AssetTree)
 	g.POST("/assets/hosts/create", h.CreateHost)
 	g.POST("/assets/hosts/update", h.UpdateHost)
@@ -563,6 +566,46 @@ func (h *AssetHandler) ListHosts(c *gin.Context) {
 	result, err := h.biz.ListHosts(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 500, "query hosts failed")
+		return
+	}
+	response.OK(c, result)
+}
+
+// ExportHosts POST /api/v1/assets/hosts/export 导出主机 Excel。
+func (h *AssetHandler) ExportHosts(c *gin.Context) {
+	req := new(api.HostListRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid host export request")
+		return
+	}
+	result, err := h.biz.ExportHosts(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 500, "export hosts failed")
+		return
+	}
+	response.OK(c, result)
+}
+
+// HostImportTemplate POST /api/v1/assets/hosts/template 下载主机导入模板。
+func (h *AssetHandler) HostImportTemplate(c *gin.Context) {
+	result, err := h.biz.HostImportTemplate()
+	if err != nil {
+		response.Error(c, 500, "create host import template failed")
+		return
+	}
+	response.OK(c, result)
+}
+
+// ImportHosts POST /api/v1/assets/hosts/import 导入主机 Excel。
+func (h *AssetHandler) ImportHosts(c *gin.Context) {
+	req := new(api.HostExcelImportRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid host import request")
+		return
+	}
+	result, err := h.biz.ImportHosts(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
 		return
 	}
 	response.OK(c, result)

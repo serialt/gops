@@ -63,6 +63,20 @@ func (r *AssetRepo) ListHosts(ctx context.Context, db *gorm.DB, cond *define.Hos
 	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
 }
 
+func (r *AssetRepo) GetHostByIP(ctx context.Context, db *gorm.DB, ip string) (*model.Host, error) {
+	q := query.Use(db).Host
+	return q.WithContext(ctx).Where(q.IP.Eq(ip)).First()
+}
+
+func (r *AssetRepo) CreateHost(ctx context.Context, db *gorm.DB, host *model.Host) error {
+	return query.Use(db).Host.WithContext(ctx).Create(host)
+}
+
+func (r *AssetRepo) SaveHost(ctx context.Context, db *gorm.DB, host *model.Host) error {
+	q := query.Use(db).Host
+	return q.WithContext(ctx).Where(q.ID.Eq(host.ID)).Save(host)
+}
+
 func (r *AssetRepo) ListDBInstances(ctx context.Context, db *gorm.DB, cond *define.DBInstanceListCond) ([]*model.DbInstance, int64, error) {
 	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).DbInstance
