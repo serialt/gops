@@ -29,11 +29,16 @@ const instance = getCurrentInstance()
 const selectable = computed(() => Boolean(props.bulkDelete || props.bulkCollect || instance?.vnode.props?.onSelectionChanged))
 
 const defaultColDef: ColDef = {
-  minWidth: 10,
+  minWidth: 40,
   resizable: true,
   sortable: true,
   unSortIcon: true,
   suppressHeaderMenuButton: true,
+  tooltipValueGetter: (params) => {
+    const value = params.valueFormatted ?? params.value
+    if (value == null) return ''
+    return typeof value === 'string' ? value : String(value)
+  },
 }
 const rowSelection: RowSelectionOptions = {
   mode: 'multiRow',
@@ -122,14 +127,42 @@ const paginationSize = computed({ get: () => props.serverPagination ? (props.pag
 // 操作列保持固定宽度。仅其左侧最后一个数据列填充余量，其他列继续贴合实际内容。
 const normalizedColumnDefs = computed<ColDef[]>(() => {
   const isActionColumn = (column: ColDef) => column.headerName === '操作'
-  const fillIndex = columnDefsWithTimestamps.value.reduce((lastIndex, column, index) => isActionColumn(column) ? lastIndex : index, -1)
+  const fillIndex = columnDefsWithTimestamps.value.reduce(
+    (lastIndex, column, index) => isActionColumn(column) ? lastIndex : index,
+    -1,
+  )
   return columnDefsWithTimestamps.value.map((column, index) => {
-    if (index === fillIndex) {
-      return { ...column, width: undefined, flex: undefined, minWidth: column.minWidth ?? 100, maxWidth: undefined, suppressSizeToFit: false }
-    }
     if (isActionColumn(column)) return { ...column, sortable: false, suppressSizeToFit: true }
-    if (column.width) return { ...column, suppressSizeToFit: true }
-    return { ...column, minWidth: column.minWidth ?? 10, maxWidth: column.maxWidth ?? 320, suppressSizeToFit: true }
+    if (index === fillIndex) {
+      return {
+        ...column,
+        width: undefined,
+        flex: 1,
+        minWidth: Math.min(column.minWidth ?? 40, 250),
+        maxWidth: undefined,
+        suppressSizeToFit: false,
+        tooltipField: undefined,
+        tooltipValueGetter: column.tooltipValueGetter ?? ((params) => {
+          const value = params.valueFormatted ?? params.value
+          if (value == null) return ''
+          return typeof value === 'string' ? value : String(value)
+        }),
+      }
+    }
+    return {
+      ...column,
+      width: undefined,
+      flex: undefined,
+      minWidth: Math.min(column.minWidth ?? 40, 250),
+      maxWidth: 250,
+      suppressSizeToFit: true,
+      tooltipField: undefined,
+      tooltipValueGetter: column.tooltipValueGetter ?? ((params) => {
+        const value = params.valueFormatted ?? params.value
+        if (value == null) return ''
+        return typeof value === 'string' ? value : String(value)
+      }),
+    }
   })
 })
 
@@ -137,14 +170,12 @@ let resizeFrame = 0
 function resizeColumns(event: any) {
   cancelAnimationFrame(resizeFrame)
   resizeFrame = requestAnimationFrame(() => {
-    // 先按内容压缩普通列；再只把余量分配给最后一个数据列。
+    // Size content columns from the current page; the final data column flexes into remaining space.
     const columns = event.api.getColumns().filter((column: any) => {
       const definition = column.getColDef()
-      const autoSizedAction = definition.headerName === '操作' && !definition.width
-      return definition.suppressSizeToFit && !definition.width && (!column.isPinned() || autoSizedAction)
+      return definition.headerName !== '操作' && !definition.flex && !column.isPinned()
     })
     event.api.autoSizeColumns(columns)
-    event.api.sizeColumnsToFit()
   })
 }
 
@@ -263,11 +294,6 @@ function resolveRowId(params: any) {
   return props.getRowId!(params.data)
 }
 
-function fillRemainingSpace(event: any) {
-  // 拖拽任意普通列后，由最后一个数据列接收余量，防止固定操作列前出现空区。
-  if (event.finished !== false) event.api.sizeColumnsToFit()
-}
-
 function handleSelectionChanged(event: any) {
   selectedRows.value = event.api.getSelectedRows()
   emit('selectionChanged', selectedRows.value)
@@ -341,8 +367,8 @@ function handleGridReady(event: any) {
       :selection-column-def="selectable ? selectionColumnDef : undefined" :locale-text="localeText"
       :animate-rows="false" :get-row-id="getRowId ? resolveRowId : undefined" :row-height="rowHeight" :row-buffer="5"
       :dom-layout="domLayout" :enable-cell-text-selection="true" :ensure-dom-order="false" :tooltip-show-delay="200"
-      :tooltip-hide-delay="10000" @grid-ready="handleGridReady" @first-data-rendered="resizeColumns"
-      @column-resized="fillRemainingSpace" @grid-size-changed="fillRemainingSpace"
+      tooltip-show-mode="whenTruncated" :tooltip-hide-delay="10000" @grid-ready="handleGridReady"
+      @first-data-rendered="resizeColumns" @row-data-updated="resizeColumns"
       @selection-changed="handleSelectionChanged" />
     <div v-if="pagination" class="grid-pagination">
       <el-pagination v-model:current-page="paginationPage" v-model:page-size="paginationSize"
@@ -375,6 +401,12 @@ function handleGridReady(event: any) {
 
 .app-data-grid :deep(.ag-sort-indicator-icon) {
   padding: 0;
+}
+
+.app-data-grid :deep(.ag-cell-value) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-data-grid-bulk-button {
