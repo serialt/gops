@@ -30,4 +30,4 @@ export const testMonitorChannel = (data: MonitorAlertChannelTestRequest) => requ
 export const listMonitorReceivers = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<MonitorAlertReceiver>>('/monitor/receivers/list', { keyword, page, limit })
 export const saveMonitorReceiver = (data: MonitorAlertReceiverRequest) => request.post<MonitorAlertReceiver>('/monitor/receivers/save', data)
 export const deleteMonitorReceiver = (id: number) => request.post<null>('/monitor/receivers/delete', { id })
-export const listMonitorLogs = (page = 1, limit = 20) => request.post<PageResponse<MonitorAlertLog>>('/monitor/logs/list', { page, limit })
+export const listMonitorLogs = (page = 1, limit = 20, keyword = '', status = '', domain_id = 0) => request.post<PageResponse<MonitorAlertLog>>('/monitor/logs/list', { page, limit, keyword, status, domain_id })

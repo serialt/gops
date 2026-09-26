@@ -166,6 +166,7 @@ type MonitorAlertLogListRequest struct {
 	PageRequest
 	DomainID int64  `json:"domain_id"`
 	Status   string `json:"status"`
+	Keyword  string `json:"keyword"`
 }
 type MonitorAlertLogResponse struct {
 	ID           int64     `json:"id"`

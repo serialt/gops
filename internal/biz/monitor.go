@@ -604,6 +604,10 @@ func (b *MonitorBiz) ListLogs(req *api.MonitorAlertLogListRequest) (*api.PageRes
 	if req.Status != "" {
 		q = q.Where("status = ?", req.Status)
 	}
+	if keyword := strings.TrimSpace(req.Keyword); keyword != "" {
+		pattern := "%" + keyword + "%"
+		q = q.Where("alert_type LIKE ? OR message LIKE ? OR channel_type LIKE ? OR error_message LIKE ?", pattern, pattern, pattern, pattern)
+	}
 	rows, total, err := queryPage[model.MonitorAlertLog](q, req.Page, req.Limit)
 	if err != nil {
 		return nil, err
