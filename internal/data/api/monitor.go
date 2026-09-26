@@ -4,9 +4,12 @@ import "time"
 
 type MonitorDomainListRequest struct {
 	PageRequest
-	Keyword string  `json:"keyword"`
-	Status  string  `json:"status"`
-	IDs     []int64 `json:"ids"`
+	Keyword        string  `json:"keyword"`
+	Status         string  `json:"status"`
+	SSLStatus      string  `json:"ssl_status"`
+	SSLExpiryStart string  `json:"ssl_expiry_start"`
+	SSLExpiryEnd   string  `json:"ssl_expiry_end"`
+	IDs            []int64 `json:"ids"`
 }
 type MonitorDomainRequest struct {
 	ID                int64  `json:"id"`
@@ -68,8 +71,11 @@ type MonitorStatsResponse struct {
 	Paused   int64 `json:"paused"`
 }
 type MonitorStatsRequest struct {
-	Keyword string `json:"keyword"`
-	Status  string `json:"status"`
+	Keyword        string `json:"keyword"`
+	Status         string `json:"status"`
+	SSLStatus      string `json:"ssl_status"`
+	SSLExpiryStart string `json:"ssl_expiry_start"`
+	SSLExpiryEnd   string `json:"ssl_expiry_end"`
 }
 type MonitorDomainExcelImportResponse struct {
 	Created int `json:"created"`

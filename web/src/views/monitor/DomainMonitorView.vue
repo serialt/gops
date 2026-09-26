@@ -7,15 +7,17 @@ import AppDataGrid from '@/components/AppDataGrid.vue'
 import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
 import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
-const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
+const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const statusFilter = ref(''); const sslStatusFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
 const importInput = ref<HTMLInputElement>(); const exporting = ref(false); const importing = ref(false)
 const auth = useAuthStore()
 const requestClientOptions: Array<{ label: string; value: MonitorRequestClient }> = [{ label: 'Google Chrome', value: 'chrome' }, { label: 'Mozilla Firefox', value: 'firefox' }, { label: 'Microsoft Edge', value: 'edge' }, { label: 'Apple Safari', value: 'safari' }, { label: 'curl', value: 'curl' }]
 const form = ref<MonitorDomainRequest>({ domain: '', port: 443, request_client: 'chrome', check_interval: 300, check_jitter: 30, enable_ssl: true, verify_certificate: true, enable_alert: true, response_threshold: 3000, ssl_expiry_days: 30 })
 async function load() {
+    const expiryStart = sslExpiryRange.value?.[0] || ''
+    const expiryEnd = sslExpiryRange.value?.[1] || ''
     const [listResponse, statsResponse] = await Promise.all([
-        listMonitorDomains(keyword.value, '', page.value, pageSize.value),
-        monitorStats(keyword.value),
+        listMonitorDomains(keyword.value, statusFilter.value, page.value, pageSize.value, sslStatusFilter.value, expiryStart, expiryEnd),
+        monitorStats(keyword.value, statusFilter.value, sslStatusFilter.value, expiryStart, expiryEnd),
     ])
     rows.value = listResponse.data.data.list
     total.value = listResponse.data.data.total
@@ -58,7 +60,7 @@ async function importExcel(event: Event) {
         ElMessage.success(`导入完成：新增 ${data.data.created} 条，更新 ${data.data.updated} 条`)
     } finally { importing.value = false; input.value = '' }
 }
-watch(keyword, () => { page.value = 1; void load() })
+watch([keyword, statusFilter, sslStatusFilter, sslExpiryRange], () => { page.value = 1; void load() })
 function formatDate(value?: string) { return value && !value.startsWith('0001-') ? value.replace('T', ' ').slice(0, 19) : '—' }
 function statusText(status?: string) { return status === 'normal' ? '正常' : status === 'abnormal' ? '异常' : status === 'paused' ? '暂停' : '未知' }
 function intervalText(seconds?: number) { if (!seconds) return '—'; return seconds % 60 === 0 ? `${seconds / 60}分钟` : `${seconds}秒` }
@@ -99,7 +101,20 @@ onMounted(load)
             <div class="stat-card is-abnormal"><span>异常</span><strong>{{ stats.abnormal }}</strong></div>
             <div class="stat-card is-paused"><span>暂停</span><strong>{{ stats.paused }}</strong></div>
         </div>
-        <div class="toolbar"><el-input v-model="keyword" placeholder="搜索域名" clearable />
+        <div class="toolbar"><el-input v-model="keyword" class="domain-search" placeholder="搜索域名、端口或根 CA" clearable />
+            <el-select v-model="statusFilter" class="status-filter" placeholder="全部状态" clearable>
+                <el-option label="正常" value="normal" />
+                <el-option label="异常" value="abnormal" />
+                <el-option label="暂停" value="paused" />
+                <el-option label="未知" value="unknown" />
+            </el-select>
+            <el-select v-model="sslStatusFilter" class="ssl-filter" placeholder="SSL 证书" clearable>
+                <el-option label="有效" value="valid" />
+                <el-option label="无效" value="invalid" />
+                <el-option label="未启用" value="disabled" />
+            </el-select>
+            <el-date-picker v-model="sslExpiryRange" class="expiry-filter" type="daterange" value-format="YYYY-MM-DD"
+                start-placeholder="到期开始" end-placeholder="到期结束" range-separator="至" clearable />
             <div class="toolbar-actions"><el-dropdown
                     v-if="auth.hasPermission('POST /api/v1/monitor/domains/export') || auth.hasPermission('POST /api/v1/monitor/domains/import')"
                     split-button class="excel-transfer-dropdown" popper-class="excel-transfer-popper"
@@ -138,7 +153,7 @@ onMounted(load)
             <template v-if="detailMonitor">
                 <div class="detail-overview">
                     <div class="detail-item"><span>域名：</span><strong class="domain-value">{{ detailMonitor.domain
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>状态：</span><strong class="detail-status"
                             :class="`is-${detailMonitor.status}`">{{ statusText(detailMonitor.status) }}</strong></div>
                     <div class="detail-item"><span>端口：</span><strong>{{ detailMonitor.port }}</strong></div>
@@ -152,16 +167,16 @@ onMounted(load)
                     <div class="detail-item"><span>根 CA：</span><strong>{{ detailMonitor.ssl_root_ca || '—' }}</strong>
                     </div>
                     <div class="detail-item"><span>SSL到期：</span><strong>{{ formatDate(detailMonitor.ssl_expiry)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>检查间隔：</span><strong>{{ intervalText(detailMonitor.check_interval)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>抖动：</span><strong>0～{{ detailMonitor.check_jitter }}秒</strong></div>
                     <div class="detail-item"><span>最后检查：</span><strong>{{ formatDate(detailMonitor.last_check)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>创建时间：</span><strong>{{ formatDate(detailMonitor.created_at)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-item"><span>更新时间：</span><strong>{{ formatDate(detailMonitor.updated_at)
-                    }}</strong></div>
+                            }}</strong></div>
                 </div>
                 <div class="history-panel">
                     <h3>检查历史 <small>最近 {{ historyRows.length }} 条</small></h3>
@@ -171,7 +186,7 @@ onMounted(load)
                             <div class="history-time">{{ formatDate(item.checked_at) }}</div>
                             <div class="history-result">
                                 <span class="detail-status" :class="`is-${item.status}`">{{ statusText(item.status)
-                                }}</span>
+                                    }}</span>
                                 <strong>{{ item.response_time }}ms</strong>
                                 <span v-if="item.status_code" class="history-code">HTTP {{ item.status_code }}</span>
                             </div>
@@ -196,14 +211,38 @@ onMounted(load)
 .toolbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 8px;
+    flex-wrap: wrap;
+}
+
+.toolbar :deep(.domain-search) {
+    flex: 0 0 260px;
+    width: 260px;
+}
+
+.toolbar :deep(.status-filter) {
+    flex: 0 0 140px;
+    width: 140px;
+}
+
+.toolbar :deep(.ssl-filter) {
+    flex: 0 0 150px;
+    width: 150px;
+}
+
+.toolbar :deep(.expiry-filter) {
+    flex: 0 0 280px;
+    width: 280px;
 }
 
 .toolbar-actions {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 0 0 auto;
+    margin-left: auto;
+    white-space: nowrap;
 }
 
 .toolbar-actions :deep(.el-button + .el-button) {
@@ -245,11 +284,6 @@ onMounted(load)
 
 .stat-card.is-paused strong {
     color: var(--text-muted);
-}
-
-.toolbar .el-input {
-    width: 260px;
-    flex: none;
 }
 
 .grid {

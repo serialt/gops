@@ -75,12 +75,7 @@ func (b *MonitorBiz) CheckDueDomains() {
 
 func (b *MonitorBiz) ListDomains(req *api.MonitorDomainListRequest) (*api.PageResponse[*api.MonitorDomainResponse], error) {
 	q := b.db.Model(&model.MonitorDomain{}).Order("id DESC")
-	if req.Keyword != "" {
-		q = q.Where("domain LIKE ?", "%"+req.Keyword+"%")
-	}
-	if req.Status != "" {
-		q = q.Where("status = ?", req.Status)
-	}
+	q = filterMonitorDomains(q, req.Keyword, req.Status, req.SSLStatus, req.SSLExpiryStart, req.SSLExpiryEnd)
 	if len(req.IDs) > 0 {
 		q = q.Where("id IN ?", req.IDs)
 	}
@@ -93,6 +88,31 @@ func (b *MonitorBiz) ListDomains(req *api.MonitorDomainListRequest) (*api.PageRe
 		out = append(out, monitorDomainResponse(row))
 	}
 	return &api.PageResponse[*api.MonitorDomainResponse]{List: out, Total: total}, nil
+}
+
+func filterMonitorDomains(query *gorm.DB, keyword, status, sslStatus, expiryStart, expiryEnd string) *gorm.DB {
+	if keyword = strings.TrimSpace(keyword); keyword != "" {
+		pattern := "%" + keyword + "%"
+		query = query.Where("domain LIKE ? OR CAST(port AS TEXT) LIKE ? OR ssl_root_ca LIKE ?", pattern, pattern, pattern)
+	}
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	switch sslStatus {
+	case "valid":
+		query = query.Where("enable_ssl = ? AND ssl_valid = ?", true, true)
+	case "invalid":
+		query = query.Where("enable_ssl = ? AND ssl_valid = ?", true, false)
+	case "disabled":
+		query = query.Where("enable_ssl = ?", false)
+	}
+	if expiryStart != "" {
+		query = query.Where("DATE(ssl_expiry) >= DATE(?)", expiryStart)
+	}
+	if expiryEnd != "" {
+		query = query.Where("DATE(ssl_expiry) <= DATE(?)", expiryEnd)
+	}
+	return query
 }
 func (b *MonitorBiz) CreateDomain(req *api.MonitorDomainRequest) (*api.MonitorDomainResponse, error) {
 	normalized := normalizeMonitorDomainRequest(req)
@@ -514,14 +534,7 @@ func signDingTalkWebhook(endpoint, secret string) (string, error) {
 func (b *MonitorBiz) DomainStats(req *api.MonitorStatsRequest) (*api.MonitorStatsResponse, error) {
 	out := &api.MonitorStatsResponse{}
 	filteredQuery := func() *gorm.DB {
-		query := b.db.Model(&model.MonitorDomain{})
-		if req.Keyword != "" {
-			query = query.Where("domain LIKE ?", "%"+req.Keyword+"%")
-		}
-		if req.Status != "" {
-			query = query.Where("status = ?", req.Status)
-		}
-		return query
+		return filterMonitorDomains(b.db.Model(&model.MonitorDomain{}), req.Keyword, req.Status, req.SSLStatus, req.SSLExpiryStart, req.SSLExpiryEnd)
 	}
 	if err := filteredQuery().Count(&out.Total).Error; err != nil {
 		return nil, err
