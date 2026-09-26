@@ -3,8 +3,10 @@ package api
 import "time"
 
 type MonitorDomainListRequest struct {
-	Keyword string `json:"keyword"`
-	Status  string `json:"status"`
+	PageRequest
+	Keyword string  `json:"keyword"`
+	Status  string  `json:"status"`
+	IDs     []int64 `json:"ids"`
 }
 type MonitorDomainRequest struct {
 	ID                int64  `json:"id"`
@@ -23,6 +25,7 @@ type MonitorDomainIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
 }
 type MonitorCheckHistoryListRequest struct {
+	PageRequest
 	DomainID int64 `json:"domain_id" binding:"required"`
 }
 type MonitorCheckHistoryResponse struct {
@@ -64,12 +67,17 @@ type MonitorStatsResponse struct {
 	Abnormal int64 `json:"abnormal"`
 	Paused   int64 `json:"paused"`
 }
+type MonitorStatsRequest struct {
+	Keyword string `json:"keyword"`
+	Status  string `json:"status"`
+}
 type MonitorDomainExcelImportResponse struct {
 	Created int `json:"created"`
 	Updated int `json:"updated"`
 }
 
 type MonitorAlertChannelListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type MonitorAlertChannelConfig struct {
@@ -111,6 +119,7 @@ type MonitorAlertChannelResponse struct {
 }
 
 type MonitorAlertReceiverListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type MonitorAlertReceiverRequest struct {
@@ -154,6 +163,7 @@ type MonitorAlertReceiverResponse struct {
 }
 
 type MonitorAlertLogListRequest struct {
+	PageRequest
 	DomainID int64  `json:"domain_id"`
 	Status   string `json:"status"`
 }

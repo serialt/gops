@@ -37,7 +37,7 @@ type SSHConnection struct {
 }
 
 // ListSFTP lists the entries in a remote directory over the host's SSH connection.
-func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) ([]*api.SFTPEntryResponse, error) {
+func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) (*api.PageResponse[*api.SFTPEntryResponse], error) {
 	_, client, err := b.dialHostSSH(req.HostID)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,8 @@ func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) ([]*api.SFTPEntryResponse,
 			Modified: entry.ModTime().Format("2006/01/02 15:04:05"), Permissions: entry.Mode().String(),
 		})
 	}
-	return result, nil
+	page, total := slicePage(result, req.Page, req.Limit)
+	return &api.PageResponse[*api.SFTPEntryResponse]{List: page, Total: total}, nil
 }
 
 // UploadSFTP uploads files into a remote directory over the host's SSH connection.

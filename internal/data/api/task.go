@@ -3,6 +3,7 @@ package api
 import "time"
 
 type TaskListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type TaskJobRequest struct {

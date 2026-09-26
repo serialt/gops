@@ -18,20 +18,23 @@ func NewOrganizationBiz(db *gorm.DB) *OrganizationBiz {
 	return &OrganizationBiz{db: db}
 }
 
-func (b *OrganizationBiz) List(req *api.OrganizationQueryRequest) ([]*api.OrganizationResponse, error) {
-	var rows []model.Organization
-	query := b.db.Order("parent_id ASC, sort_order ASC, id ASC")
+func (b *OrganizationBiz) List(req *api.OrganizationQueryRequest) (*api.PageResponse[*api.OrganizationResponse], error) {
+	query := b.db.Model(&model.Organization{}).Order("parent_id ASC, sort_order ASC, id ASC")
 	if req.Keyword != "" {
 		query = query.Where("name LIKE ? OR code LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
-	if err := query.Find(&rows).Error; err != nil {
+	if req.SelectedID > 0 {
+		query = query.Where("id = ? OR parent_id = ?", req.SelectedID, req.SelectedID)
+	}
+	rows, total, err := queryPage[model.Organization](query, req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.OrganizationResponse, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, toOrganizationResponse(row))
 	}
-	return result, nil
+	return &api.PageResponse[*api.OrganizationResponse]{List: result, Total: total}, nil
 }
 
 func (b *OrganizationBiz) Create(req *api.OrganizationRequest) (*api.OrganizationResponse, error) {

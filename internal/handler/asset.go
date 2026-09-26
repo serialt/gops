@@ -69,6 +69,9 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 
 	g.POST("/assets/db-instances/options", h.DatabaseTypeOptions)
 	g.POST("/assets/db-instances/list", h.ListDBInstances)
+	g.POST("/assets/db-instances/export", h.ExportDBInstances)
+	g.POST("/assets/db-instances/template", h.DBInstanceImportTemplate)
+	g.POST("/assets/db-instances/import", h.ImportDBInstances)
 	g.POST("/assets/db-instances/create", h.CreateDBInstance)
 	g.POST("/assets/db-instances/update", h.UpdateDBInstance)
 	g.POST("/assets/db-instances/test", h.TestDBInstanceConnection)
@@ -719,6 +722,52 @@ func (h *AssetHandler) ListDBInstances(c *gin.Context) {
 	result, err := h.biz.ListDBInstances(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 500, "query database instances failed")
+		return
+	}
+	response.OK(c, result)
+}
+
+// ExportDBInstances POST /api/v1/assets/db-instances/export 导出数据库实例 Excel。
+func (h *AssetHandler) ExportDBInstances(c *gin.Context) {
+	req := new(api.DbInstanceListRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid database instance export request")
+		return
+	}
+	fileName, content, err := h.biz.ExportDBInstances(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 500, "export database instances failed")
+		return
+	}
+	writeExcelAttachment(c, fileName, content)
+}
+
+// DBInstanceImportTemplate POST /api/v1/assets/db-instances/template 下载数据库实例导入模板。
+func (h *AssetHandler) DBInstanceImportTemplate(c *gin.Context) {
+	fileName, content, err := h.biz.DBInstanceImportTemplate()
+	if err != nil {
+		response.Error(c, 500, "create database instance import template failed")
+		return
+	}
+	writeExcelAttachment(c, fileName, content)
+}
+
+// ImportDBInstances POST /api/v1/assets/db-instances/import 导入数据库实例 Excel。
+func (h *AssetHandler) ImportDBInstances(c *gin.Context) {
+	header, err := c.FormFile("file")
+	if err != nil {
+		response.Error(c, 400, "Excel 文件不能为空")
+		return
+	}
+	file, err := header.Open()
+	if err != nil {
+		response.Error(c, 400, "无法读取上传的 Excel 文件")
+		return
+	}
+	defer func() { _ = file.Close() }()
+	result, err := h.biz.ImportDBInstances(c.Request.Context(), header.Filename, file)
+	if err != nil {
+		response.Error(c, 400, err.Error())
 		return
 	}
 	response.OK(c, result)

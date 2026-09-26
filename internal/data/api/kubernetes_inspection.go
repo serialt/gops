@@ -12,6 +12,7 @@ type KubernetesInspectionIDRequest struct {
 }
 
 type KubernetesInspectionHistoryRequest struct {
+	PageRequest
 	ClusterID int64 `json:"cluster_id"`
 }
 

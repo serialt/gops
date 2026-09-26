@@ -30,7 +30,12 @@ func (h *RoleHandler) RegisterRoutes(g *gin.RouterGroup) {
 
 // List POST /api/v1/roles/list 查询角色列表。
 func (h *RoleHandler) List(c *gin.Context) {
-	result, err := h.biz.List()
+	req := new(api.RoleListRequest)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, 400, "invalid role query")
+		return
+	}
+	result, err := h.biz.List(req)
 	if err != nil {
 		response.Error(c, 500, "query roles failed")
 		return

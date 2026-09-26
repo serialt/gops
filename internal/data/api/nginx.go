@@ -3,6 +3,7 @@ package api
 import "time"
 
 type NginxSourceListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type NginxSourceRequest struct {
@@ -42,6 +43,7 @@ type NginxOverviewResponse struct {
 	ErrorRequests int64 `json:"error_requests"`
 }
 type NginxAccessLogListRequest struct {
+	PageRequest
 	SourceID int64  `json:"source_id"`
 	Keyword  string `json:"keyword"`
 }

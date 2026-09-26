@@ -24,6 +24,9 @@ func (r *AssetRepo) ListGroups(ctx context.Context, db *gorm.DB, cond *define.As
 		value := "%" + cond.Keyword + "%"
 		do = do.Where(field.Or(q.Name.Like(value), q.Code.Like(value)))
 	}
+	if cond.ParentID > 0 {
+		do = do.Where(q.ParentID.Eq(cond.ParentID))
+	}
 	return do.Order(q.SortOrder, q.ID).FindByPage(offset, limit)
 }
 
@@ -60,6 +63,12 @@ func (r *AssetRepo) ListHosts(ctx context.Context, db *gorm.DB, cond *define.Hos
 	if cond.GroupID > 0 {
 		do = do.Where(q.GroupID.Eq(cond.GroupID))
 	}
+	if cond.Status != nil {
+		do = do.Where(q.Status.Eq(*cond.Status))
+	}
+	if len(cond.IDs) > 0 {
+		do = do.Where(q.ID.In(cond.IDs...))
+	}
 	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
 }
 
@@ -88,7 +97,27 @@ func (r *AssetRepo) ListDBInstances(ctx context.Context, db *gorm.DB, cond *defi
 	if cond.GroupID > 0 {
 		do = do.Where(q.GroupID.Eq(cond.GroupID))
 	}
+	if cond.DbType != "" {
+		do = do.Where(q.DbType.Eq(cond.DbType))
+	}
+	if len(cond.IDs) > 0 {
+		do = do.Where(q.ID.In(cond.IDs...))
+	}
 	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
+}
+
+func (r *AssetRepo) GetDBInstanceByEndpoint(ctx context.Context, db *gorm.DB, dbType, host string, port int64) (*model.DbInstance, error) {
+	q := query.Use(db).DbInstance
+	return q.WithContext(ctx).Where(q.DbType.Eq(dbType), q.Host.Eq(host), q.Port.Eq(port)).First()
+}
+
+func (r *AssetRepo) CreateDBInstance(ctx context.Context, db *gorm.DB, instance *model.DbInstance) error {
+	return query.Use(db).DbInstance.WithContext(ctx).Create(instance)
+}
+
+func (r *AssetRepo) SaveDBInstance(ctx context.Context, db *gorm.DB, instance *model.DbInstance) error {
+	q := query.Use(db).DbInstance
+	return q.WithContext(ctx).Where(q.ID.Eq(instance.ID)).Save(instance)
 }
 
 func (r *AssetRepo) GetCredential(ctx context.Context, db *gorm.DB, id int64) (*model.Credential, error) {

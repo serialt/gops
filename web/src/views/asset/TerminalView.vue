@@ -267,7 +267,7 @@ async function loadSftpDirectory(path = sftpPath.value) {
   if (sftpOriginKey.value === null) return
   try {
     const result = await listSftp(sftpOriginKey.value, path)
-    sftpEntries.value = result.data.data
+    sftpEntries.value = result.data.data.list
     return true
   } catch {
     sftpEntries.value = []

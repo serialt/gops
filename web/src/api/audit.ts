@@ -1,3 +1,4 @@
+import type { PageResponse } from '@/utils/request'
 import request from '@/utils/request'
 
 export interface AuditOperationLog {
@@ -54,17 +55,17 @@ export interface AuditLoginFilter {
   end_time?: string
 }
 
-export const listAuditOperations = (filter: AuditOperationFilter = {}) =>
-  request.post<AuditOperationLog[]>('/audit/operation-logs/list', filter)
+export const listAuditOperations = (filter: AuditOperationFilter = {}, page = 1, limit = 20) =>
+  request.post<PageResponse<AuditOperationLog>>('/audit/operation-logs/list', { ...filter, page, limit })
 
 export const deleteAuditOperations = (ids: number[]) =>
   request.post<null>('/audit/operation-logs/delete', { ids })
 
-export const listAuditLogins = (filter: AuditLoginFilter = {}) =>
-  request.post<AuditLoginLog[]>('/audit/login-logs/list', filter)
+export const listAuditLogins = (filter: AuditLoginFilter = {}, page = 1, limit = 20) =>
+  request.post<PageResponse<AuditLoginLog>>('/audit/login-logs/list', { ...filter, page, limit })
 
 export const deleteAuditLogins = (ids: number[]) =>
   request.post<null>('/audit/login-logs/delete', { ids })
 
-export const listAuditData = (keyword = '') =>
-  request.post<AuditDataLog[]>('/audit/data-logs/list', { keyword })
+export const listAuditData = (keyword = '', page = 1, limit = 20) =>
+  request.post<PageResponse<AuditDataLog>>('/audit/data-logs/list', { keyword, page, limit })

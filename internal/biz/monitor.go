@@ -60,23 +60,26 @@ func (b *MonitorBiz) CheckDueDomains() {
 	}
 }
 
-func (b *MonitorBiz) ListDomains(req *api.MonitorDomainListRequest) ([]*api.MonitorDomainResponse, error) {
-	var rows []model.MonitorDomain
-	q := b.db.Order("id DESC")
+func (b *MonitorBiz) ListDomains(req *api.MonitorDomainListRequest) (*api.PageResponse[*api.MonitorDomainResponse], error) {
+	q := b.db.Model(&model.MonitorDomain{}).Order("id DESC")
 	if req.Keyword != "" {
 		q = q.Where("domain LIKE ?", "%"+req.Keyword+"%")
 	}
 	if req.Status != "" {
 		q = q.Where("status = ?", req.Status)
 	}
-	if err := q.Find(&rows).Error; err != nil {
+	if len(req.IDs) > 0 {
+		q = q.Where("id IN ?", req.IDs)
+	}
+	rows, total, err := queryPage[model.MonitorDomain](q, req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	out := make([]*api.MonitorDomainResponse, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, monitorDomainResponse(row))
 	}
-	return out, nil
+	return &api.PageResponse[*api.MonitorDomainResponse]{List: out, Total: total}, nil
 }
 func (b *MonitorBiz) CreateDomain(req *api.MonitorDomainRequest) (*api.MonitorDomainResponse, error) {
 	normalized := normalizeMonitorDomainRequest(req)
@@ -199,16 +202,26 @@ func (b *MonitorBiz) checkDomain(row *model.MonitorDomain) error {
 	}
 	return nil
 }
-func (b *MonitorBiz) DomainStats() (*api.MonitorStatsResponse, error) {
+func (b *MonitorBiz) DomainStats(req *api.MonitorStatsRequest) (*api.MonitorStatsResponse, error) {
 	out := &api.MonitorStatsResponse{}
-	if err := b.db.Model(&model.MonitorDomain{}).Count(&out.Total).Error; err != nil {
+	filteredQuery := func() *gorm.DB {
+		query := b.db.Model(&model.MonitorDomain{})
+		if req.Keyword != "" {
+			query = query.Where("domain LIKE ?", "%"+req.Keyword+"%")
+		}
+		if req.Status != "" {
+			query = query.Where("status = ?", req.Status)
+		}
+		return query
+	}
+	if err := filteredQuery().Count(&out.Total).Error; err != nil {
 		return nil, err
 	}
 	for _, item := range []struct {
 		status string
 		into   *int64
 	}{{"normal", &out.Normal}, {"abnormal", &out.Abnormal}, {"paused", &out.Paused}} {
-		if err := b.db.Model(&model.MonitorDomain{}).Where("status = ?", item.status).Count(item.into).Error; err != nil {
+		if err := filteredQuery().Where("status = ?", item.status).Count(item.into).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -216,19 +229,21 @@ func (b *MonitorBiz) DomainStats() (*api.MonitorStatsResponse, error) {
 }
 
 // ListCheckHistory returns recent request logs for one domain monitor.
-func (b *MonitorBiz) ListCheckHistory(req *api.MonitorCheckHistoryListRequest) ([]*api.MonitorCheckHistoryResponse, error) {
+func (b *MonitorBiz) ListCheckHistory(req *api.MonitorCheckHistoryListRequest) (*api.PageResponse[*api.MonitorCheckHistoryResponse], error) {
 	if err := b.pruneCheckHistory(req.DomainID); err != nil {
 		return nil, err
 	}
 	var rows []model.MonitorCheckHistory
-	if err := b.db.Where("domain_id = ?", req.DomainID).Order("checked_at DESC, id DESC").Limit(30).Find(&rows).Error; err != nil {
+	query := b.db.Model(&model.MonitorCheckHistory{}).Where("domain_id = ?", req.DomainID).Order("checked_at DESC, id DESC")
+	rows, total, err := queryPage[model.MonitorCheckHistory](query, req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.MonitorCheckHistoryResponse, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, &api.MonitorCheckHistoryResponse{ID: row.ID, DomainID: row.DomainID, Status: row.Status, ResponseTime: row.ResponseTime, SSLValid: row.SslValid, SSLExpiry: row.SslExpiry, StatusCode: row.StatusCode, ErrorMessage: row.ErrorMessage, CheckedAt: row.CheckedAt})
 	}
-	return result, nil
+	return &api.PageResponse[*api.MonitorCheckHistoryResponse]{List: result, Total: total}, nil
 }
 
 func (b *MonitorBiz) pruneCheckHistory(domainID int64) error {
@@ -394,13 +409,13 @@ func monitorError(err error) error {
 	return err
 }
 
-func (b *MonitorBiz) ListChannels(req *api.MonitorAlertChannelListRequest) ([]*api.MonitorAlertChannelResponse, error) {
-	var rows []model.MonitorAlertChannel
-	q := b.db.Order("id DESC")
+func (b *MonitorBiz) ListChannels(req *api.MonitorAlertChannelListRequest) (*api.PageResponse[*api.MonitorAlertChannelResponse], error) {
+	q := b.db.Model(&model.MonitorAlertChannel{}).Order("id DESC")
 	if req.Keyword != "" {
 		q = q.Where("name LIKE ?", "%"+req.Keyword+"%")
 	}
-	if err := q.Find(&rows).Error; err != nil {
+	rows, total, err := queryPage[model.MonitorAlertChannel](q, req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	out := make([]*api.MonitorAlertChannelResponse, 0, len(rows))
@@ -411,7 +426,7 @@ func (b *MonitorBiz) ListChannels(req *api.MonitorAlertChannelListRequest) ([]*a
 		}
 		out = append(out, item)
 	}
-	return out, nil
+	return &api.PageResponse[*api.MonitorAlertChannelResponse]{List: out, Total: total}, nil
 }
 func (b *MonitorBiz) SaveChannel(req *api.MonitorAlertChannelRequest) (*api.MonitorAlertChannelResponse, error) {
 	if err := validateAlertChannel(req); err != nil {
@@ -513,20 +528,20 @@ func (b *MonitorBiz) DeleteChannel(req *api.MonitorAlertChannelIDRequest) error 
 	}
 	return nil
 }
-func (b *MonitorBiz) ListReceivers(req *api.MonitorAlertReceiverListRequest) ([]*api.MonitorAlertReceiverResponse, error) {
-	var rows []model.MonitorAlertReceiver
-	q := b.db.Order("id DESC")
+func (b *MonitorBiz) ListReceivers(req *api.MonitorAlertReceiverListRequest) (*api.PageResponse[*api.MonitorAlertReceiverResponse], error) {
+	q := b.db.Model(&model.MonitorAlertReceiver{}).Order("id DESC")
 	if req.Keyword != "" {
 		q = q.Where("name LIKE ? OR email LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
-	if err := q.Find(&rows).Error; err != nil {
+	rows, total, err := queryPage[model.MonitorAlertReceiver](q, req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	out := make([]*api.MonitorAlertReceiverResponse, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, monitorAlertReceiverResponse(r))
 	}
-	return out, nil
+	return &api.PageResponse[*api.MonitorAlertReceiverResponse]{List: out, Total: total}, nil
 }
 func (b *MonitorBiz) SaveReceiver(req *api.MonitorAlertReceiverRequest) (*api.MonitorAlertReceiverResponse, error) {
 	if err := validateAlertReceiver(req); err != nil {
@@ -581,21 +596,21 @@ func (b *MonitorBiz) DeleteReceiver(req *api.MonitorAlertReceiverIDRequest) erro
 	}
 	return nil
 }
-func (b *MonitorBiz) ListLogs(req *api.MonitorAlertLogListRequest) ([]*api.MonitorAlertLogResponse, error) {
-	var rows []model.MonitorAlertLog
-	q := b.db.Order("sent_at DESC")
+func (b *MonitorBiz) ListLogs(req *api.MonitorAlertLogListRequest) (*api.PageResponse[*api.MonitorAlertLogResponse], error) {
+	q := b.db.Model(&model.MonitorAlertLog{}).Order("sent_at DESC")
 	if req.DomainID > 0 {
 		q = q.Where("domain_id = ?", req.DomainID)
 	}
 	if req.Status != "" {
 		q = q.Where("status = ?", req.Status)
 	}
-	if err := q.Find(&rows).Error; err != nil {
+	rows, total, err := queryPage[model.MonitorAlertLog](q, req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	out := make([]*api.MonitorAlertLogResponse, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, &api.MonitorAlertLogResponse{ID: r.ID, DomainID: r.DomainID, AlertType: r.AlertType, Status: r.Status, Message: r.Message, ChannelType: r.ChannelType, ErrorMessage: r.ErrorMessage, SentAt: r.SentAt})
 	}
-	return out, nil
+	return &api.PageResponse[*api.MonitorAlertLogResponse]{List: out, Total: total}, nil
 }

@@ -23,6 +23,7 @@ const organizationPaneStartWidth = ref(200)
 const keyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(20)
+const totalUsers = ref(0)
 const selectedUsers = ref<User[]>([])
 const dialogVisible = ref(false)
 const editingID = ref<number | null>(null)
@@ -56,16 +57,8 @@ const organizationTree = computed(() => {
   organizations.value.forEach(item => item.parent_id ? map.get(item.parent_id)?.children.push(map.get(item.id)) : roots.push(map.get(item.id)))
   return roots
 })
-const visibleUsers = computed(() => {
-  if (!activeOrganizationId.value) return users.value
-  return users.value.filter(user => user.organizations.some(organization => organization.id === activeOrganizationId.value))
-})
-const pagedUsers = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return visibleUsers.value.slice(start, start + pageSize.value)
-})
 watch(organizationKeyword, value => organizationTreeRef.value?.filter(value))
-watch(keyword, () => { loadUsers() })
+watch([keyword, activeOrganizationId], () => { currentPage.value = 1; void loadUsers() })
 
 function filterOrganizationNode(value: string, data: Organization) {
   if (!value) return true
@@ -74,22 +67,21 @@ function filterOrganizationNode(value: string, data: Organization) {
 }
 
 async function load() {
-  currentPage.value = 1
   loading.value = true
   try {
-    const [usersRes, rolesRes, organizationsRes] = await Promise.all([getUsers(keyword.value, activeOrganizationId.value), getRoles(), getOrganizations()])
-    users.value = usersRes.data.data
-    roles.value = rolesRes.data.data
-    organizations.value = organizationsRes.data.data
+    const [rolesRes, organizationsRes] = await Promise.all([getRoles(1, 1000), getOrganizations('', 1, 1000)])
+    roles.value = rolesRes.data.data.list
+    organizations.value = organizationsRes.data.data.list
+    await loadUsers()
   } finally { loading.value = false }
 }
 
 async function loadUsers() {
-  currentPage.value = 1
   loading.value = true
   try {
-    const usersRes = await getUsers(keyword.value, activeOrganizationId.value)
-    users.value = usersRes.data.data
+    const usersRes = await getUsers(keyword.value, activeOrganizationId.value, currentPage.value, pageSize.value)
+    users.value = usersRes.data.data.list
+    totalUsers.value = usersRes.data.data.total
   } finally { loading.value = false }
 }
 
@@ -182,10 +174,10 @@ async function batchRemoveUsers() {
 
 onMounted(load)
 
-function handleOrganizationNodeClick(node: Organization) { activeOrganizationId.value = node.id; loadUsers() }
+function handleOrganizationNodeClick(node: Organization) { activeOrganizationId.value = node.id }
 function userIndex(index: number) { return (currentPage.value - 1) * pageSize.value + index + 1 }
-function handlePageChange(page: number) { currentPage.value = page }
-function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1 }
+function handlePageChange(page: number) { currentPage.value = page; void loadUsers() }
+function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1; void loadUsers() }
 
 function startOrganizationPaneDrag(event: PointerEvent) {
   if (event.button !== 0) return
@@ -247,7 +239,7 @@ function toggleOrganizationPane() {
           </div>
         </div>
 
-        <AppDataGrid v-loading="loading" :row-data="pagedUsers" :column-defs="userColumnDefs"
+        <AppDataGrid v-loading="loading" :row-data="users" :column-defs="userColumnDefs"
           @selection-changed="handleUserSelectionChanged" />
         <!--
         <el-table-column label="序号" type="index" :index="userIndex" width="70" :resizable="true" />
@@ -275,8 +267,8 @@ function toggleOrganizationPane() {
 </el-table>
 -->
         <div class="pagination-bar">
-          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100, 500, 1000]"
-            :total="visibleUsers.length" layout="total, sizes, prev, pager, next, jumper"
+          <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+            :page-sizes="[20, 50, 100, 500, 1000]" :total="totalUsers" layout="total, sizes, prev, pager, next, jumper"
             @current-change="handlePageChange" @size-change="handlePageSizeChange" />
         </div>
       </div>
@@ -287,7 +279,8 @@ function toggleOrganizationPane() {
           <el-form-item :label="editingID ? '新密码' : '密码'" :required="!editingID"><el-input v-model="form.password"
               type="password" show-password :placeholder="editingID ? '留空表示不修改' : ''" /></el-form-item>
           <el-form-item label="昵称" required><el-input v-model="form.nickname" /></el-form-item>
-          <el-form-item label="邮箱"><el-input v-model="form.email" type="email" placeholder="未填写时跳过登录邮件验证" /></el-form-item>
+          <el-form-item label="邮箱"><el-input v-model="form.email" type="email"
+              placeholder="未填写时跳过登录邮件验证" /></el-form-item>
           <el-form-item label="角色"><el-select v-model="form.role_ids" multiple style="width: 100%"><el-option
                 v-for="role in roles" :key="role.id" :label="role.name" :value="role.id" /></el-select></el-form-item>
           <el-form-item label="所属组织"><el-tree-select v-model="form.organization_ids" :data="organizationTree"

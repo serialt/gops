@@ -24,23 +24,23 @@ func NewUserBiz(db *gorm.DB, casbinService *casbinx.Service, repo *rbac.RbacRepo
 	return &UserBiz{db: db, casbin: casbinService, repo: repo}
 }
 
-func (b *UserBiz) List(req *api.UserListRequest) ([]*api.UserResponse, error) {
-	var users []model.User
-	query := b.db.Preload("Roles").Preload("Organizations").Order("id DESC")
+func (b *UserBiz) List(req *api.UserListRequest) (*api.PageResponse[*api.UserResponse], error) {
+	query := b.db.Model(&model.User{}).Preload("Roles").Preload("Organizations").Order("id DESC")
 	if req.Keyword != "" {
 		query = query.Where("username LIKE ? OR nickname LIKE ? OR email LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
 	}
 	if req.OrganizationID > 0 {
-		query = query.Joins("JOIN organization_user ON organization_user.user_id = \"user\".id").Where("organization_user.organization_id = ?", req.OrganizationID).Group("\"user\".id")
+		query = query.Where("EXISTS (SELECT 1 FROM organization_user WHERE organization_user.user_id = \"user\".id AND organization_user.organization_id = ?)", req.OrganizationID)
 	}
-	if err := query.Find(&users).Error; err != nil {
+	users, total, err := queryPage[model.User](query, req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.UserResponse, 0, len(users))
 	for _, user := range users {
 		result = append(result, toUserResponse(user))
 	}
-	return result, nil
+	return &api.PageResponse[*api.UserResponse]{List: result, Total: total}, nil
 }
 
 func (b *UserBiz) Create(req *api.UserRequest) (*api.UserResponse, error) {

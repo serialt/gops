@@ -13,6 +13,9 @@ interface CastHeader { version: number; width: number; height: number; timestamp
 interface CastEvent { time: number; type: string; data: string }
 
 const rows = ref<TerminalSession[]>([])
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 const keyword = ref('')
 const sessionType = ref('')
 const recording = ref('')
@@ -59,7 +62,7 @@ function assetCell(row: TerminalSession) {
   return cell
 }
 const columns = computed<ColDef[]>(() => [
-  { field: 'id', headerName: 'ID', width: 64 },
+  { headerName: '序号', valueGetter: (p: any) => (page.value - 1) * pageSize.value + (p.node?.rowIndex ?? 0) + 1, width: 64 },
   { field: 'session_type', headerName: '会话类型', width: 112, cellRenderer: (p: any) => { const tag = document.createElement('span'); tag.className = `audit-type ${p.value === 'database' ? 'database' : 'ssh'}`; tag.textContent = p.value === 'database' ? '数据库' : 'SSH'; return tag } },
   { headerName: '资产信息', minWidth: 170, cellRenderer: (p: any) => assetCell(p.data) },
   { field: 'username', headerName: '操作用户', minWidth: 112, valueFormatter: (p: any) => p.value || `用户 #${p.data.user_id}` },
@@ -70,7 +73,7 @@ const columns = computed<ColDef[]>(() => [
   { field: 'started_at', headerName: '创建时间', minWidth: 180, valueFormatter: (p: any) => p.value ? String(p.value).replace('T', ' ').replace(/\+.*$/, '').slice(0, 19) : '—' },
   { headerName: '操作', pinned: 'right', width: 96, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'audit-actions'; wrap.append(iconButton('查看录制', 'view', VideoPlay, () => viewRecording(p.data)), iconButton('删除会话', 'delete', Delete, () => remove(p.data))); return wrap } },
 ])
-async function load() { const { data } = await listTerminalSessions(keyword.value, sessionType.value); rows.value = data.data }
+async function load() { const { data } = await listTerminalSessions(keyword.value, sessionType.value, page.value, pageSize.value); rows.value = data.data.list; total.value = data.data.total }
 async function viewRecording(row: TerminalSession) {
   stopPlayback()
   const { data } = await getTerminalSessionRecording(row.id)
@@ -194,9 +197,13 @@ onBeforeUnmount(stopPlayback)
         <h2 class="page-title">终端录制</h2>
       </div>
       <div class="filters"><el-input v-model="keyword" placeholder="搜索用户、主机或数据库名称/IP..." clearable
-          @input="load" /><el-select v-model="sessionType" placeholder="会话类型" clearable @change="load"><el-option
-            label="SSH" value="ssh" /><el-option label="数据库" value="database" /></el-select></div>
-      <AppDataGrid :row-data="rows" :column-defs="columns" pagination :bulk-delete="batchRemove" />
+          @input="page = 1; load()" /><el-select v-model="sessionType" placeholder="会话类型" clearable
+          @change="page = 1; load()"><el-option label="SSH" value="ssh" /><el-option label="数据库"
+            value="database" /></el-select></div>
+      <AppDataGrid :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
+        :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove"
+        @page-change="value => { page = value; void load() }"
+        @page-size-change="value => { pageSize = value; page = 1; void load() }" />
     </div><el-dialog v-model="recordingVisible" class="recording-dialog" title="会话录制" width="80%" align-center
       @closed="closePlayback">
       <div v-if="castHeader" class="recording-player">

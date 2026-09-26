@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Delete, Edit, Monitor, Refresh, Search } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectDBInstanceInfo, createCredential, createDBInstance, deleteDBInstance, getDatabaseTypeOptions, listAssetGroups, listCredentials, listDBInstances, testDBInstanceConnection, type AssetGroup, type Credential, type DatabaseTypeOption, type DbInstance, updateDBInstance } from '@/api/asset'
+import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Delete, Download, Edit, Monitor, Refresh, Search, Upload } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectDBInstanceInfo, createCredential, createDBInstance, deleteDBInstance, downloadDBInstanceImportTemplate, exportDBInstances, getDatabaseTypeOptions, importDBInstances, listAssetGroups, listCredentials, listDBInstances, testDBInstanceConnection, type AssetGroup, type Credential, type DatabaseTypeOption, type DbInstance, updateDBInstance } from '@/api/asset'
 import { useAuthStore } from '@/stores/auth'
+import { downloadAttachment } from '@/utils/download'
 interface AssetTreeNode { id: number; label: string; count: number; children: AssetTreeNode[] }
 const rows = ref<DbInstance[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const databaseTypes = ref<DatabaseTypeOption[]>([]); const keyword = ref(''); const typeFilter = ref(''); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const testingConnection = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ group_id: number | null; name: string; db_type: string; host: string; port: number | null; version: string; credential_id: number | null; tags: string; description: string; status: boolean }>({ group_id: null, name: '', db_type: '', host: '', port: null, version: '', credential_id: null, tags: '', description: '', status: true })
 const auth = useAuthStore()
+const excelInput = ref<HTMLInputElement>()
+const excelBusy = ref(false)
+const selectedInstances = ref<DbInstance[]>([])
 const tagItems = computed(() => form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
-const visibleRows = computed(() => rows.value.filter(row => (!selectedGroupID.value || row.group_id === selectedGroupID.value) && (!typeFilter.value || row.db_type === typeFilter.value)))
 const treeData = computed<AssetTreeNode[]>(() => { const counts = new Map<number, number>(); rows.value.forEach(row => counts.set(row.group_id, (counts.get(row.group_id) || 0) + 1)); const nodes = new Map<number, AssetTreeNode>(); const roots: AssetTreeNode[] = []; groups.value.forEach(group => nodes.set(group.id, { id: group.id, label: group.name, count: counts.get(group.id) || 0, children: [] })); groups.value.forEach(group => { const node = nodes.get(group.id); const parent = nodes.get(group.parent_id); if (!node) return; if (group.parent_id && parent) parent.children.push(node); else roots.push(node) }); return roots })
 function actionIcon(title: string, kind: string, icon: Component, fn: () => void) { const root = document.createElement('span'); render(h(ElTooltip, { content: title, placement: 'top', showAfter: 250 }, { default: () => h('button', { type: 'button', 'aria-label': title, class: `db-action-icon ${kind}`, onClick: fn }, [h('span', { class: 'el-icon' }, [h(icon)])]) }), root); return root }
 function actionRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'db-actions'; if (auth.hasPermission('POST /api/v1/assets/db-instances/collect')) wrap.append(actionIcon('采集信息', 'collect', Refresh, () => { void collect(p.data) })); if (auth.hasPermission('POST /api/v1/assets/db-instances/update')) wrap.append(actionIcon('编辑', 'edit', Edit, () => edit(p.data))); if (auth.hasPermission('POST /api/v1/assets/db-instances/delete')) wrap.append(actionIcon('删除', 'delete', Delete, () => remove(p.data))); return wrap }
 function badgeRenderer(kind: string, value: string) { const tag = document.createElement('span'); tag.className = `db-badge ${kind}`; tag.textContent = value || '-'; return tag }
-const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '实例名称', minWidth: 130 }, { field: 'db_type', headerName: '类型', width: 110, cellRenderer: (p: any) => badgeRenderer('type', databaseTypes.value.find(item => item.value === p.value)?.label ?? p.value) }, { field: 'host', headerName: '地址', minWidth: 140 }, { field: 'port', headerName: '端口', width: 80, valueFormatter: p => p.value ? String(p.value) : '—' }, { field: 'version', headerName: '版本', width: 150, cellRenderer: (p: any) => badgeRenderer('version', p.value) }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value ? '' : ' is-disabled'}">${p.value ? '在线' : '离线'}</span>` }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: actionRenderer }])
-async function load(reset = false) { if (reset) page.value = 1; const { data } = await listDBInstances(keyword.value, selectedGroupID.value || 0, page.value, pageSize.value); rows.value = data.data.list; total.value = data.data.total }
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((page.value - 1) * pageSize.value + (p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '实例名称', minWidth: 130 }, { field: 'db_type', headerName: '类型', width: 110, cellRenderer: (p: any) => badgeRenderer('type', databaseTypes.value.find(item => item.value === p.value)?.label ?? p.value) }, { field: 'host', headerName: '地址', minWidth: 140 }, { field: 'port', headerName: '端口', width: 80, valueFormatter: p => p.value ? String(p.value) : '—' }, { field: 'version', headerName: '版本', width: 150, cellRenderer: (p: any) => badgeRenderer('version', p.value) }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => `<span class="grid-status${p.value ? '' : ' is-disabled'}">${p.value ? '在线' : '离线'}</span>` }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: actionRenderer }])
+async function load(reset = false) { if (reset) page.value = 1; const { data } = await listDBInstances(keyword.value, selectedGroupID.value || 0, page.value, pageSize.value, typeFilter.value); rows.value = data.data.list; total.value = data.data.total }
 function changePage(value: number) { page.value = value; void load() }
 function changePageSize(value: number) { pageSize.value = value; page.value = 1; void load() }
 async function loadCredentials() { const { data } = await listCredentials('', 1, 1000); credentials.value = data.data.list }
@@ -34,6 +37,37 @@ async function batchRemove(selectedRows: unknown[]) {
     ElMessage.success('批量删除成功')
     await load()
 }
+async function exportExcel() {
+    if (!auth.hasPermission('POST /api/v1/assets/db-instances/export')) return
+    excelBusy.value = true
+    try {
+        const response = await exportDBInstances(keyword.value, selectedGroupID.value || 0, typeFilter.value, selectedInstances.value.map(instance => instance.id))
+        downloadAttachment(response.data, response.headers['content-disposition'], '数据库管理.xlsx')
+        ElMessage.success('数据库 Excel 已导出')
+    } finally { excelBusy.value = false }
+}
+async function handleExcelCommand(command: string) {
+    if (command === 'template') {
+        if (!auth.hasPermission('POST /api/v1/assets/db-instances/template')) return
+        excelBusy.value = true
+        try {
+            const response = await downloadDBInstanceImportTemplate()
+            downloadAttachment(response.data, response.headers['content-disposition'], '数据库导入模板.xlsx')
+        } finally { excelBusy.value = false }
+    } else if (command === 'import') excelInput.value?.click()
+}
+async function importExcel(event: Event) {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0]
+    if (!file) return
+    if (!auth.hasPermission('POST /api/v1/assets/db-instances/import')) { input.value = ''; return }
+    excelBusy.value = true
+    try {
+        const { data } = await importDBInstances(file)
+        await load(true)
+        ElMessage.success(`导入完成：新增 ${data.data.created} 个，更新 ${data.data.updated} 个`)
+    } finally { excelBusy.value = false; input.value = '' }
+}
 async function collect(row: DbInstance) { await collectDBInstanceInfo(row.id); ElMessage.success(`${row.name} 状态和版本采集成功`); await load() }
 function openTerminal() { window.open('/assets/terminal', '_blank', 'noopener,noreferrer') }
 function selectTreeNode(node: AssetTreeNode) { selectedGroupID.value = node.id; void load(true) }
@@ -43,6 +77,7 @@ function moveTreePane(event: PointerEvent) { if (treePaneDragging.value) treePan
 function stopTreePaneDrag() { treePaneDragging.value = false; if (treePaneWidth.value < 90) treePaneWidth.value = 0; document.removeEventListener('pointermove', moveTreePane); document.removeEventListener('pointerup', stopTreePaneDrag) }
 function toggleTreePane() { treePaneWidth.value = treePaneWidth.value === 0 ? 200 : 0 }
 watch(treeKeyword, value => assetTreeRef.value?.filter(value))
+watch(typeFilter, () => { void load(true) })
 onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDatabaseTypes(), listAssetGroups('', 1, 1000).then(({ data }) => { groups.value = data.data.list })]) })
 </script>
 <template>
@@ -72,13 +107,27 @@ onMounted(async () => { await Promise.all([load(), loadCredentials(), loadDataba
                             class="type-filter" placeholder="数据库类型" clearable><el-option v-for="item in databaseTypes"
                                 :key="item.value" :label="item.label" :value="item.value" /></el-select></div>
                     <div class="toolbar-actions"><el-button :icon="Monitor"
-                            @click="openTerminal">终端</el-button><el-button type="primary" class="primary-btn"
+                            @click="openTerminal">终端</el-button><el-dropdown
+                            v-if="auth.hasPermission('POST /api/v1/assets/db-instances/export') || auth.hasPermission('POST /api/v1/assets/db-instances/import') || auth.hasPermission('POST /api/v1/assets/db-instances/template')"
+                            split-button :loading="excelBusy"
+                            :disabled="!auth.hasPermission('POST /api/v1/assets/db-instances/export')"
+                            @click="exportExcel" @command="handleExcelCommand">导出 Excel
+                            <template #dropdown><el-dropdown-menu><el-dropdown-item
+                                        v-if="auth.hasPermission('POST /api/v1/assets/db-instances/template')"
+                                        command="template" :icon="Download">下载 Excel
+                                        导入模板</el-dropdown-item><el-dropdown-item
+                                        v-if="auth.hasPermission('POST /api/v1/assets/db-instances/import')"
+                                        command="import" :icon="Upload">从 Excel
+                                        导入</el-dropdown-item></el-dropdown-menu></template>
+                        </el-dropdown><input ref="excelInput" type="file" accept=".xlsx" hidden
+                            @change="importExcel" /><el-button type="primary" class="primary-btn"
                             @click="create">新增数据库</el-button></div>
                 </div>
-                <AppDataGrid class="db-grid" :row-data="visibleRows" :column-defs="columns" pagination server-pagination
+                <AppDataGrid class="db-grid" :row-data="rows" :column-defs="columns" pagination server-pagination
                     :bulk-delete="auth.hasPermission('POST /api/v1/assets/db-instances/delete') ? batchRemove : undefined"
                     :total="total" :current-page="page" :page-size="pageSize" @page-change="changePage"
-                    @page-size-change="changePageSize" />
+                    @page-size-change="changePageSize"
+                    @selection-changed="selectedInstances = $event as DbInstance[]" />
             </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑数据库' : '新增数据库'" width="60%">
                 <el-form :model="form" label-width="92px" class="db-form">
                     <el-row :gutter="16"><el-col :xs="24" :sm="12"><el-form-item label="所属分组"><el-select

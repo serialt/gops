@@ -13,6 +13,7 @@ const permissionDrawer = ref(false)
 const editingID = ref<number | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(20)
+const totalRoles = ref(0)
 const selectedRoles = ref<Role[]>([])
 const selectedRole = ref<Role | null>(null)
 const checkedKeys = ref<string[]>([])
@@ -34,11 +35,6 @@ const grouped = computed(() => catalog.value.reduce<Record<string, Permission[]>
   group.push(item)
   return result
 }, {}))
-const pagedRoles = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return roles.value.slice(start, start + pageSize.value)
-})
-
 function groupKeys(group: string) {
   return (grouped.value[group] ?? []).map(item => item.key)
 }
@@ -72,12 +68,14 @@ function clearPermissions() {
 
 async function load() {
   currentPage.value = 1
-  const [rolesRes, catalogRes] = await Promise.all([getRoles(), getPermissionCatalog()])
-  roles.value = rolesRes.data.data
+  const [rolesRes, catalogRes] = await Promise.all([getRoles(currentPage.value, pageSize.value), getPermissionCatalog()])
+  roles.value = rolesRes.data.data.list
+  totalRoles.value = rolesRes.data.data.total
   catalog.value = catalogRes.data.data
 }
 
-function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1 }
+function handlePageChange(page: number) { currentPage.value = page; void load() }
+function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1; void load() }
 
 function openCreate() {
   editingID.value = null
@@ -149,11 +147,11 @@ onMounted(load)
         </div>
       </div>
 
-      <AppDataGrid :row-data="pagedRoles" :column-defs="roleColumnDefs"
-        @selection-changed="handleRoleSelectionChanged" />
+      <AppDataGrid :row-data="roles" :column-defs="roleColumnDefs" @selection-changed="handleRoleSelectionChanged" />
       <div class="pagination-bar">
-        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100, 500, 1000]"
-          :total="roles.length" layout="total, sizes, prev, pager, next, jumper" @size-change="handlePageSizeChange" />
+        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
+          :page-sizes="[20, 50, 100, 500, 1000]" :total="totalRoles" layout="total, sizes, prev, pager, next, jumper"
+          @current-change="handlePageChange" @size-change="handlePageSizeChange" />
       </div>
     </div>
 
@@ -184,7 +182,7 @@ onMounted(load)
             </el-checkbox>
             <span class="group-count">{{groupKeys(group).filter(key => checkedKeys.includes(key)).length}}/{{
               items.length
-              }}</span>
+            }}</span>
           </div>
           <div class="permission-list">
             <el-checkbox v-for="item in items" :key="item.key" :model-value="checkedKeys.includes(item.key)"

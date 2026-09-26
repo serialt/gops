@@ -19,16 +19,16 @@ func NewRoleBiz(db *gorm.DB, casbinService *casbinx.Service) *RoleBiz {
 	return &RoleBiz{db: db, casbin: casbinService}
 }
 
-func (b *RoleBiz) List() ([]*api.RoleResponse, error) {
-	var roles []model.Role
-	if err := b.db.Order("id ASC").Find(&roles).Error; err != nil {
+func (b *RoleBiz) List(req *api.RoleListRequest) (*api.PageResponse[*api.RoleResponse], error) {
+	roles, total, err := queryPage[model.Role](b.db.Model(&model.Role{}).Order("id ASC"), req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.RoleResponse, 0, len(roles))
 	for _, role := range roles {
 		result = append(result, toRoleResponse(role))
 	}
-	return result, nil
+	return &api.PageResponse[*api.RoleResponse]{List: result, Total: total}, nil
 }
 
 func (b *RoleBiz) Create(req *api.RoleRequest) (*api.RoleResponse, error) {

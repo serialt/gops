@@ -59,7 +59,7 @@ func (b *KubernetesBiz) client(clusterID int64) (*kubernetes.Clientset, error) {
 	}
 	return value.(*kubernetes.Clientset), nil
 }
-func (b *KubernetesBiz) Nodes(r *api.KubernetesResourceListRequest) ([]*api.KubernetesNodeResponse, error) {
+func (b *KubernetesBiz) Nodes(r *api.KubernetesResourceListRequest) (*api.PageResponse[*api.KubernetesNodeResponse], error) {
 	c, e := b.client(r.ClusterID)
 	if e != nil {
 		return nil, e
@@ -102,7 +102,8 @@ func (b *KubernetesBiz) Nodes(r *api.KubernetesResourceListRequest) ([]*api.Kube
 		}
 		o = append(o, item)
 	}
-	return o, nil
+	page, total := slicePage(o, r.Page, r.Limit)
+	return &api.PageResponse[*api.KubernetesNodeResponse]{List: page, Total: total}, nil
 }
 func (b *KubernetesBiz) UpdateNode(r *api.KubernetesNodeUpdateRequest) (*api.KubernetesNodeResponse, error) {
 	c, err := b.client(r.ClusterID)
@@ -209,7 +210,7 @@ func nodeResponse(n corev1.Node) *api.KubernetesNodeResponse {
 	return &api.KubernetesNodeResponse{Name: n.Name, Status: status, Roles: strings.Join(roles, ","), Age: utils.CalculateAge(n.CreationTimestamp.Time), Version: n.Status.NodeInfo.KubeletVersion, InternalIP: ip, ExternalIP: externalIP, OSImage: n.Status.NodeInfo.OSImage, KernelVersion: n.Status.NodeInfo.KernelVersion, ContainerRuntime: n.Status.NodeInfo.ContainerRuntimeVersion, Labels: n.Labels, Annotations: n.Annotations, CPUCapacity: n.Status.Capacity.Cpu().String(), MemoryCapacity: n.Status.Capacity.Memory().String(), PodCapacity: int(n.Status.Capacity.Pods().Value()), Schedulable: !n.Spec.Unschedulable, TaintCount: len(n.Spec.Taints), Taints: taints, PodCIDR: n.Spec.PodCIDR, ProviderID: n.Spec.ProviderID, Conditions: conditions, CreatedAt: n.CreationTimestamp.Format("2006-01-02 15:04:05")}
 }
 
-func (b *KubernetesBiz) Pods(r *api.KubernetesResourceListRequest) ([]*api.PodInfo, error) {
+func (b *KubernetesBiz) Pods(r *api.KubernetesResourceListRequest) (*api.PageResponse[*api.PodInfo], error) {
 	c, err := b.client(r.ClusterID)
 	if err != nil {
 		return nil, err
@@ -240,9 +241,10 @@ func (b *KubernetesBiz) Pods(r *api.KubernetesResourceListRequest) ([]*api.PodIn
 		}
 		out = append(out, &api.PodInfo{Name: p.Name, Namespace: p.Namespace, Ready: fmt.Sprintf("%d/%d", ready, len(p.Spec.Containers)), Status: string(p.Status.Phase), Phase: string(p.Status.Phase), Restarts: restarts, Age: utils.CalculateAge(p.CreationTimestamp.Time), IP: p.Status.PodIP, Node: p.Spec.NodeName, Labels: p.Labels, Containers: containers})
 	}
-	return out, nil
+	page, total := slicePage(out, r.Page, r.Limit)
+	return &api.PageResponse[*api.PodInfo]{List: page, Total: total}, nil
 }
-func (b *KubernetesBiz) Namespaces(r *api.KubernetesResourceListRequest) ([]*api.KubernetesNamespaceResponse, error) {
+func (b *KubernetesBiz) Namespaces(r *api.KubernetesResourceListRequest) (*api.PageResponse[*api.KubernetesNamespaceResponse], error) {
 	c, e := b.client(r.ClusterID)
 	if e != nil {
 		return nil, e
@@ -266,7 +268,8 @@ func (b *KubernetesBiz) Namespaces(r *api.KubernetesResourceListRequest) ([]*api
 			Labels:    x.Labels,
 			CreatedAt: x.CreationTimestamp.Format("2006-01-02 15:04:05")})
 	}
-	return o, nil
+	page, total := slicePage(o, r.Page, r.Limit)
+	return &api.PageResponse[*api.KubernetesNamespaceResponse]{List: page, Total: total}, nil
 }
 func (b *KubernetesBiz) UpdateNamespace(r *api.KubernetesNamespaceUpdateRequest) (*api.KubernetesNamespaceResponse, error) {
 	c, err := b.client(r.ClusterID)
@@ -284,7 +287,7 @@ func (b *KubernetesBiz) UpdateNamespace(r *api.KubernetesNamespaceUpdateRequest)
 	}
 	return &api.KubernetesNamespaceResponse{Name: updated.Name, Status: string(updated.Status.Phase), Age: utils.CalculateAge(updated.CreationTimestamp.Time), Labels: updated.Labels, CreatedAt: updated.CreationTimestamp.Format("2006-01-02 15:04:05")}, nil
 }
-func (b *KubernetesBiz) Workloads(r *api.KubernetesResourceListRequest) ([]*api.KubernetesWorkloadResponse, error) {
+func (b *KubernetesBiz) Workloads(r *api.KubernetesResourceListRequest) (*api.PageResponse[*api.KubernetesWorkloadResponse], error) {
 	c, e := b.client(r.ClusterID)
 	if e != nil {
 		return nil, e
@@ -345,7 +348,8 @@ func (b *KubernetesBiz) Workloads(r *api.KubernetesResourceListRequest) ([]*api.
 		}
 		appendWorkload(x.Namespace, x.Name, "CronJob", fmt.Sprintf("%d active", len(x.Status.Active)), status, x.CreationTimestamp)
 	}
-	return o, nil
+	page, total := slicePage(o, r.Page, r.Limit)
+	return &api.PageResponse[*api.KubernetesWorkloadResponse]{List: page, Total: total}, nil
 }
 
 func (b *KubernetesBiz) WorkloadStats(r *api.KubernetesResourceListRequest) (*api.KubernetesWorkloadStatsResponse, error) {
@@ -440,7 +444,7 @@ func (b *KubernetesBiz) Stats(r *api.KubernetesClusterStatsRequest) (*api.Cluste
 	return result, nil
 }
 
-func (b *KubernetesBiz) Events(r *api.KubernetesResourceListRequest) ([]*api.EventInfo, error) {
+func (b *KubernetesBiz) Events(r *api.KubernetesResourceListRequest) (*api.PageResponse[*api.EventInfo], error) {
 	c, err := b.client(r.ClusterID)
 	if err != nil {
 		return nil, err
@@ -460,7 +464,8 @@ func (b *KubernetesBiz) Events(r *api.KubernetesResourceListRequest) ([]*api.Eve
 		}
 		out = append(out, &api.EventInfo{Type: x.Type, Reason: x.Reason, Message: x.Message, Source: x.Source.Component, Count: x.Count, FirstTimestamp: x.FirstTimestamp.Format("2006-01-02 15:04:05"), LastTimestamp: x.LastTimestamp.Format("2006-01-02 15:04:05"), InvolvedObject: api.InvolvedObjectInfo{Kind: x.InvolvedObject.Kind, Name: x.InvolvedObject.Name, Namespace: x.InvolvedObject.Namespace}})
 	}
-	return out, nil
+	page, total := slicePage(out, r.Page, r.Limit)
+	return &api.PageResponse[*api.EventInfo]{List: page, Total: total}, nil
 }
 func workloadResponse(x appsv1.Deployment) *api.KubernetesWorkloadResponse {
 	status := "未知"

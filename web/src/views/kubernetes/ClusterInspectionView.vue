@@ -7,7 +7,7 @@ import AppDataGrid from '@/components/AppDataGrid.vue'
 import { listKubernetesClusters, type KubernetesCluster } from '@/api/kubernetes'
 import { deleteInspection, getInspectionProgress, getInspectionResult, listInspectionHistory, startInspection, type InspectionCheck, type InspectionHistory, type InspectionReport } from '@/api/kubernetes-inspection'
 
-const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), running = ref(false), progress = ref(0), step = ref(''), report = ref<InspectionReport | null>(null), history = ref<InspectionHistory[]>([]), historyVisible = ref(false)
+const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), running = ref(false), progress = ref(0), step = ref(''), report = ref<InspectionReport | null>(null), history = ref<InspectionHistory[]>([]), historyVisible = ref(false), historyPage = ref(1), historyPageSize = ref(20), historyTotal = ref(0)
 const activeSection = ref('all')
 let timer = 0
 const summary = computed(() => report.value?.summary)
@@ -17,17 +17,18 @@ const activeSectionData = computed(() => reportSections.value.find(section => se
 const visibleChecks = computed(() => activeSection.value === 'all' ? checks.value : activeSectionData.value?.checks.map(item => ({ ...item, section: activeSectionData.value?.title })) || [])
 const statusColumn: ColDef = { field: 'status', headerName: '状态', width: 86, minWidth: 86, maxWidth: 86, headerClass: 'inspection-status-header', cellClass: 'inspection-status-cell', cellRenderer: statusRenderer }
 const checkColumns: ColDef[] = [{ field: 'section', headerName: '分类', width: 100 }, { field: 'name', headerName: '检查项', minWidth: 130 }, statusColumn, { field: 'value', headerName: '当前值', minWidth: 140 }, { field: 'expected', headerName: '期望值', minWidth: 120 }, { field: 'detail', headerName: '说明', minWidth: 180 }, { field: 'suggestion', headerName: '建议', minWidth: 180 }]
-const historyColumns = computed<ColDef[]>(() => [{ headerName: '序号', width: 60, valueGetter: (p: any) => p.node.rowIndex + 1 }, { field: 'cluster_name', headerName: '集群', minWidth: 130 }, statusColumn, { field: 'score', headerName: '评分', width: 80 }, { field: 'check_count', headerName: '检查项', width: 80 }, { field: 'warning_count', headerName: '警告', width: 70 }, { field: 'fail_count', headerName: '异常', width: 70 }, { field: 'duration', headerName: '耗时', width: 75, valueFormatter: (p: any) => `${p.value || 0}s` }, { field: 'started_at', headerName: '巡检时间', minWidth: 155 }, { headerName: '操作', pinned: 'right', width: 150, minWidth: 150, maxWidth: 150, headerClass: 'inspection-action-header', cellClass: 'inspection-action-cell', cellRenderer: historyActions }])
+const historyColumns = computed<ColDef[]>(() => [{ headerName: '序号', width: 60, valueGetter: (p: any) => (historyPage.value - 1) * historyPageSize.value + p.node.rowIndex + 1 }, { field: 'cluster_name', headerName: '集群', minWidth: 130 }, statusColumn, { field: 'score', headerName: '评分', width: 80 }, { field: 'check_count', headerName: '检查项', width: 80 }, { field: 'warning_count', headerName: '警告', width: 70 }, { field: 'fail_count', headerName: '异常', width: 70 }, { field: 'duration', headerName: '耗时', width: 75, valueFormatter: (p: any) => `${p.value || 0}s` }, { field: 'started_at', headerName: '巡检时间', minWidth: 155 }, { headerName: '操作', pinned: 'right', width: 150, minWidth: 150, maxWidth: 150, headerClass: 'inspection-action-header', cellClass: 'inspection-action-cell', cellRenderer: historyActions }])
 const detailColumns = computed<ColDef[]>(() => activeSection.value === 'nodes' ? [{ field: 'name', headerName: '节点名称', minWidth: 160 }, { field: 'status', headerName: '状态', width: 90 }, { field: 'cpu', headerName: 'CPU容量', width: 100 }, { field: 'memory', headerName: '内存容量', width: 120 }, { field: 'pods', headerName: 'Pod容量', width: 100 }] : [{ field: 'type', headerName: '类型', width: 90 }, { field: 'reason', headerName: '原因', minWidth: 130 }, { field: 'object', headerName: '对象', minWidth: 160 }, { field: 'namespace', headerName: '命名空间', width: 110 }, { field: 'count', headerName: '次数', width: 70 }, { field: 'last_seen', headerName: '最后发生', minWidth: 150 }, { field: 'message', headerName: '消息', minWidth: 260 }])
 function statusRenderer(p: any) { const tag = document.createElement('span'), dot = document.createElement('i'), text = document.createElement('span'), value = String(p.value || ''), labels: Record<string, string> = { success: '通过', warning: '警告', error: '异常', running: '运行中', completed: '已完成', failed: '失败' }; tag.className = `inspection-status ${value}`; text.textContent = labels[value] || value; tag.append(dot, text); return tag }
 function historyActions(p: any) { const wrap = document.createElement('div'); wrap.className = 'inspection-actions'; const view = document.createElement('button'); view.textContent = '查看'; view.className = 'view'; view.onclick = () => void openResult(p.data.id); const remove = document.createElement('button'); remove.textContent = '删除'; remove.className = 'remove'; remove.onclick = () => void removeHistory(p.data); wrap.append(view, remove); return wrap }
-async function loadClusters() { const { data } = await listKubernetesClusters(); clusters.value = data.data; clusterID.value = clusters.value[0]?.id || 0 }
+async function loadClusters() { const { data } = await listKubernetesClusters('', 1, 1000); clusters.value = data.data.list; clusterID.value = clusters.value[0]?.id || 0 }
 async function start() { if (!clusterID.value) return; running.value = true; report.value = null; progress.value = 5; step.value = '正在初始化巡检'; try { const { data } = await startInspection(clusterID.value); poll(data.data.id) } catch { running.value = false } }
 function poll(id: number) { window.clearTimeout(timer); timer = window.setTimeout(async () => { try { const { data } = await getInspectionProgress(id), value = data.data; progress.value = value.progress; step.value = value.current_step; if (value.status === 'running') { poll(id); return } running.value = false; if (value.status === 'completed') { await openResult(id); ElMessage.success('集群巡检完成') } else ElMessage.error('集群巡检失败') } catch { running.value = false } }, 1000) }
 async function openResult(id: number) { const { data } = await getInspectionResult(id); report.value = data.data.report; activeSection.value = 'all'; historyVisible.value = false }
-async function openHistory() { const { data } = await listInspectionHistory(clusterID.value); history.value = data.data; historyVisible.value = true }
+async function openHistory() { historyPage.value = 1; await loadHistory(); historyVisible.value = true }
+async function loadHistory() { const { data } = await listInspectionHistory(clusterID.value, historyPage.value, historyPageSize.value); history.value = data.data.list; historyTotal.value = data.data.total }
 async function removeHistory(row: InspectionHistory) { await ElMessageBox.confirm(`确定删除 ${row.cluster_name} 的巡检记录？`, '删除巡检记录'); await deleteInspection(row.id); history.value = history.value.filter(item => item.id !== row.id); ElMessage.success('删除成功') }
-async function batchRemoveHistory(selectedRows: unknown[]) { const selected = selectedRows as InspectionHistory[]; if (!selected.length) return; await ElMessageBox.confirm(`确定删除选中的 ${selected.length} 条巡检记录？`, '批量删除巡检记录'); await Promise.all(selected.map(row => deleteInspection(row.id))); history.value = history.value.filter(row => !selected.some(item => item.id === row.id)); ElMessage.success('批量删除成功') }
+async function batchRemoveHistory(selectedRows: unknown[]) { const selected = selectedRows as InspectionHistory[]; if (!selected.length) return; await ElMessageBox.confirm(`确定删除选中的 ${selected.length} 条巡检记录？`, '批量删除巡检记录'); await Promise.all(selected.map(row => deleteInspection(row.id))); ElMessage.success('批量删除成功'); await loadHistory() }
 onBeforeUnmount(() => window.clearTimeout(timer))
 loadClusters()
 </script>
@@ -57,7 +58,8 @@ loadClusters()
     <template v-if="report && !running">
       <div class="summary-grid">
         <article class="score-card">
-          <div class="score" :class="report.score >= 90 ? 'good' : report.score >= 70 ? 'warn' : 'bad'">{{ report.score }}</div>
+          <div class="score" :class="report.score >= 90 ? 'good' : report.score >= 70 ? 'warn' : 'bad'">{{ report.score
+            }}</div>
           <span>健康评分</span><strong>{{ report.cluster_name }}</strong>
         </article>
         <article><strong>{{ summary?.total }}</strong><span>检查项</span></article>
@@ -69,7 +71,8 @@ loadClusters()
       <div class="report-card">
         <nav class="section-tabs"><button :class="{ active: activeSection === 'all' }"
             @click="activeSection = 'all'">概览</button><button v-for="section in reportSections" :key="section.key"
-            :class="{ active: activeSection === section.key }" @click="activeSection = section.key">{{ section.title }}</button>
+            :class="{ active: activeSection === section.key }" @click="activeSection = section.key">{{ section.title
+            }}</button>
         </nav>
         <div v-if="activeSection === 'all'" class="status-overview"><span><i class="ok">✓</i>正常
             <strong>{{ summary?.passed }}</strong></span><span><i class="warn">!</i>警告
@@ -90,7 +93,10 @@ loadClusters()
       </div>
     </template>
     <el-dialog v-model="historyVisible" title="巡检历史" width="min(1000px,calc(100vw - 20px))" align-center>
-      <AppDataGrid class="history-grid" :row-data="history" :column-defs="historyColumns"
+      <AppDataGrid class="history-grid" :row-data="history" :column-defs="historyColumns" server-pagination
+        :total="historyTotal" :current-page="historyPage" :page-size="historyPageSize"
+        @page-change="value => { historyPage = value; void loadHistory() }"
+        @page-size-change="value => { historyPageSize = value; historyPage = 1; void loadHistory() }"
         :get-row-id="(row: unknown) => String((row as InspectionHistory).id)" :bulk-delete="batchRemoveHistory"
         pagination />
     </el-dialog>

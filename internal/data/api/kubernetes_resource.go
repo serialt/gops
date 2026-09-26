@@ -1,6 +1,7 @@
 package api
 
 type KubernetesResourceListRequest struct {
+	PageRequest
 	ClusterID int64  `json:"cluster_id" binding:"required"`
 	Keyword   string `json:"keyword"`
 	Namespace string `json:"namespace"`

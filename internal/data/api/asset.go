@@ -4,7 +4,8 @@ import "time"
 
 type AssetGroupListRequest struct {
 	PageRequest
-	Keyword string `json:"keyword"`
+	Keyword  string `json:"keyword"`
+	ParentID int64  `json:"parent_id"`
 }
 type AssetGroupRequest struct {
 	ID          int64  `json:"id"`
@@ -103,8 +104,10 @@ type DatabaseTypeOptionResponse struct {
 
 type HostListRequest struct {
 	PageRequest
-	Keyword string `json:"keyword"`
-	GroupID int64  `json:"group_id"`
+	Keyword string  `json:"keyword"`
+	GroupID int64   `json:"group_id"`
+	Status  *int64  `json:"status"`
+	IDs     []int64 `json:"ids"`
 }
 type HostExcelImportResponse struct {
 	Created int `json:"created"`
@@ -163,6 +166,7 @@ type HostResponse struct {
 }
 
 type SFTPListRequest struct {
+	PageRequest
 	HostID int64  `json:"host_id" binding:"required"`
 	Path   string `json:"path"`
 }
@@ -181,8 +185,10 @@ type SFTPDownloadRequest struct {
 
 type DbInstanceListRequest struct {
 	PageRequest
-	Keyword string `json:"keyword"`
-	GroupID int64  `json:"group_id"`
+	Keyword string  `json:"keyword"`
+	GroupID int64   `json:"group_id"`
+	DbType  string  `json:"db_type"`
+	IDs     []int64 `json:"ids"`
 }
 type DbInstanceRequest struct {
 	ID           int64  `json:"id"`
@@ -199,6 +205,10 @@ type DbInstanceRequest struct {
 }
 type DbInstanceIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
+}
+type DbInstanceExcelImportResponse struct {
+	Created int `json:"created"`
+	Updated int `json:"updated"`
 }
 type DbInstanceTestRequest struct {
 	DbType       string `json:"db_type" binding:"required"`

@@ -3,6 +3,7 @@ package api
 import "time"
 
 type UserListRequest struct {
+	PageRequest
 	Keyword        string `json:"keyword"`
 	OrganizationID int64  `json:"organization_id"`
 }

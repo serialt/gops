@@ -1,13 +1,15 @@
 package api
 
 type KubernetesObjectRequest struct {
-	ClusterID int64  `json:"cluster_id" binding:"required"`
-	Resource  string `json:"resource" binding:"required"`
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Keyword   string `json:"keyword"`
-	YAML      string `json:"yaml"`
-	Refresh   bool   `json:"refresh"`
+	PageRequest
+	ClusterID   int64  `json:"cluster_id" binding:"required"`
+	Resource    string `json:"resource" binding:"required"`
+	Namespace   string `json:"namespace"`
+	Name        string `json:"name"`
+	Keyword     string `json:"keyword"`
+	ServiceType string `json:"service_type"`
+	YAML        string `json:"yaml"`
+	Refresh     bool   `json:"refresh"`
 }
 
 type KubernetesObjectResponse struct {

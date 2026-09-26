@@ -9,6 +9,10 @@ type RoleRequest struct {
 	Description string `json:"description"`
 }
 
+type RoleListRequest struct {
+	PageRequest
+}
+
 type RoleIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
 }

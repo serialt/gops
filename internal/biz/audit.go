@@ -13,9 +13,8 @@ import (
 type AuditBiz struct{ db *gorm.DB }
 
 func NewAuditBiz(db *gorm.DB) *AuditBiz { return &AuditBiz{db} }
-func (b *AuditBiz) Operations(r *api.AuditListRequest) ([]*api.AuditOperationLogResponse, error) {
-	var a []model.AuditOperationLog
-	q := b.db.Order("id DESC")
+func (b *AuditBiz) Operations(r *api.AuditListRequest) (*api.PageResponse[*api.AuditOperationLogResponse], error) {
+	q := b.db.Model(&model.AuditOperationLog{}).Order("id DESC")
 	if r.Keyword != "" {
 		like := "%" + strings.TrimSpace(r.Keyword) + "%"
 		q = q.Where("username LIKE ? OR module LIKE ? OR action LIKE ? OR description LIKE ? OR path LIKE ? OR ip LIKE ?", like, like, like, like, like, like)
@@ -34,18 +33,18 @@ func (b *AuditBiz) Operations(r *api.AuditListRequest) ([]*api.AuditOperationLog
 		q = q.Where("status >= ? AND status < ?", lower, lower+100)
 	}
 	q = applyAuditTimeRange(q, r.StartTime, r.EndTime)
-	if e := q.Find(&a).Error; e != nil {
+	a, total, e := queryPage[model.AuditOperationLog](q, r.Page, r.Limit)
+	if e != nil {
 		return nil, e
 	}
 	o := make([]*api.AuditOperationLogResponse, 0, len(a))
 	for _, x := range a {
 		o = append(o, &api.AuditOperationLogResponse{ID: x.ID, Username: x.Username, Module: x.Module, Action: x.Action, Description: x.Description, Method: x.Method, Path: x.Path, Status: x.Status, CostTime: x.CostTime, IP: x.IP, CreatedAt: x.CreatedAt})
 	}
-	return o, nil
+	return &api.PageResponse[*api.AuditOperationLogResponse]{List: o, Total: total}, nil
 }
-func (b *AuditBiz) Logins(r *api.AuditListRequest) ([]*api.AuditLoginLogResponse, error) {
-	var a []model.AuditLoginLog
-	q := b.db.Order("id DESC")
+func (b *AuditBiz) Logins(r *api.AuditListRequest) (*api.PageResponse[*api.AuditLoginLogResponse], error) {
+	q := b.db.Model(&model.AuditLoginLog{}).Order("id DESC")
 	if r.Keyword != "" {
 		like := "%" + strings.TrimSpace(r.Keyword) + "%"
 		q = q.Where("username LIKE ? OR ip LIKE ? OR message LIKE ?", like, like, like)
@@ -60,29 +59,30 @@ func (b *AuditBiz) Logins(r *api.AuditListRequest) ([]*api.AuditLoginLogResponse
 		q = q.Where("status = ?", r.Status)
 	}
 	q = applyAuditTimeRange(q, r.StartTime, r.EndTime)
-	if e := q.Find(&a).Error; e != nil {
+	a, total, e := queryPage[model.AuditLoginLog](q, r.Page, r.Limit)
+	if e != nil {
 		return nil, e
 	}
 	o := make([]*api.AuditLoginLogResponse, 0, len(a))
 	for _, x := range a {
 		o = append(o, &api.AuditLoginLogResponse{ID: x.ID, Username: x.Username, LoginType: x.LoginType, Status: x.Status, IP: x.IP, Message: x.Message, CreatedAt: x.CreatedAt})
 	}
-	return o, nil
+	return &api.PageResponse[*api.AuditLoginLogResponse]{List: o, Total: total}, nil
 }
-func (b *AuditBiz) Data(r *api.AuditListRequest) ([]*api.AuditDataLogResponse, error) {
-	var a []model.AuditDataLog
-	q := b.db.Order("id DESC")
+func (b *AuditBiz) Data(r *api.AuditListRequest) (*api.PageResponse[*api.AuditDataLogResponse], error) {
+	q := b.db.Model(&model.AuditDataLog{}).Order("id DESC")
 	if r.Keyword != "" {
 		q = q.Where("username LIKE ? OR table_name LIKE ?", "%"+r.Keyword+"%", "%"+r.Keyword+"%")
 	}
-	if e := q.Find(&a).Error; e != nil {
+	a, total, e := queryPage[model.AuditDataLog](q, r.Page, r.Limit)
+	if e != nil {
 		return nil, e
 	}
 	o := make([]*api.AuditDataLogResponse, 0, len(a))
 	for _, x := range a {
 		o = append(o, &api.AuditDataLogResponse{ID: x.ID, Username: x.Username, TableName: x.TableName_, RecordID: x.RecordID, Action: x.Action, OldData: x.OldData, NewData: x.NewData, CreatedAt: x.CreatedAt})
 	}
-	return o, nil
+	return &api.PageResponse[*api.AuditDataLogResponse]{List: o, Total: total}, nil
 }
 func (b *AuditBiz) DeleteOperations(r *api.AuditDeleteRequest) error {
 	return b.db.Where("id IN ?", r.IDs).Delete(&model.AuditOperationLog{}).Error

@@ -9,20 +9,20 @@ import (
 type TaskBiz struct{ db *gorm.DB }
 
 func NewTaskBiz(db *gorm.DB) *TaskBiz { return &TaskBiz{db} }
-func (b *TaskBiz) ListJobs(r *api.TaskListRequest) ([]*api.TaskJobResponse, error) {
-	var a []model.TaskJob
-	q := b.db.Order("id DESC")
+func (b *TaskBiz) ListJobs(r *api.TaskListRequest) (*api.PageResponse[*api.TaskJobResponse], error) {
+	q := b.db.Model(&model.TaskJob{}).Order("id DESC")
 	if r.Keyword != "" {
 		q = q.Where("name LIKE ?", "%"+r.Keyword+"%")
 	}
-	if e := q.Find(&a).Error; e != nil {
+	a, total, e := queryPage[model.TaskJob](q, r.Page, r.Limit)
+	if e != nil {
 		return nil, e
 	}
 	o := make([]*api.TaskJobResponse, 0, len(a))
 	for _, x := range a {
 		o = append(o, taskJob(x))
 	}
-	return o, nil
+	return &api.PageResponse[*api.TaskJobResponse]{List: o, Total: total}, nil
 }
 func (b *TaskBiz) SaveJob(r *api.TaskJobRequest) (*api.TaskJobResponse, error) {
 	x := model.TaskJob{ID: r.ID, Name: r.Name, TemplateID: r.TemplateID, TaskType: r.TaskType, TargetHosts: r.TargetHosts, Parameters: r.Parameters, Status: "pending"}

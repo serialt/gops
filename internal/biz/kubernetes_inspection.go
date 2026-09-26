@@ -327,22 +327,38 @@ func buildInspectionReport(clusterID int64, clusterName string, s *inspectionSna
 		eventStatus = "warning"
 	}
 	add("events", "集群事件", check("事件", "近 24 小时警告事件", eventStatus, fmt.Sprintf("%d", warnings), "不超过 10", "高频警告通常意味着资源或控制器异常", "检查事件详情并处理重复告警原因"))
-	metric := func(label, value, tone string) *api.KubernetesInspectionMetric { return &api.KubernetesInspectionMetric{Label: label, Value: value, Tone: tone} }
+	metric := func(label, value, tone string) *api.KubernetesInspectionMetric {
+		return &api.KubernetesInspectionMetric{Label: label, Value: value, Tone: tone}
+	}
 	sectionByKey := map[string]*api.KubernetesInspectionSection{}
-	for _, section := range sections { sectionByKey[section.Key] = section }
+	for _, section := range sections {
+		sectionByKey[section.Key] = section
+	}
 	sectionByKey["cluster"].Metrics = []*api.KubernetesInspectionMetric{metric("Kubernetes 版本", s.version, ""), metric("连接状态", "正常", "success")}
 	nodeDetails := make([]map[string]any, 0, len(s.nodes.Items))
-	for _, node := range s.nodes.Items { status := "NotReady"; for _, condition := range node.Status.Conditions { if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue { status = "Ready" } }; nodeDetails = append(nodeDetails, map[string]any{"name":node.Name,"status":status,"cpu":node.Status.Capacity.Cpu().String(),"memory":node.Status.Capacity.Memory().String(),"pods":node.Status.Capacity.Pods().String()}) }
-	sectionByKey["nodes"].Metrics = []*api.KubernetesInspectionMetric{metric("节点总数",fmt.Sprint(len(s.nodes.Items)),""),metric("Ready 节点",fmt.Sprint(ready),"success"),metric("NotReady 节点",fmt.Sprint(len(s.nodes.Items)-ready),nodeStatus),metric("有资源压力",fmt.Sprint(pressure),nodeStatus)}
+	for _, node := range s.nodes.Items {
+		status := "NotReady"
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+				status = "Ready"
+			}
+		}
+		nodeDetails = append(nodeDetails, map[string]any{"name": node.Name, "status": status, "cpu": node.Status.Capacity.Cpu().String(), "memory": node.Status.Capacity.Memory().String(), "pods": node.Status.Capacity.Pods().String()})
+	}
+	sectionByKey["nodes"].Metrics = []*api.KubernetesInspectionMetric{metric("节点总数", fmt.Sprint(len(s.nodes.Items)), ""), metric("Ready 节点", fmt.Sprint(ready), "success"), metric("NotReady 节点", fmt.Sprint(len(s.nodes.Items)-ready), nodeStatus), metric("有资源压力", fmt.Sprint(pressure), nodeStatus)}
 	sectionByKey["nodes"].Details = nodeDetails
-	sectionByKey["workloads"].Metrics = []*api.KubernetesInspectionMetric{metric("Deployment",fmt.Sprint(len(s.deployments.Items)),""),metric("DaemonSet",fmt.Sprint(len(s.daemonSets.Items)),""),metric("StatefulSet",fmt.Sprint(len(s.statefulSets.Items)),""),metric("Pod总数",fmt.Sprintf("%d/%d",running,len(s.pods.Items)),workloadStatus)}
-	sectionByKey["network"].Metrics = []*api.KubernetesInspectionMetric{metric("Service总数",fmt.Sprint(len(s.services.Items)),""),metric("Endpoint总数",fmt.Sprint(len(s.endpoints.Items)),""),metric("无Endpoint的Service",fmt.Sprint(missingEndpoints),networkStatus)}
-	sectionByKey["storage"].Metrics = []*api.KubernetesInspectionMetric{metric("PV总数",fmt.Sprint(len(s.pvs.Items)),""),metric("PVC总数",fmt.Sprint(len(s.pvcs.Items)),""),metric("Pending PVC",fmt.Sprint(pendingPVC),storageStatus)}
-	sectionByKey["security"].Metrics = []*api.KubernetesInspectionMetric{metric("Pod总数",fmt.Sprint(len(s.pods.Items)),""),metric("特权容器",fmt.Sprint(privileged),securityStatus),metric("hostNetwork Pod",fmt.Sprint(hostNetwork),securityStatus)}
-	sectionByKey["capacity"].Metrics = []*api.KubernetesInspectionMetric{metric("CPU分配率",fmt.Sprintf("%.1f%%",cpuPercent),capacityStatus),metric("内存分配率",fmt.Sprintf("%.1f%%",memoryPercent),capacityStatus),metric("Pod密度",fmt.Sprintf("%.1f%%",podPercent),capacityStatus),metric("Pod数量",fmt.Sprintf("%d/%d",len(s.pods.Items),podCapacity),"")}
+	sectionByKey["workloads"].Metrics = []*api.KubernetesInspectionMetric{metric("Deployment", fmt.Sprint(len(s.deployments.Items)), ""), metric("DaemonSet", fmt.Sprint(len(s.daemonSets.Items)), ""), metric("StatefulSet", fmt.Sprint(len(s.statefulSets.Items)), ""), metric("Pod总数", fmt.Sprintf("%d/%d", running, len(s.pods.Items)), workloadStatus)}
+	sectionByKey["network"].Metrics = []*api.KubernetesInspectionMetric{metric("Service总数", fmt.Sprint(len(s.services.Items)), ""), metric("Endpoint总数", fmt.Sprint(len(s.endpoints.Items)), ""), metric("无Endpoint的Service", fmt.Sprint(missingEndpoints), networkStatus)}
+	sectionByKey["storage"].Metrics = []*api.KubernetesInspectionMetric{metric("PV总数", fmt.Sprint(len(s.pvs.Items)), ""), metric("PVC总数", fmt.Sprint(len(s.pvcs.Items)), ""), metric("Pending PVC", fmt.Sprint(pendingPVC), storageStatus)}
+	sectionByKey["security"].Metrics = []*api.KubernetesInspectionMetric{metric("Pod总数", fmt.Sprint(len(s.pods.Items)), ""), metric("特权容器", fmt.Sprint(privileged), securityStatus), metric("hostNetwork Pod", fmt.Sprint(hostNetwork), securityStatus)}
+	sectionByKey["capacity"].Metrics = []*api.KubernetesInspectionMetric{metric("CPU分配率", fmt.Sprintf("%.1f%%", cpuPercent), capacityStatus), metric("内存分配率", fmt.Sprintf("%.1f%%", memoryPercent), capacityStatus), metric("Pod密度", fmt.Sprintf("%.1f%%", podPercent), capacityStatus), metric("Pod数量", fmt.Sprintf("%d/%d", len(s.pods.Items), podCapacity), "")}
 	eventDetails := make([]map[string]any, 0)
-	for _, event := range s.events.Items { if event.Type == corev1.EventTypeWarning && event.LastTimestamp.Time.After(recent) { eventDetails = append(eventDetails,map[string]any{"type":event.Type,"reason":event.Reason,"object":event.InvolvedObject.Kind+"/"+event.InvolvedObject.Name,"namespace":event.Namespace,"count":event.Count,"last_seen":event.LastTimestamp.Format("2006-01-02 15:04:05"),"message":event.Message}) } }
-	sectionByKey["events"].Metrics = []*api.KubernetesInspectionMetric{metric("Warning事件",fmt.Sprint(warnings),eventStatus)}
+	for _, event := range s.events.Items {
+		if event.Type == corev1.EventTypeWarning && event.LastTimestamp.Time.After(recent) {
+			eventDetails = append(eventDetails, map[string]any{"type": event.Type, "reason": event.Reason, "object": event.InvolvedObject.Kind + "/" + event.InvolvedObject.Name, "namespace": event.Namespace, "count": event.Count, "last_seen": event.LastTimestamp.Format("2006-01-02 15:04:05"), "message": event.Message})
+		}
+	}
+	sectionByKey["events"].Metrics = []*api.KubernetesInspectionMetric{metric("Warning事件", fmt.Sprint(warnings), eventStatus)}
 	sectionByKey["events"].Details = eventDetails
 	summary := &api.KubernetesInspectionSummary{}
 	for _, section := range sections {
@@ -399,20 +415,20 @@ func (b *KubernetesBiz) InspectionResult(r *api.KubernetesInspectionIDRequest) (
 	return &api.KubernetesInspectionResultResponse{Inspection: inspectionHistory(record), Report: &report}, nil
 }
 
-func (b *KubernetesBiz) InspectionHistory(r *api.KubernetesInspectionHistoryRequest) ([]*api.KubernetesInspectionHistoryResponse, error) {
-	var records []model.KubernetesClusterInspection
-	query := b.db.Order("id DESC")
+func (b *KubernetesBiz) InspectionHistory(r *api.KubernetesInspectionHistoryRequest) (*api.PageResponse[*api.KubernetesInspectionHistoryResponse], error) {
+	query := b.db.Model(&model.KubernetesClusterInspection{}).Order("id DESC")
 	if r.ClusterID > 0 {
 		query = query.Where("cluster_id = ?", r.ClusterID)
 	}
-	if err := query.Limit(500).Find(&records).Error; err != nil {
+	records, total, err := queryPage[model.KubernetesClusterInspection](query, r.Page, r.Limit)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.KubernetesInspectionHistoryResponse, 0, len(records))
 	for _, record := range records {
 		result = append(result, inspectionHistory(record))
 	}
-	return result, nil
+	return &api.PageResponse[*api.KubernetesInspectionHistoryResponse]{List: result, Total: total}, nil
 }
 
 func (b *KubernetesBiz) DeleteInspection(r *api.KubernetesInspectionIDRequest) error {

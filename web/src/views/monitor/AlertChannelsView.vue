@@ -10,6 +10,9 @@ const emptyConfig = (): MonitorAlertChannelConfig => ({ smtp_host: '', smtp_port
 const emptyForm = (): MonitorAlertChannelRequest => ({ name: '', channel_type: 'email', enabled: true, config: emptyConfig() })
 const rows = ref<MonitorAlertChannel[]>([])
 const keyword = ref('')
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 const dialogVisible = ref(false)
 const saving = ref(false)
 const testing = ref(false)
@@ -39,14 +42,14 @@ function actionRenderer(params: { data: MonitorAlertChannel }) {
   return wrap
 }
 const columns: ColDef[] = [
-  { headerName: '序号', valueGetter: (p: any) => p.node!.rowIndex! + 1, width: 70 },
+  { headerName: '序号', valueGetter: (p: any) => (page.value - 1) * pageSize.value + p.node!.rowIndex! + 1, width: 70 },
   { field: 'name', headerName: '通道名称', minWidth: 150 },
   { field: 'channel_type', headerName: '通道类型', minWidth: 110, cellRenderer: (p: any) => createTag(labels[p.value as MonitorAlertChannelType] || p.value, `type-${p.value}`) },
   { field: 'enabled', headerName: '状态', width: 90, cellRenderer: (p: any) => createTag(p.value ? '启用' : '禁用', p.value ? 'enabled' : 'disabled') },
   { headerName: '配置预览', minWidth: 280, valueGetter: (p: any) => configPreview(p.data) },
   { headerName: '操作', pinned: 'right', width: 150, cellClass: 'channel-operation-cell', cellRenderer: actionRenderer },
 ]
-async function load() { const { data } = await listMonitorChannels(keyword.value); rows.value = data.data }
+async function load() { const { data } = await listMonitorChannels(keyword.value, page.value, pageSize.value); rows.value = data.data.list; total.value = data.data.total }
 function open(row?: MonitorAlertChannel) {
   editing.value = row ?? null
   form.value = row ? { id: row.id, name: row.name, channel_type: row.channel_type, enabled: row.enabled, config: { ...emptyConfig(), ...row.config } } : emptyForm()
@@ -96,7 +99,7 @@ async function testChannel() {
     ElMessage.success('测试消息发送成功')
   } finally { testing.value = false }
 }
-watch(keyword, load)
+watch(keyword, () => { page.value = 1; void load() })
 onMounted(load)
 </script>
 
@@ -105,7 +108,10 @@ onMounted(load)
     <div class="toolbar"><el-input v-model="keyword" placeholder="搜索通道名称" clearable />
       <div class="toolbar-actions"><el-button type="primary" @click="open()">新增通道</el-button></div>
     </div>
-    <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination :bulk-delete="batchRemove" />
+    <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
+      :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove"
+      @page-change="value => { page = value; void load() }"
+      @page-size-change="value => { pageSize = value; page = 1; void load() }" />
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑告警通道' : '新增告警通道'" width="min(720px, 72vw)"
       :close-on-click-modal="false" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="105px" class="channel-form">

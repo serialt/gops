@@ -499,7 +499,7 @@ func (b *KubernetesBiz) ResourceTemplate(r *api.KubernetesObjectRequest) (*api.K
 	return &api.KubernetesYAMLResponse{YAML: content}, nil
 }
 
-func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.KubernetesObjectResponse, error) {
+func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) (*api.PageResponse[*api.KubernetesObjectResponse], error) {
 	spec, err := resourceSpec(r.Resource)
 	if err != nil {
 		return nil, err
@@ -509,7 +509,10 @@ func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.Kube
 	if cacheable && !r.Refresh {
 		if cached, found := b.workloadCache.Get(cacheKey); found {
 			if values, ok := cached.([]*api.KubernetesObjectResponse); ok {
-				return filterKubernetesObjects(values, r.Keyword), nil
+				filtered := filterKubernetesObjects(values, r.Keyword)
+				filtered = filterKubernetesObjectServiceType(filtered, r.ServiceType)
+				page, total := slicePage(filtered, r.Page, r.Limit)
+				return &api.PageResponse[*api.KubernetesObjectResponse]{List: page, Total: total}, nil
 			}
 		}
 	}
@@ -560,7 +563,23 @@ func (b *KubernetesBiz) ListObjects(r *api.KubernetesObjectRequest) ([]*api.Kube
 	if err != nil {
 		return nil, err
 	}
-	return filterKubernetesObjects(value.([]*api.KubernetesObjectResponse), r.Keyword), nil
+	filtered := filterKubernetesObjects(value.([]*api.KubernetesObjectResponse), r.Keyword)
+	filtered = filterKubernetesObjectServiceType(filtered, r.ServiceType)
+	page, total := slicePage(filtered, r.Page, r.Limit)
+	return &api.PageResponse[*api.KubernetesObjectResponse]{List: page, Total: total}, nil
+}
+
+func filterKubernetesObjectServiceType(rows []*api.KubernetesObjectResponse, serviceType string) []*api.KubernetesObjectResponse {
+	if serviceType == "" {
+		return rows
+	}
+	filtered := make([]*api.KubernetesObjectResponse, 0, len(rows))
+	for _, row := range rows {
+		if row.ServiceType == serviceType {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered
 }
 
 func isWorkloadResource(resource string) bool {

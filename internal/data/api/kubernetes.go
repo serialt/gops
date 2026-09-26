@@ -3,6 +3,7 @@ package api
 import "time"
 
 type KubernetesClusterListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type KubernetesClusterRequest struct {

@@ -3,7 +3,9 @@ package api
 import "time"
 
 type OrganizationQueryRequest struct {
-	Keyword string `json:"keyword"`
+	PageRequest
+	Keyword    string `json:"keyword"`
+	SelectedID int64  `json:"selected_id"`
 }
 
 type OrganizationRequest struct {

@@ -2,23 +2,24 @@
 import { onMounted, ref, watch } from 'vue'
 import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Upload } from '@element-plus/icons-vue'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
+import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
+import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
-const rows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
+const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
 const importInput = ref<HTMLInputElement>(); const exporting = ref(false); const importing = ref(false)
+const auth = useAuthStore()
 const requestClientOptions: Array<{ label: string; value: MonitorRequestClient }> = [{ label: 'Google Chrome', value: 'chrome' }, { label: 'Mozilla Firefox', value: 'firefox' }, { label: 'Microsoft Edge', value: 'edge' }, { label: 'Apple Safari', value: 'safari' }, { label: 'curl', value: 'curl' }]
 const form = ref<MonitorDomainRequest>({ domain: '', port: 443, request_client: 'chrome', check_interval: 300, check_jitter: 30, enable_ssl: true, verify_certificate: true, enable_alert: true, response_threshold: 3000, ssl_expiry_days: 30 })
 async function load() {
-    const { data } = await listMonitorDomains(keyword.value)
-    rows.value = data.data
-    stats.value = rows.value.reduce<MonitorStats>((result, row) => {
-        result.total += 1
-        if (row.status === 'normal') result.normal += 1
-        else if (row.status === 'abnormal') result.abnormal += 1
-        else if (row.status === 'paused') result.paused += 1
-        return result
-    }, { total: 0, normal: 0, abnormal: 0, paused: 0 })
+    const [listResponse, statsResponse] = await Promise.all([
+        listMonitorDomains(keyword.value, '', page.value, pageSize.value),
+        monitorStats(keyword.value),
+    ])
+    rows.value = listResponse.data.data.list
+    total.value = listResponse.data.data.total
+    stats.value = statsResponse.data.data
 }
 function open(row?: MonitorDomain) { editing.value = row ?? null; form.value = row ? { id: row.id, domain: row.domain, port: row.port, request_client: row.request_client || 'chrome', check_interval: row.check_interval, check_jitter: row.check_jitter ?? 30, enable_ssl: row.enable_ssl, verify_certificate: row.verify_certificate, enable_alert: row.enable_alert, response_threshold: row.response_threshold, ssl_expiry_days: row.ssl_expiry_days } : { domain: '', port: 443, request_client: 'chrome', check_interval: 300, check_jitter: 30, enable_ssl: true, verify_certificate: true, enable_alert: true, response_threshold: 3000, ssl_expiry_days: 30 }; dialog.value = true }
 function handleHTTPSChange(value: boolean | string | number) { if (!value) form.value.verify_certificate = false }
@@ -36,11 +37,11 @@ async function save() {
 async function remove(row: MonitorDomain) { await ElMessageBox.confirm(`删除监控 ${row.domain}？`, '确认删除'); await deleteMonitorDomain(row.id); await load() }
 async function batchRemove(selectedRows: unknown[]) { const selected = selectedRows as MonitorDomain[]; if (!selected.length) return; await ElMessageBox.confirm(`确定删除选中的 ${selected.length} 条监控？`, '批量删除确认', { type: 'warning' }); await Promise.all(selected.map(row => deleteMonitorDomain(row.id))); ElMessage.success('批量删除成功'); await load() }
 async function check(row: MonitorDomain) { await checkMonitorDomain(row.id); ElMessage.success('检测完成'); await load() }
-async function detail(row: MonitorDomain) { const { data } = await listMonitorCheckHistory(row.id); historyRows.value = data.data; detailMonitor.value = row; detailDialog.value = true }
+async function detail(row: MonitorDomain) { const { data } = await listMonitorCheckHistory(row.id); historyRows.value = data.data.list; detailMonitor.value = row; detailDialog.value = true }
 async function exportExcel() {
     exporting.value = true
     try {
-        const response = await exportMonitorDomains(keyword.value)
+        const response = await exportMonitorDomains(keyword.value, selectedRows.value.map(row => row.id))
         downloadAttachment(response.data, response.headers['content-disposition'], '域名监控.xlsx')
         ElMessage.success(`已导出 ${rows.value.length} 条监控配置`)
     } finally { exporting.value = false }
@@ -57,7 +58,7 @@ async function importExcel(event: Event) {
         ElMessage.success(`导入完成：新增 ${data.data.created} 条，更新 ${data.data.updated} 条`)
     } finally { importing.value = false; input.value = '' }
 }
-watch(keyword, load)
+watch(keyword, () => { page.value = 1; void load() })
 function formatDate(value?: string) { return value && !value.startsWith('0001-') ? value.replace('T', ' ').slice(0, 19) : '—' }
 function statusText(status?: string) { return status === 'normal' ? '正常' : status === 'abnormal' ? '异常' : status === 'paused' ? '暂停' : '未知' }
 function intervalText(seconds?: number) { if (!seconds) return '—'; return seconds % 60 === 0 ? `${seconds / 60}分钟` : `${seconds}秒` }
@@ -87,7 +88,7 @@ function operationRenderer(p: any) {
     )
     return actions
 }
-const columns: ColDef[] = [{ headerName: '序号', valueGetter: (p: any) => p.node!.rowIndex! + 1, width: 70 }, { field: 'domain', headerName: '域名', minWidth: 160 }, { field: 'port', headerName: '端口', width: 80 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => statusRenderer(p.value === 'normal' ? '正常' : p.value === 'abnormal' ? '异常' : p.value === 'paused' ? '暂停' : '未知', p.value === 'normal' ? 'is-success' : p.value === 'abnormal' ? 'is-danger' : 'is-muted') }, { field: 'response_time', headerName: '响应时间', width: 105, valueFormatter: (p: any) => p.value ? `${p.value} ms` : '—' }, { field: 'ssl_valid', headerName: 'SSL 证书', width: 100, cellRenderer: (p: any) => statusRenderer(p.data.enable_ssl ? (p.value ? '有效' : '无效') : '未启用', p.data.enable_ssl ? (p.value ? 'is-success' : 'is-danger') : 'is-muted') }, { field: 'ssl_root_ca', headerName: '根 CA', minWidth: 150, valueFormatter: (p: any) => p.value || '—' }, { field: 'ssl_expiry', headerName: 'SSL 到期时间', minWidth: 155, valueFormatter: (p: any) => formatDate(p.value) }, { field: 'check_interval', headerName: '检查间隔', width: 100, valueFormatter: (p: any) => `${p.value} 秒` }, { field: 'last_check', headerName: '最后检查', minWidth: 155, valueFormatter: (p: any) => formatDate(p.value) }, { headerName: '操作', pinned: 'right', cellClass: 'monitor-operation-cell', cellRenderer: operationRenderer }]
+const columns: ColDef[] = [{ headerName: '序号', valueGetter: (p: any) => (page.value - 1) * pageSize.value + p.node!.rowIndex! + 1, width: 70 }, { field: 'domain', headerName: '域名', minWidth: 160 }, { field: 'port', headerName: '端口', width: 80 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => statusRenderer(p.value === 'normal' ? '正常' : p.value === 'abnormal' ? '异常' : p.value === 'paused' ? '暂停' : '未知', p.value === 'normal' ? 'is-success' : p.value === 'abnormal' ? 'is-danger' : 'is-muted') }, { field: 'response_time', headerName: '响应时间', width: 105, valueFormatter: (p: any) => p.value ? `${p.value} ms` : '—' }, { field: 'ssl_valid', headerName: 'SSL 证书', width: 100, cellRenderer: (p: any) => statusRenderer(p.data.enable_ssl ? (p.value ? '有效' : '无效') : '未启用', p.data.enable_ssl ? (p.value ? 'is-success' : 'is-danger') : 'is-muted') }, { field: 'ssl_root_ca', headerName: '根 CA', minWidth: 150, valueFormatter: (p: any) => p.value || '—' }, { field: 'ssl_expiry', headerName: 'SSL 到期时间', minWidth: 155, valueFormatter: (p: any) => formatDate(p.value) }, { field: 'check_interval', headerName: '检查间隔', width: 100, valueFormatter: (p: any) => `${p.value} 秒` }, { field: 'last_check', headerName: '最后检查', minWidth: 155, valueFormatter: (p: any) => formatDate(p.value) }, { headerName: '操作', pinned: 'right', cellClass: 'monitor-operation-cell', cellRenderer: operationRenderer }]
 onMounted(load)
 </script>
 <template>
@@ -99,13 +100,22 @@ onMounted(load)
             <div class="stat-card is-paused"><span>暂停</span><strong>{{ stats.paused }}</strong></div>
         </div>
         <div class="toolbar"><el-input v-model="keyword" placeholder="搜索域名" clearable />
-            <div class="toolbar-actions"><input ref="importInput" type="file" accept=".xlsx" hidden
-                    @change="importExcel" /><el-button v-permission="'POST /api/v1/monitor/domains/import'"
-                    :loading="importing" @click="chooseImport">Excel 导入</el-button><el-button
-                    v-permission="'POST /api/v1/monitor/domains/export'" :loading="exporting" @click="exportExcel">Excel
-                    导出</el-button><el-button type="primary" @click="open()">新增监控</el-button></div>
+            <div class="toolbar-actions"><el-dropdown
+                    v-if="auth.hasPermission('POST /api/v1/monitor/domains/export') || auth.hasPermission('POST /api/v1/monitor/domains/import')"
+                    split-button :loading="exporting || importing"
+                    :disabled="!auth.hasPermission('POST /api/v1/monitor/domains/export')" @click="exportExcel"
+                    @command="chooseImport">导出 Excel
+                    <template #dropdown><el-dropdown-menu><el-dropdown-item
+                                v-if="auth.hasPermission('POST /api/v1/monitor/domains/import')" command="import"
+                                :icon="Upload">从 Excel 导入</el-dropdown-item></el-dropdown-menu></template>
+                </el-dropdown><input ref="importInput" type="file" accept=".xlsx" hidden
+                    @change="importExcel" /><el-button type="primary" @click="open()">新增监控</el-button></div>
         </div>
-        <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination :bulk-delete="batchRemove" />
+        <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
+            :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove"
+            @selection-changed="selectedRows = $event as MonitorDomain[]"
+            @page-change="value => { page = value; void load() }"
+            @page-size-change="value => { pageSize = value; page = 1; void load() }" />
         <el-dialog v-model="dialog" :title="editing ? '编辑监控' : '新增监控'" width="480px"><el-form
                 label-width="100px"><el-form-item label="域名"><el-input
                         v-model="form.domain" /></el-form-item><el-form-item label="端口"><el-input-number
@@ -178,18 +188,25 @@ onMounted(load)
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     min-height: 0
 }
 
 .toolbar {
     display: flex;
-    justify-content: space-between
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 .toolbar-actions {
     display: flex;
+    align-items: center;
     gap: 8px;
+}
+
+.toolbar-actions :deep(.el-button + .el-button) {
+    margin-left: 0;
 }
 
 .monitor-stats {
@@ -230,7 +247,8 @@ onMounted(load)
 }
 
 .toolbar .el-input {
-    width: 260px
+    width: 260px;
+    flex: none;
 }
 
 .grid {

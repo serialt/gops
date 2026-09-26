@@ -117,9 +117,9 @@ func (h *MonitorHandler) ListCheckHistory(c *gin.Context) {
 
 // DomainStats POST /api/v1/monitor/domains/stats 查询监控统计。
 func (h *MonitorHandler) DomainStats(c *gin.Context) {
-	req := new(struct{})
+	req := new(api.MonitorStatsRequest)
 	if monitorBind(c, req) {
-		data, err := h.biz.DomainStats()
+		data, err := h.biz.DomainStats(req)
 		monitorResult(c, data, err)
 	}
 }

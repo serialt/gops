@@ -9,20 +9,20 @@ import (
 type SSLCertBiz struct{ db *gorm.DB }
 
 func NewSSLCertBiz(db *gorm.DB) *SSLCertBiz { return &SSLCertBiz{db} }
-func (b *SSLCertBiz) List(r *api.SSLCertificateListRequest) ([]*api.SSLCertificateResponse, error) {
-	var a []model.SslCertificate
-	q := b.db.Order("id DESC")
+func (b *SSLCertBiz) List(r *api.SSLCertificateListRequest) (*api.PageResponse[*api.SSLCertificateResponse], error) {
+	q := b.db.Model(&model.SslCertificate{}).Order("id DESC")
 	if r.Keyword != "" {
 		q = q.Where("name LIKE ? OR domain LIKE ?", "%"+r.Keyword+"%", "%"+r.Keyword+"%")
 	}
-	if e := q.Find(&a).Error; e != nil {
+	a, total, e := queryPage[model.SslCertificate](q, r.Page, r.Limit)
+	if e != nil {
 		return nil, e
 	}
 	o := make([]*api.SSLCertificateResponse, 0, len(a))
 	for _, x := range a {
 		o = append(o, sslCert(x))
 	}
-	return o, nil
+	return &api.PageResponse[*api.SSLCertificateResponse]{List: o, Total: total}, nil
 }
 func (b *SSLCertBiz) Save(r *api.SSLCertificateRequest) (*api.SSLCertificateResponse, error) {
 	x := model.SslCertificate{ID: r.ID, Name: r.Name, Domain: r.Domain, SourceType: r.SourceType, CaProvider: r.CaProvider, AutoRenew: r.AutoRenew, RenewDaysBefore: r.RenewDaysBefore, Status: "pending"}

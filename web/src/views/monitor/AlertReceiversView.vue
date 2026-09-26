@@ -8,6 +8,9 @@ import { deleteMonitorReceiver, listMonitorReceivers, saveMonitorReceiver, type 
 const emptyForm = (): MonitorAlertReceiverRequest => ({ name: '', email: '', phone: '', webhook: '', wechat_id: '', dingtalk_id: '', feishu_id: '', enable_email: true, enable_webhook: false, enable_wechat: false, enable_dingtalk: false, enable_feishu: false, enable_system_msg: true, enabled: true })
 const rows = ref<MonitorAlertReceiver[]>([])
 const keyword = ref('')
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 const dialogVisible = ref(false)
 const saving = ref(false)
 const editing = ref<MonitorAlertReceiver | null>(null)
@@ -27,7 +30,7 @@ function actionRenderer(params: { data: MonitorAlertReceiver }) {
   wrap.append(edit, removeButton); return wrap
 }
 const columns: ColDef[] = [
-  { headerName: '序号', valueGetter: (p: any) => p.node!.rowIndex! + 1, width: 70 },
+  { headerName: '序号', valueGetter: (p: any) => (page.value - 1) * pageSize.value + p.node!.rowIndex! + 1, width: 70 },
   { field: 'name', headerName: '姓名', minWidth: 130 },
   { field: 'email', headerName: '邮箱地址', minWidth: 180, valueFormatter: (p: any) => p.value || '-' },
   { field: 'phone', headerName: '手机号码', minWidth: 130, valueFormatter: (p: any) => p.value || '-' },
@@ -35,7 +38,7 @@ const columns: ColDef[] = [
   { field: 'enabled', headerName: '状态', width: 90, cellRenderer: (p: any) => tag(p.value ? '启用' : '禁用', p.value ? 'enabled' : 'disabled') },
   { headerName: '操作', pinned: 'right', width: 150, cellClass: 'receiver-operation-cell', cellRenderer: actionRenderer },
 ]
-async function load() { const { data } = await listMonitorReceivers(keyword.value); rows.value = data.data }
+async function load() { const { data } = await listMonitorReceivers(keyword.value, page.value, pageSize.value); rows.value = data.data.list; total.value = data.data.total }
 function open(row?: MonitorAlertReceiver) { editing.value = row ?? null; form.value = row ? { ...row } : emptyForm(); dialogVisible.value = true }
 function selectedCount() { const f = form.value; return [f.enable_email, f.enable_webhook, f.enable_wechat, f.enable_dingtalk, f.enable_feishu, f.enable_system_msg].filter(Boolean).length }
 async function save() {
@@ -48,7 +51,7 @@ async function save() {
 }
 async function remove(row: MonitorAlertReceiver) { await ElMessageBox.confirm(`确定删除接收人“${row.name}”？`, '确认删除', { type: 'warning' }); await deleteMonitorReceiver(row.id); ElMessage.success('删除成功'); await load() }
 async function batchRemove(selectedRows: unknown[]) { const selected = selectedRows as MonitorAlertReceiver[]; if (!selected.length) return; await ElMessageBox.confirm(`确定删除选中的 ${selected.length} 个接收人？`, '批量删除确认', { type: 'warning' }); await Promise.all(selected.map(row => deleteMonitorReceiver(row.id))); ElMessage.success('批量删除成功'); await load() }
-watch(keyword, load)
+watch(keyword, () => { page.value = 1; void load() })
 onMounted(load)
 </script>
 
@@ -57,7 +60,10 @@ onMounted(load)
     <div class="toolbar"><el-input v-model="keyword" placeholder="搜索接收人姓名或邮箱" clearable />
       <div class="toolbar-actions"><el-button type="primary" @click="open()">新增接收人</el-button></div>
     </div>
-    <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination :bulk-delete="batchRemove" />
+    <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
+      :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove"
+      @page-change="value => { page = value; void load() }"
+      @page-size-change="value => { pageSize = value; page = 1; void load() }" />
     <el-dialog v-model="dialogVisible" :title="editing ? '编辑告警接收人' : '新增告警接收人'" width="min(760px, 76vw)"
       :close-on-click-modal="false" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="105px" class="receiver-form">

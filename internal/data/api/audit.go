@@ -3,6 +3,7 @@ package api
 import "time"
 
 type AuditListRequest struct {
+	PageRequest
 	Keyword   string `json:"keyword"`
 	Username  string `json:"username"`
 	Module    string `json:"module"`

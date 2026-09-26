@@ -7,9 +7,9 @@ const rows = ref<Host[]>([]); const total = ref(0); const page = ref(1); const p
 const auth = useAuthStore()
 const excelInput = ref<HTMLInputElement>()
 const excelBusy = ref(false)
+const selectedHosts = ref<Host[]>([])
 const tagItems = computed(() => form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
 const hostTypeLabels: Record<string, string> = { self: '自建主机', cloud: '云主机' }
-const visibleRows = computed(() => rows.value.filter(row => (selectedGroupID.value === null || row.group_id === selectedGroupID.value) && (statusFilter.value === null || row.status === statusFilter.value)))
 const treeData = computed<AssetTreeNode[]>(() => { const counts = new Map<number, number>(); rows.value.forEach(row => counts.set(row.group_id, (counts.get(row.group_id) || 0) + 1)); const nodes = new Map<number, AssetTreeNode>(); const roots: AssetTreeNode[] = []; groups.value.forEach(group => nodes.set(group.id, { id: group.id, label: group.name, count: counts.get(group.id) || 0, children: [] })); groups.value.forEach(group => { const node = nodes.get(group.id); const parent = nodes.get(group.parent_id); if (!node) return; if (group.parent_id && parent) parent.children.push(node); else roots.push(node) }); return roots })
 function componentIcon(icon: Component, className = 'el-icon') { const root = document.createElement('span'); root.className = className; render(h(icon), root); return root }
 function hostRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = `host-summary status-${p.data.status}`; const icon = componentIcon(Monitor, 'host-summary-icon el-icon'); const text = document.createElement('span'); text.className = 'host-summary-text'; const name = document.createElement('strong'); name.textContent = p.data.name || '-'; const address = document.createElement('small'); address.textContent = `${p.data.ip || '-'}:${p.data.port || 22}`; text.append(name, address); wrap.append(icon, text); return wrap }
@@ -24,8 +24,8 @@ function actionRenderer(p: any) { const wrap = document.createElement('div'); wr
 function formatBytes(value: number) { if (!value) return '-'; const units = ['B', 'K', 'M', 'G', 'T']; let size = value; let index = 0; while (size >= 1024 && index < units.length - 1) { size /= 1024; index++ }; return `${size.toFixed(index > 2 ? 1 : 0)}${units[index]}` }
 function metricRenderer(kind: 'cpu' | 'memory' | 'disk') { return (p: any) => { const row = p.data as Host; const usage = kind === 'cpu' ? row.cpu_usage : kind === 'memory' ? row.memory_usage : row.disk_usage; const headline = kind === 'cpu' ? (row.cpu_cores ? `${row.cpu_cores}核` : '-') : `${formatBytes(kind === 'memory' ? row.memory_used : row.disk_used)} / ${formatBytes(kind === 'memory' ? row.memory_total : row.disk_total)}`; const wrap = document.createElement('div'); wrap.className = `host-metric${usage >= 70 ? ' is-warning' : ''}`; const text = document.createElement('span'); text.textContent = headline; const details = document.createElement('div'); const bar = document.createElement('i'); const fill = document.createElement('b'); fill.style.width = `${Math.max(0, Math.min(100, usage || 0))}%`; bar.append(fill); const percent = document.createElement('small'); percent.textContent = usage ? `${usage.toFixed(1)}%` : '-'; details.append(bar, percent); wrap.append(text, details); return wrap } }
 function systemRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-system'; const os = document.createElement('span'); os.append(componentIcon(Monitor)); const osText = document.createElement('em'); osText.textContent = p.data.os || '-'; os.append(osText); const arch = document.createElement('small'); arch.append(componentIcon(Cpu)); const archText = document.createElement('em'); archText.textContent = p.data.arch || '-'; arch.append(archText); wrap.append(os, arch); return wrap }
-const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 58 }, { field: 'name', headerName: '主机', minWidth: 190, cellRenderer: hostRenderer }, { field: 'status', headerName: '状态', width: 86, cellRenderer: statusRenderer }, { field: 'host_type', headerName: '类型', width: 90, cellRenderer: typeRenderer }, { headerName: 'CPU', width: 132, cellRenderer: metricRenderer('cpu') }, { headerName: '内存', width: 160, cellRenderer: metricRenderer('memory') }, { headerName: '磁盘', width: 160, cellRenderer: metricRenderer('disk') }, { field: 'tags', headerName: '标签', width: 115, cellRenderer: tagsRenderer }, { headerName: '系统信息', minWidth: 170, flex: 1, cellRenderer: systemRenderer }, { headerName: '操作', pinned: 'right', width: 170, cellRenderer: actionRenderer }])
-async function load(reset = false) { if (reset) page.value = 1; const { data } = await listHosts(keyword.value, selectedGroupID.value || 0, page.value, pageSize.value); rows.value = data.data.list; total.value = data.data.total }
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((page.value - 1) * pageSize.value + (p.node?.rowIndex ?? 0) + 1), width: 58 }, { field: 'name', headerName: '主机', minWidth: 190, cellRenderer: hostRenderer }, { field: 'status', headerName: '状态', width: 86, cellRenderer: statusRenderer }, { field: 'host_type', headerName: '类型', width: 90, cellRenderer: typeRenderer }, { headerName: 'CPU', width: 132, cellRenderer: metricRenderer('cpu') }, { headerName: '内存', width: 160, cellRenderer: metricRenderer('memory') }, { headerName: '磁盘', width: 160, cellRenderer: metricRenderer('disk') }, { field: 'tags', headerName: '标签', width: 115, cellRenderer: tagsRenderer }, { headerName: '系统信息', minWidth: 170, flex: 1, cellRenderer: systemRenderer }, { headerName: '操作', pinned: 'right', width: 170, cellRenderer: actionRenderer }])
+async function load(reset = false) { if (reset) page.value = 1; const { data } = await listHosts(keyword.value, selectedGroupID.value || 0, page.value, pageSize.value, statusFilter.value); rows.value = data.data.list; total.value = data.data.total }
 function changePage(value: number) { page.value = value; void load() }
 function changePageSize(value: number) { pageSize.value = value; page.value = 1; void load() }
 async function loadFormOptions() { const [groupResult, credentialResult, cloudResult] = await Promise.all([listAssetGroups('', 1, 1000), listCredentials('', 1, 1000), listCloudAccounts('', 1, 1000)]); groups.value = groupResult.data.data.list; credentials.value = credentialResult.data.data.list; cloudAccounts.value = cloudResult.data.data.list }
@@ -56,7 +56,7 @@ async function exportExcel() {
     if (!auth.hasPermission('POST /api/v1/assets/hosts/export')) return
     excelBusy.value = true
     try {
-        const response = await exportHosts(keyword.value, selectedGroupID.value || 0)
+        const response = await exportHosts(keyword.value, selectedGroupID.value || 0, statusFilter.value, selectedHosts.value.map(host => host.id))
         downloadAttachment(response.data, response.headers['content-disposition'], '主机管理.xlsx')
         ElMessage.success('主机 Excel 已导出')
     } finally { excelBusy.value = false }
@@ -90,6 +90,7 @@ async function importExcel(event: Event) {
     }
 }
 watch(treeKeyword, value => assetTreeRef.value?.filter(value))
+watch(statusFilter, () => { void load(true) })
 watch(() => form.host_type, type => { if (type !== 'cloud') form.cloud_account_id = null })
 onMounted(() => { void load(); void loadFormOptions() })
 </script>
@@ -140,10 +141,11 @@ onMounted(() => { void load(); void loadFormOptions() })
                             @click="create">新增主机</el-button>
                     </div>
                 </div>
-                <AppDataGrid class="host-grid" :row-data="visibleRows" :column-defs="columns" pagination
+                <AppDataGrid class="host-grid" :row-data="rows" :column-defs="columns" pagination
                     :bulk-delete="auth.hasPermission('POST /api/v1/assets/hosts/delete') ? batchRemove : undefined"
                     server-pagination :total="total" :current-page="page" :page-size="pageSize"
-                    @page-change="changePage" @page-size-change="changePageSize" />
+                    @page-change="changePage" @page-size-change="changePageSize"
+                    @selection-changed="selectedHosts = $event as Host[]" />
             </section>
         </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑主机' : '新增主机'" width="60%">
             <el-form :model="form" label-width="92px" class="host-form">

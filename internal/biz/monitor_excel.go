@@ -20,9 +20,19 @@ import (
 var monitorExcelHeaders = []string{"域名", "端口", "请求客户端", "检测间隔(秒)", "抖动(秒)", "HTTPS", "证书校验", "启用告警", "响应阈值(毫秒)", "SSL到期提醒(天)", "状态", "响应时间(毫秒)", "SSL有效", "SSL到期时间", "根CA", "最后检测", "最近错误"}
 
 func (b *MonitorBiz) ExportDomains(req *api.MonitorDomainListRequest) (string, []byte, error) {
-	rows, err := b.ListDomains(req)
-	if err != nil {
-		return "", nil, err
+	pageRequest := *req
+	pageRequest.Page, pageRequest.Limit = 1, api.MaxLimit
+	rows := make([]*api.MonitorDomainResponse, 0)
+	for {
+		page, err := b.ListDomains(&pageRequest)
+		if err != nil {
+			return "", nil, err
+		}
+		rows = append(rows, page.List...)
+		if int64(len(rows)) >= page.Total || len(page.List) == 0 {
+			break
+		}
+		pageRequest.Page++
 	}
 	book := excelize.NewFile()
 	defer func() { _ = book.Close() }()

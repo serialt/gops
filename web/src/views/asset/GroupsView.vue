@@ -9,6 +9,10 @@ import { createAssetGroup, deleteAssetGroup, listAssetGroups, updateAssetGroup, 
 interface AssetGroupTreeNode { id: number; label: string; count: number; children: AssetGroupTreeNode[] }
 
 const rows = ref<AssetGroup[]>([])
+const tableRows = ref<AssetGroup[]>([])
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 const keyword = ref('')
 const treeKeyword = ref('')
 const selectedID = ref<number | null>(null)
@@ -39,16 +43,6 @@ const treeData = computed<AssetGroupTreeNode[]>(() => {
   return roots
 })
 const selectedName = computed(() => groupNameByID.value.get(selectedID.value ?? 0) ?? '全部资产分组')
-const tableRows = computed(() => {
-  const selected = selectedID.value
-  const term = keyword.value.trim().toLowerCase()
-  return rows.value.filter((group) => {
-    const matchesSelected = !selected || group.parent_id === selected
-    const matchesKeyword = !term || group.name.toLowerCase().includes(term) || group.code.toLowerCase().includes(term)
-    return matchesSelected && matchesKeyword
-  })
-})
-
 function actionButton(text: string, kind: string, onClick: () => void) {
   const button = document.createElement('button')
   button.className = `asset-action ${kind}`
@@ -58,7 +52,7 @@ function actionButton(text: string, kind: string, onClick: () => void) {
 }
 
 const columnDefs = computed<ColDef[]>(() => [
-  { headerName: '序号', valueGetter: (params) => String((params.node?.rowIndex ?? 0) + 1), width: 70 },
+  { headerName: '序号', valueGetter: (params) => String((page.value - 1) * pageSize.value + (params.node?.rowIndex ?? 0) + 1), width: 70 },
   { field: 'name', headerName: '分组名称', minWidth: 120 },
   { field: 'code', headerName: '分组编码', minWidth: 120 },
   { field: 'parent_id', headerName: '上级分组', valueFormatter: (params) => params.value ? (groupNameByID.value.get(params.value) ?? '未知分组') : '顶级分组', minWidth: 110 },
@@ -67,7 +61,7 @@ const columnDefs = computed<ColDef[]>(() => [
   { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (params: { data: AssetGroup }) => { const wrap = document.createElement('div'); wrap.className = 'asset-actions'; wrap.append(actionButton('编辑', 'edit', () => openEdit(params.data)), actionButton('删除', 'delete', () => remove(params.data))); return wrap } },
 ])
 
-function selectNode(node: AssetGroupTreeNode) { selectedID.value = node.id }
+function selectNode(node: AssetGroupTreeNode) { selectedID.value = node.id; page.value = 1; void loadTable() }
 function filterTreeNode(value: string, data: AssetGroupTreeNode) { return !value || data.label.toLowerCase().includes(value.toLowerCase()) }
 function startTreePaneDrag(event: PointerEvent) {
   if (event.button !== 0) return
@@ -89,7 +83,8 @@ function stopTreePaneDrag() {
   document.removeEventListener('pointerup', stopTreePaneDrag)
 }
 function toggleTreePane() { treePaneWidth.value = treePaneWidth.value === 0 ? 200 : 0 }
-async function load() { const { data } = await listAssetGroups('', 1, 1000); rows.value = data.data.list }
+async function load() { const { data } = await listAssetGroups('', 1, 1000); rows.value = data.data.list; await loadTable() }
+async function loadTable() { const { data } = await listAssetGroups(keyword.value, page.value, pageSize.value, selectedID.value || 0); tableRows.value = data.data.list; total.value = data.data.total }
 function openCreate() { editingID.value = null; Object.assign(form, { name: '', code: '', parent_id: selectedID.value ?? 0, description: '', sort_order: 0, status: true }); dialogVisible.value = true }
 function openEdit(row: AssetGroup) { editingID.value = row.id; Object.assign(form, row); dialogVisible.value = true }
 async function save() { if (!form.name || !form.code) return ElMessage.warning('请填写分组名称和编码'); if (editingID.value) await updateAssetGroup({ ...form, id: editingID.value }); else await createAssetGroup(form); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
@@ -106,6 +101,7 @@ async function batchRemoveGroups() {
 }
 
 watch(treeKeyword, (value) => groupTreeRef.value?.filter(value))
+watch(keyword, () => { page.value = 1; void loadTable() })
 onMounted(load)
 </script>
 
@@ -146,6 +142,9 @@ onMounted(load)
           </div>
         </div>
         <AppDataGrid class="asset-group-grid" :row-data="tableRows" :column-defs="columnDefs" pagination
+          server-pagination :total="total" :current-page="page" :page-size="pageSize"
+          @page-change="value => { page = value; void loadTable() }"
+          @page-size-change="value => { pageSize = value; page = 1; void loadTable() }"
           @selection-changed="handleGroupSelectionChanged" />
       </section>
     </div>

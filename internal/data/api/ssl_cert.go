@@ -3,6 +3,7 @@ package api
 import "time"
 
 type SSLCertificateListRequest struct {
+	PageRequest
 	Keyword string `json:"keyword"`
 }
 type SSLCertificateRequest struct {

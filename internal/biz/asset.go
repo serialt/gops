@@ -83,7 +83,7 @@ func (b *AssetBiz) DatabaseTypeOptions() []*api.DatabaseTypeOptionResponse {
 }
 
 func (b *AssetBiz) ListGroups(ctx context.Context, req *api.AssetGroupListRequest) (*api.PageResponse[*api.AssetGroupResponse], error) {
-	rows, total, err := b.repo.ListGroups(ctx, b.db, &define.AssetGroupListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword})
+	rows, total, err := b.repo.ListGroups(ctx, b.db, &define.AssetGroupListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword, ParentID: req.ParentID})
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +468,7 @@ func cloudAccountResponse(row model.CloudAccount) *api.CloudAccountResponse {
 }
 
 func (b *AssetBiz) ListHosts(ctx context.Context, req *api.HostListRequest) (*api.PageResponse[*api.HostResponse], error) {
-	rows, total, err := b.repo.ListHosts(ctx, b.db, &define.HostListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword, GroupID: req.GroupID})
+	rows, total, err := b.repo.ListHosts(ctx, b.db, &define.HostListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword, GroupID: req.GroupID, Status: req.Status, IDs: req.IDs})
 	if err != nil {
 		return nil, err
 	}
@@ -562,7 +562,7 @@ func hostResponse(r model.Host) *api.HostResponse {
 }
 
 func (b *AssetBiz) ListDBInstances(ctx context.Context, req *api.DbInstanceListRequest) (*api.PageResponse[*api.DbInstanceResponse], error) {
-	rows, total, err := b.repo.ListDBInstances(ctx, b.db, &define.DBInstanceListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword, GroupID: req.GroupID})
+	rows, total, err := b.repo.ListDBInstances(ctx, b.db, &define.DBInstanceListCond{Page: req.Page, Limit: req.Limit, Keyword: req.Keyword, GroupID: req.GroupID, DbType: req.DbType, IDs: req.IDs})
 	if err != nil {
 		return nil, err
 	}
@@ -727,16 +727,17 @@ func dbInstanceResponse(r model.DbInstance) *api.DbInstanceResponse {
 	return &api.DbInstanceResponse{ID: r.ID, GroupID: r.GroupID, Name: r.Name, DbType: r.DbType, Host: r.Host, Port: r.Port, Version: r.Version, CredentialID: r.CredentialID, Tags: r.Tags, Description: r.Description, Status: r.Status, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
-func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) ([]*api.TerminalSessionResponse, error) {
-	var rows []model.TerminalSession
-	q := b.db.Order("started_at DESC")
+func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) (*api.PageResponse[*api.TerminalSessionResponse], error) {
+	q := b.db.Model(&model.TerminalSession{}).Order("started_at DESC")
 	if req.SessionType != "" {
 		q = q.Where("session_type = ?", req.SessionType)
 	}
 	if req.Keyword != "" {
-		q = q.Where("CAST(user_id AS TEXT) LIKE ? OR CAST(host_id AS TEXT) LIKE ?", "%"+req.Keyword+"%", "%"+req.Keyword+"%")
+		like := "%" + req.Keyword + "%"
+		q = q.Where("CAST(user_id AS TEXT) LIKE ? OR CAST(host_id AS TEXT) LIKE ? OR EXISTS (SELECT 1 FROM \"user\" WHERE \"user\".id = terminal_session.user_id AND (username LIKE ? OR nickname LIKE ?)) OR EXISTS (SELECT 1 FROM host WHERE host.id = terminal_session.host_id AND (name LIKE ? OR ip LIKE ?)) OR EXISTS (SELECT 1 FROM db_instance WHERE db_instance.id = terminal_session.db_instance_id AND (name LIKE ? OR host LIKE ?))", like, like, like, like, like, like, like, like)
 	}
-	if err := q.Find(&rows).Error; err != nil {
+	rows, total, err := queryPage[model.TerminalSession](q, req.Page, req.Limit)
+	if err != nil {
 		return nil, err
 	}
 	userIDs := make([]int64, 0, len(rows))
@@ -797,7 +798,7 @@ func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) ([]
 		}
 		result = append(result, item)
 	}
-	return result, nil
+	return &api.PageResponse[*api.TerminalSessionResponse]{List: result, Total: total}, nil
 }
 func (b *AssetBiz) GetTerminalSessionRecording(req *api.TerminalSessionIDRequest) (*api.TerminalSessionRecordingResponse, error) {
 	var row model.TerminalSession

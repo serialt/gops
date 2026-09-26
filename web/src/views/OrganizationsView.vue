@@ -19,6 +19,8 @@ const treePaneStartX = ref(0)
 const treePaneStartWidth = ref(220)
 const currentPage = ref(1)
 const pageSize = ref(20)
+const total = ref(0)
+const tableRows = ref<Organization[]>([])
 const selectedOrganizations = ref<Organization[]>([])
 const form = reactive({ parent_id: null as number | null, name: '', code: '', manager: '', status: true })
 
@@ -35,15 +37,6 @@ const treeData = computed(() => {
 })
 
 const selectedName = computed(() => organizations.value.find(item => item.id === selectedId.value)?.name || '全部组织')
-const tableData = computed(() => organizations.value.filter(item => {
-  const matchesNode = !selectedId.value || item.parent_id === selectedId.value || item.id === selectedId.value
-  const term = keyword.value.trim().toLowerCase()
-  return matchesNode && (!term || item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term))
-}))
-const pagedTableData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return tableData.value.slice(start, start + pageSize.value)
-})
 function organizationActionButton(text: string, className: string, onClick: () => void) {
   const button = document.createElement('button')
   button.className = `grid-action ${className}`
@@ -58,7 +51,7 @@ const organizationColumnDefs = computed<ColDef[]>(() => [
   { headerName: '更新时间', valueGetter: params => formatDate(params.data.updated_at) },
   { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (params: any) => { const wrap = document.createElement('div'); wrap.className = 'grid-action-group'; wrap.append(organizationActionButton('编辑', 'edit', () => openEdit(params.data)), organizationActionButton('删除', 'delete', () => remove(params.data))); return wrap } },
 ])
-watch([keyword, selectedId], () => { currentPage.value = 1 })
+watch([keyword, selectedId], () => { currentPage.value = 1; void loadTable() })
 
 function selectNode(node: { id: number }) {
   selectedId.value = node.id
@@ -94,7 +87,16 @@ function toggleTreePane() {
   treePaneWidth.value = treePaneWidth.value === 0 ? 220 : 0
 }
 
-async function load() { const { data } = await getOrganizations(); organizations.value = data.data }
+async function load() {
+  const { data } = await getOrganizations('', 1, 1000)
+  organizations.value = data.data.list
+  await loadTable()
+}
+async function loadTable() {
+  const { data } = await getOrganizations(keyword.value, currentPage.value, pageSize.value, selectedId.value || 0)
+  tableRows.value = data.data.list
+  total.value = data.data.total
+}
 function openCreate() { editingId.value = null; Object.assign(form, { parent_id: selectedId.value, name: '', code: '', manager: '', status: true }); dialogVisible.value = true }
 function openEdit(row: Organization) { editingId.value = row.id; Object.assign(form, { parent_id: row.parent_id, name: row.name, code: row.code, manager: row.manager, status: row.status }); dialogVisible.value = true }
 async function save() { if (!form.name || !form.code) return ElMessage.warning('请填写组织名称和编码'); if (editingId.value) await updateOrganization(editingId.value, form); else await createOrganization(form); ElMessage.success('保存成功'); dialogVisible.value = false; await load() }
@@ -111,7 +113,8 @@ async function batchRemoveOrganizations() {
 }
 onMounted(load)
 function organizationIndex(index: number) { return (currentPage.value - 1) * pageSize.value + index + 1 }
-function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1 }
+function handlePageChange(page: number) { currentPage.value = page; void loadTable() }
+function handlePageSizeChange(size: number) { pageSize.value = size; currentPage.value = 1; void loadTable() }
 </script>
 
 <template>
@@ -151,12 +154,12 @@ function handlePageSizeChange(size: number) { pageSize.value = size; currentPage
           <div class="list-toolbar">
             <el-input v-model="keyword" placeholder="搜索组织名称或编码" clearable :prefix-icon="Search" />
           </div>
-          <AppDataGrid :row-data="pagedTableData" :column-defs="organizationColumnDefs"
+          <AppDataGrid :row-data="tableRows" :column-defs="organizationColumnDefs"
             @selection-changed="handleOrganizationSelectionChanged" />
           <div class="pagination-bar">
             <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize"
-              :page-sizes="[20, 50, 100, 500, 1000]" :total="tableData.length" layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handlePageSizeChange" />
+              :page-sizes="[20, 50, 100, 500, 1000]" :total="total" layout="total, sizes, prev, pager, next, jumper"
+              @current-change="handlePageChange" @size-change="handlePageSizeChange" />
           </div>
         </div>
       </section>

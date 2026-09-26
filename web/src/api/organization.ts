@@ -1,14 +1,14 @@
 import type { Organization } from '@/types'
-import request from '@/utils/request'
+import request, { type PageResponse } from '@/utils/request'
 
-export interface OrganizationResponse extends Organization {}
-export interface OrganizationListRequest { keyword: string }
+export interface OrganizationResponse extends Organization { }
+export interface OrganizationListRequest { keyword: string; page: number; limit: number; selected_id: number }
 export interface OrganizationCreateRequest { parent_id: number | null; name: string; code: string; manager: string; status: boolean }
 export interface OrganizationUpdateRequest extends OrganizationCreateRequest { id: number }
 export interface OrganizationMoveRequest { parent_id: number | null; sort_order: number }
 export interface OrganizationIDRequest { id: number }
 
-export const getOrganizations = (keyword = '') => request.post<OrganizationResponse[]>('/organizations/list', { keyword } satisfies OrganizationListRequest)
+export const getOrganizations = (keyword = '', page = 1, limit = 20, selected_id = 0) => request.post<PageResponse<OrganizationResponse>>('/organizations/list', { keyword, page, limit, selected_id } satisfies OrganizationListRequest)
 export const createOrganization = (data: OrganizationCreateRequest) => request.post<OrganizationResponse>('/organizations/create', data)
 export const updateOrganization = (id: number, data: OrganizationCreateRequest) => request.post<OrganizationResponse>('/organizations/update', { ...data, id } satisfies OrganizationUpdateRequest)
 export const deleteOrganization = (id: number) => request.post<null>('/organizations/delete', { id } satisfies OrganizationIDRequest)

@@ -128,20 +128,20 @@ func (b *KubernetesBiz) StartStatusScheduler(ctx context.Context, interval time.
 	}
 }
 
-func (b *KubernetesBiz) List(r *api.KubernetesClusterListRequest) ([]*api.KubernetesClusterResponse, error) {
-	var a []model.KubernetesCluster
-	q := b.db.Order("id DESC")
+func (b *KubernetesBiz) List(r *api.KubernetesClusterListRequest) (*api.PageResponse[*api.KubernetesClusterResponse], error) {
+	q := b.db.Model(&model.KubernetesCluster{}).Order("id DESC")
 	if r.Keyword != "" {
 		q = q.Where("name LIKE ? OR alias LIKE ?", "%"+r.Keyword+"%", "%"+r.Keyword+"%")
 	}
-	if e := q.Find(&a).Error; e != nil {
+	a, total, e := queryPage[model.KubernetesCluster](q, r.Page, r.Limit)
+	if e != nil {
 		return nil, e
 	}
 	o := make([]*api.KubernetesClusterResponse, 0, len(a))
 	for _, x := range a {
 		o = append(o, k8sCluster(x))
 	}
-	return o, nil
+	return &api.PageResponse[*api.KubernetesClusterResponse]{List: o, Total: total}, nil
 }
 func (b *KubernetesBiz) Save(r *api.KubernetesClusterRequest) (*api.KubernetesClusterResponse, error) {
 	x := model.KubernetesCluster{ID: r.ID, Name: r.Name, Alias_: r.Alias, APIEndpoint: r.APIEndpoint, KubeConfig: r.KubeConfig, Region: r.Region, Provider: r.Provider, Description: r.Description, Status: r.Status}

@@ -8,7 +8,7 @@ import AppDataGrid from '@/components/AppDataGrid.vue'
 import { deleteKubernetesCluster, getKubernetesClusterConfig, listKubernetesClusters, listKubernetesObjects, saveKubernetesCluster, syncKubernetesClusters, testKubernetesCluster, type KubernetesCluster, type KubernetesObject } from '@/api/kubernetes'
 
 type AuthMode = 'kubeconfig' | 'serviceAccount'
-const rows = ref<KubernetesCluster[]>([]), allRows = ref<KubernetesCluster[]>([]), keyword = ref(''), dialog = ref(false), saving = ref(false), syncing = ref(false)
+const rows = ref<KubernetesCluster[]>([]), allRows = ref<KubernetesCluster[]>([]), keyword = ref(''), dialog = ref(false), saving = ref(false), syncing = ref(false), page = ref(1), pageSize = ref(20), total = ref(0)
 const router = useRouter(), credentialDialog = ref(false), credentialCluster = ref<KubernetesCluster | null>(null), credentialContent = ref('')
 const authorizationDialog = ref(false), authorizationTab = ref('connection'), authorizationCluster = ref<KubernetesCluster | null>(null), roleScope = ref('clusterroles'), authorizationRoles = ref<KubernetesObject[]>([]), rolesLoading = ref(false)
 const authorizationUsers = ref<{ username: string; serviceAccount: string; namespace: string; createdAt: string; status: string }[]>([])
@@ -20,7 +20,7 @@ const rules: FormRules = {
   api_endpoint: [{ validator: (_r, _v, done) => form.authMode === 'serviceAccount' && !form.api_endpoint.trim() ? done(new Error('请输入 API Server 地址')) : done(), trigger: 'blur' }],
   token: [{ validator: (_r, _v, done) => form.authMode === 'serviceAccount' && !form.token.trim() ? done(new Error('请输入 Service Account Token')) : done(), trigger: 'blur' }],
 }
-async function load() { if (!keyword.value) { const { data } = await listKubernetesClusters(); rows.value = data.data; allRows.value = data.data; return } const [filtered, all] = await Promise.all([listKubernetesClusters(keyword.value), listKubernetesClusters()]); rows.value = filtered.data.data; allRows.value = all.data.data }
+async function load() { const [filtered, all] = await Promise.all([listKubernetesClusters(keyword.value, page.value, pageSize.value), listKubernetesClusters('', 1, 1000)]); rows.value = filtered.data.data.list; total.value = filtered.data.data.total; allRows.value = all.data.data.list }
 function reset() { Object.assign(form, { id: 0, name: '', alias: '', authMode: 'kubeconfig', api_endpoint: '', kube_config: '', token: '', ca_data: '', region: '', provider: 'self', description: '', status: 1 }) }
 function open(row?: KubernetesCluster) { reset(); if (row) Object.assign(form, { ...row, authMode: 'kubeconfig', kube_config: '' }); dialog.value = true }
 async function readConfig(file: UploadFile) { if (!file.raw) return; form.kube_config = await file.raw.text(); ElMessage.success('KubeConfig 文件已读取') }
@@ -28,7 +28,7 @@ function serviceAccountKubeConfig() { const ca = form.ca_data.trim(); return `ap
 async function save() { if (!await formRef.value?.validate().catch(() => false)) return; saving.value = true; try { await saveKubernetesCluster({ id: form.id, name: form.name.trim(), alias: form.alias.trim(), api_endpoint: form.api_endpoint.trim(), kube_config: form.authMode === 'serviceAccount' ? serviceAccountKubeConfig() : form.kube_config, region: form.region.trim(), provider: form.provider, description: form.description.trim(), status: form.status }); dialog.value = false; ElMessage.success(form.id ? '集群更新成功' : '集群注册成功'); await load() } finally { saving.value = false } }
 async function test(row: KubernetesCluster) { const message = ElMessage({ message: '正在同步集群信息...', type: 'info', duration: 0, showClose: false }); try { await testKubernetesCluster(row.id); message.close(); ElMessage.success('同步成功'); await load() } catch (error) { message.close(); throw error } }
 async function showCredential(row: KubernetesCluster) { const { data } = await getKubernetesClusterConfig(row.id); credentialCluster.value = row; credentialContent.value = data.data.kube_config; credentialDialog.value = true }
-async function loadAuthorizationRoles() { if (!authorizationCluster.value) return; rolesLoading.value = true; try { const { data } = await listKubernetesObjects({ cluster_id: authorizationCluster.value.id, resource: roleScope.value }); authorizationRoles.value = data.data } finally { rolesLoading.value = false } }
+async function loadAuthorizationRoles() { if (!authorizationCluster.value) return; rolesLoading.value = true; try { const { data } = await listKubernetesObjects({ cluster_id: authorizationCluster.value.id, resource: roleScope.value, page: 1, limit: 1000 }); authorizationRoles.value = data.data.list } finally { rolesLoading.value = false } }
 function openAuthorization(row: KubernetesCluster) { authorizationCluster.value = row; authorizationTab.value = 'connection'; roleScope.value = 'clusterroles'; authorizationRoles.value = []; authorizationDialog.value = true }
 function manageAuthorization() { if (!authorizationCluster.value) return; authorizationDialog.value = false; router.push({ path: '/kubernetes/access', query: { cluster_id: authorizationCluster.value.id } }) }
 async function copyCredential() { await navigator.clipboard.writeText(credentialContent.value); ElMessage.success('凭证已复制') }
@@ -36,7 +36,7 @@ function downloadCredential() { const blob = new Blob([credentialContent.value],
 async function syncStatus() { syncing.value = true; const message = ElMessage({ message: '正在同步集群信息...', type: 'info', duration: 0, showClose: false }); try { const { data } = await syncKubernetesClusters(); message.close(); const result = data.data; if (result.failed) ElMessage.warning(`同步完成：成功 ${result.success}，失败 ${result.failed}`); else ElMessage.success('同步成功'); await load() } catch (error) { message.close(); throw error } finally { syncing.value = false } }
 async function remove(row: KubernetesCluster) { await ElMessageBox.confirm(`确定删除集群“${row.alias || row.name}”？`, '确认删除'); await deleteKubernetesCluster(row.id); load() }
 async function batchRemove(selectedRows: unknown[]) { const selected = selectedRows as KubernetesCluster[]; if (!selected.length) return; await ElMessageBox.confirm(`确定删除选中的 ${selected.length} 个集群？`, '批量删除确认'); await Promise.all(selected.map(row => deleteKubernetesCluster(row.id))); ElMessage.success('批量删除成功'); await load() }
-watch(keyword, load)
+watch(keyword, () => { page.value = 1; void load() })
 watch([authorizationTab, roleScope], () => { if (authorizationDialog.value && authorizationTab.value === 'roles') loadAuthorizationRoles() })
 const stats = computed(() => ({ total: allRows.value.length, healthy: allRows.value.filter(x => x.status === 1).length, nodes: allRows.value.reduce((sum, x) => sum + Number(x.node_count || 0), 0), selfHosted: allRows.value.filter(x => !x.provider || x.provider === 'self').length }))
 const providerNames: Record<string, string> = { self: '自建集群', aliyun: '阿里云 ACK', tencent: '腾讯云 TKE', huawei: '华为云 CCE', aws: 'Amazon EKS', gcp: 'Google GKE', azure: 'Microsoft AKS' }
@@ -56,7 +56,7 @@ function actionButton(text: string, type: keyof typeof actionIcons, onClick: () 
   return button
 }
 const columns = computed<ColDef[]>(() => [
-  { headerName: '序号', valueGetter: (p: any) => p.node.rowIndex + 1, width: 70 },
+  { headerName: '序号', valueGetter: (p: any) => (page.value - 1) * pageSize.value + p.node.rowIndex + 1, width: 70 },
   { field: 'name', headerName: '▰ 集群名称', minWidth: 170 },
   { field: 'alias', headerName: '别名', minWidth: 120, valueFormatter: p => p.value || '-' },
   { field: 'status', headerName: '状态', width: 92, cellRenderer: (p: any) => { const tag = document.createElement('span'); tag.className = `cluster-status ${p.value ? 'is-healthy' : 'is-offline'}`; tag.textContent = p.value ? '正常' : '未连接'; return tag } },
@@ -103,7 +103,10 @@ onMounted(load)
         <div class="stat-content"><span>自建集群</span><strong>{{ stats.selfHosted }}</strong></div>
       </div>
     </div>
-    <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination :bulk-delete="batchRemove" />
+    <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
+      :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove"
+      @page-change="value => { page = value; void load() }"
+      @page-size-change="value => { pageSize = value; page = 1; void load() }" />
     <el-dialog v-model="dialog" class="register-dialog" :title="form.id ? '编辑集群' : '注册集群'" width="60%" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" status-icon>
         <div class="section-title">基本信息</div>
@@ -175,7 +178,7 @@ onMounted(load)
                 <div><span>别名</span><strong>{{ authorizationCluster.alias || '-' }}</strong></div>
               </div>
               <div class="info-item"><span>API Endpoint</span><strong>{{ authorizationCluster.api_endpoint || '-'
-              }}</strong></div>
+                  }}</strong></div>
               <div class="info-item"><span>版本</span><strong>{{ authorizationCluster.version || '-' }}</strong></div>
             </div>
             <div class="authorization-heading">

@@ -10,20 +10,20 @@ import (
 type NginxBiz struct{ db *gorm.DB }
 
 func NewNginxBiz(db *gorm.DB) *NginxBiz { return &NginxBiz{db} }
-func (b *NginxBiz) ListSources(r *api.NginxSourceListRequest) ([]*api.NginxSourceResponse, error) {
-	var rows []model.NginxSource
-	q := b.db.Order("id DESC")
+func (b *NginxBiz) ListSources(r *api.NginxSourceListRequest) (*api.PageResponse[*api.NginxSourceResponse], error) {
+	q := b.db.Model(&model.NginxSource{}).Order("id DESC")
 	if r.Keyword != "" {
 		q = q.Where("name LIKE ?", "%"+r.Keyword+"%")
 	}
-	if e := q.Find(&rows).Error; e != nil {
+	rows, total, e := queryPage[model.NginxSource](q, r.Page, r.Limit)
+	if e != nil {
 		return nil, e
 	}
 	out := make([]*api.NginxSourceResponse, 0, len(rows))
 	for _, x := range rows {
 		out = append(out, nginxSource(x))
 	}
-	return out, nil
+	return &api.PageResponse[*api.NginxSourceResponse]{List: out, Total: total}, nil
 }
 func (b *NginxBiz) SaveSource(r *api.NginxSourceRequest) (*api.NginxSourceResponse, error) {
 	x := model.NginxSource{ID: r.ID, Name: r.Name, SourceType: r.SourceType, Description: r.Description, Status: r.Status, HostID: r.HostID, LogPath: r.LogPath, LogFormat: r.LogFormat, CollectInterval: r.CollectInterval, RetentionDays: r.RetentionDays}
@@ -78,23 +78,23 @@ func (b *NginxBiz) Overview() (*api.NginxOverviewResponse, error) {
 	}
 	return o, nil
 }
-func (b *NginxBiz) ListLogs(r *api.NginxAccessLogListRequest) ([]*api.NginxAccessLogResponse, error) {
-	var rows []model.NginxAccessLog
-	q := b.db.Order("occurred_at DESC")
+func (b *NginxBiz) ListLogs(r *api.NginxAccessLogListRequest) (*api.PageResponse[*api.NginxAccessLogResponse], error) {
+	q := b.db.Model(&model.NginxAccessLog{}).Order("occurred_at DESC")
 	if r.SourceID > 0 {
 		q = q.Where("source_id = ?", r.SourceID)
 	}
 	if r.Keyword != "" {
 		q = q.Where("uri LIKE ? OR remote_addr LIKE ?", "%"+r.Keyword+"%", "%"+r.Keyword+"%")
 	}
-	if e := q.Find(&rows).Error; e != nil {
+	rows, total, e := queryPage[model.NginxAccessLog](q, r.Page, r.Limit)
+	if e != nil {
 		return nil, e
 	}
 	out := make([]*api.NginxAccessLogResponse, 0, len(rows))
 	for _, x := range rows {
 		out = append(out, &api.NginxAccessLogResponse{ID: x.ID, SourceID: x.SourceID, OccurredAt: x.OccurredAt, RemoteAddr: x.RemoteAddr, Method: x.Method, URI: x.URI, Status: x.Status, BodyBytesSent: x.BodyBytesSent, RequestTime: x.RequestTime, UserAgent: x.UserAgent})
 	}
-	return out, nil
+	return &api.PageResponse[*api.NginxAccessLogResponse]{List: out, Total: total}, nil
 }
 func nginxSource(x model.NginxSource) *api.NginxSourceResponse {
 	return &api.NginxSourceResponse{ID: x.ID, Name: x.Name, SourceType: x.SourceType, Description: x.Description, Status: x.Status, HostID: x.HostID, LogPath: x.LogPath, LogFormat: x.LogFormat, CollectInterval: x.CollectInterval, RetentionDays: x.RetentionDays, LastCollectLogs: x.LastCollectLogs, LastError: x.LastError, UpdatedAt: x.UpdatedAt}
