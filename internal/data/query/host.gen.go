@@ -42,6 +42,9 @@ func newHost(db *gorm.DB, opts ...gen.DOOption) host {
 	_host.Os = field.NewString(tableName, "os")
 	_host.Kernel = field.NewString(tableName, "kernel")
 	_host.Arch = field.NewString(tableName, "arch")
+	_host.CreatedAt = field.NewTime(tableName, "created_at")
+	_host.UpdatedAt = field.NewTime(tableName, "updated_at")
+	_host.DeletedAt = field.NewField(tableName, "deleted_at")
 	_host.CPUInfo = field.NewString(tableName, "cpu_info")
 	_host.CPUCores = field.NewInt64(tableName, "cpu_cores")
 	_host.CPUUsage = field.NewFloat64(tableName, "cpu_usage")
@@ -53,9 +56,6 @@ func newHost(db *gorm.DB, opts ...gen.DOOption) host {
 	_host.DiskUsage = field.NewFloat64(tableName, "disk_usage")
 	_host.Uptime = field.NewString(tableName, "uptime")
 	_host.Hostname = field.NewString(tableName, "hostname")
-	_host.CreatedAt = field.NewTime(tableName, "created_at")
-	_host.UpdatedAt = field.NewTime(tableName, "updated_at")
-	_host.DeletedAt = field.NewField(tableName, "deleted_at")
 
 	_host.fillFieldMap()
 
@@ -81,6 +81,9 @@ type host struct {
 	Os             field.String
 	Kernel         field.String
 	Arch           field.String
+	CreatedAt      field.Time
+	UpdatedAt      field.Time
+	DeletedAt      field.Field
 	CPUInfo        field.String
 	CPUCores       field.Int64
 	CPUUsage       field.Float64
@@ -92,9 +95,6 @@ type host struct {
 	DiskUsage      field.Float64
 	Uptime         field.String
 	Hostname       field.String
-	CreatedAt      field.Time
-	UpdatedAt      field.Time
-	DeletedAt      field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -126,6 +126,9 @@ func (h *host) updateTableName(table string) *host {
 	h.Os = field.NewString(table, "os")
 	h.Kernel = field.NewString(table, "kernel")
 	h.Arch = field.NewString(table, "arch")
+	h.CreatedAt = field.NewTime(table, "created_at")
+	h.UpdatedAt = field.NewTime(table, "updated_at")
+	h.DeletedAt = field.NewField(table, "deleted_at")
 	h.CPUInfo = field.NewString(table, "cpu_info")
 	h.CPUCores = field.NewInt64(table, "cpu_cores")
 	h.CPUUsage = field.NewFloat64(table, "cpu_usage")
@@ -137,9 +140,6 @@ func (h *host) updateTableName(table string) *host {
 	h.DiskUsage = field.NewFloat64(table, "disk_usage")
 	h.Uptime = field.NewString(table, "uptime")
 	h.Hostname = field.NewString(table, "hostname")
-	h.CreatedAt = field.NewTime(table, "created_at")
-	h.UpdatedAt = field.NewTime(table, "updated_at")
-	h.DeletedAt = field.NewField(table, "deleted_at")
 
 	h.fillFieldMap()
 
@@ -180,6 +180,9 @@ func (h *host) fillFieldMap() {
 	h.fieldMap["os"] = h.Os
 	h.fieldMap["kernel"] = h.Kernel
 	h.fieldMap["arch"] = h.Arch
+	h.fieldMap["created_at"] = h.CreatedAt
+	h.fieldMap["updated_at"] = h.UpdatedAt
+	h.fieldMap["deleted_at"] = h.DeletedAt
 	h.fieldMap["cpu_info"] = h.CPUInfo
 	h.fieldMap["cpu_cores"] = h.CPUCores
 	h.fieldMap["cpu_usage"] = h.CPUUsage
@@ -191,9 +194,6 @@ func (h *host) fillFieldMap() {
 	h.fieldMap["disk_usage"] = h.DiskUsage
 	h.fieldMap["uptime"] = h.Uptime
 	h.fieldMap["hostname"] = h.Hostname
-	h.fieldMap["created_at"] = h.CreatedAt
-	h.fieldMap["updated_at"] = h.UpdatedAt
-	h.fieldMap["deleted_at"] = h.DeletedAt
 }
 
 func (h host) clone(db *gorm.DB) host {

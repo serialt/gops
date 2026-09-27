@@ -31,11 +31,11 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 	_user.Username = field.NewString(tableName, "username")
 	_user.PasswordHash = field.NewString(tableName, "password_hash")
 	_user.Nickname = field.NewString(tableName, "nickname")
-	_user.Email = field.NewString(tableName, "email")
 	_user.Status = field.NewBool(tableName, "status")
 	_user.CreatedAt = field.NewTime(tableName, "created_at")
 	_user.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_user.DeletedAt = field.NewField(tableName, "deleted_at")
+	_user.Email = field.NewString(tableName, "email")
 	_user.Roles = userHasManyRoles{
 		db: db.Session(&gorm.Session{}),
 
@@ -61,11 +61,11 @@ type user struct {
 	Username     field.String
 	PasswordHash field.String
 	Nickname     field.String
-	Email        field.String
 	Status       field.Bool
 	CreatedAt    field.Time
 	UpdatedAt    field.Time
 	DeletedAt    field.Field
+	Email        field.String
 	Roles        userHasManyRoles
 
 	Organizations userHasManyOrganizations
@@ -89,11 +89,11 @@ func (u *user) updateTableName(table string) *user {
 	u.Username = field.NewString(table, "username")
 	u.PasswordHash = field.NewString(table, "password_hash")
 	u.Nickname = field.NewString(table, "nickname")
-	u.Email = field.NewString(table, "email")
 	u.Status = field.NewBool(table, "status")
 	u.CreatedAt = field.NewTime(table, "created_at")
 	u.UpdatedAt = field.NewTime(table, "updated_at")
 	u.DeletedAt = field.NewField(table, "deleted_at")
+	u.Email = field.NewString(table, "email")
 
 	u.fillFieldMap()
 
@@ -123,11 +123,11 @@ func (u *user) fillFieldMap() {
 	u.fieldMap["username"] = u.Username
 	u.fieldMap["password_hash"] = u.PasswordHash
 	u.fieldMap["nickname"] = u.Nickname
-	u.fieldMap["email"] = u.Email
 	u.fieldMap["status"] = u.Status
 	u.fieldMap["created_at"] = u.CreatedAt
 	u.fieldMap["updated_at"] = u.UpdatedAt
 	u.fieldMap["deleted_at"] = u.DeletedAt
+	u.fieldMap["email"] = u.Email
 
 }
 

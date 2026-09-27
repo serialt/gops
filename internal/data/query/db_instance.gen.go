@@ -28,7 +28,6 @@ func newDbInstance(db *gorm.DB, opts ...gen.DOOption) dbInstance {
 	tableName := _dbInstance.dbInstanceDo.TableName()
 	_dbInstance.ALL = field.NewAsterisk(tableName)
 	_dbInstance.ID = field.NewInt64(tableName, "id")
-	_dbInstance.GroupID = field.NewInt64(tableName, "group_id")
 	_dbInstance.Name = field.NewString(tableName, "name")
 	_dbInstance.DbType = field.NewString(tableName, "db_type")
 	_dbInstance.Host = field.NewString(tableName, "host")
@@ -41,6 +40,7 @@ func newDbInstance(db *gorm.DB, opts ...gen.DOOption) dbInstance {
 	_dbInstance.CreatedAt = field.NewTime(tableName, "created_at")
 	_dbInstance.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_dbInstance.DeletedAt = field.NewField(tableName, "deleted_at")
+	_dbInstance.GroupID = field.NewInt64(tableName, "group_id")
 
 	_dbInstance.fillFieldMap()
 
@@ -52,7 +52,6 @@ type dbInstance struct {
 
 	ALL          field.Asterisk
 	ID           field.Int64
-	GroupID      field.Int64
 	Name         field.String
 	DbType       field.String
 	Host         field.String
@@ -65,6 +64,7 @@ type dbInstance struct {
 	CreatedAt    field.Time
 	UpdatedAt    field.Time
 	DeletedAt    field.Field
+	GroupID      field.Int64
 
 	fieldMap map[string]field.Expr
 }
@@ -82,7 +82,6 @@ func (d dbInstance) As(alias string) *dbInstance {
 func (d *dbInstance) updateTableName(table string) *dbInstance {
 	d.ALL = field.NewAsterisk(table)
 	d.ID = field.NewInt64(table, "id")
-	d.GroupID = field.NewInt64(table, "group_id")
 	d.Name = field.NewString(table, "name")
 	d.DbType = field.NewString(table, "db_type")
 	d.Host = field.NewString(table, "host")
@@ -95,6 +94,7 @@ func (d *dbInstance) updateTableName(table string) *dbInstance {
 	d.CreatedAt = field.NewTime(table, "created_at")
 	d.UpdatedAt = field.NewTime(table, "updated_at")
 	d.DeletedAt = field.NewField(table, "deleted_at")
+	d.GroupID = field.NewInt64(table, "group_id")
 
 	d.fillFieldMap()
 
@@ -123,7 +123,6 @@ func (d *dbInstance) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 func (d *dbInstance) fillFieldMap() {
 	d.fieldMap = make(map[string]field.Expr, 14)
 	d.fieldMap["id"] = d.ID
-	d.fieldMap["group_id"] = d.GroupID
 	d.fieldMap["name"] = d.Name
 	d.fieldMap["db_type"] = d.DbType
 	d.fieldMap["host"] = d.Host
@@ -136,6 +135,7 @@ func (d *dbInstance) fillFieldMap() {
 	d.fieldMap["created_at"] = d.CreatedAt
 	d.fieldMap["updated_at"] = d.UpdatedAt
 	d.fieldMap["deleted_at"] = d.DeletedAt
+	d.fieldMap["group_id"] = d.GroupID
 }
 
 func (d dbInstance) clone(db *gorm.DB) dbInstance {

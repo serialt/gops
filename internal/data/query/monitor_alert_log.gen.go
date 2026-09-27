@@ -33,9 +33,9 @@ func newMonitorAlertLog(db *gorm.DB, opts ...gen.DOOption) monitorAlertLog {
 	_monitorAlertLog.Status = field.NewString(tableName, "status")
 	_monitorAlertLog.Message = field.NewString(tableName, "message")
 	_monitorAlertLog.ChannelType = field.NewString(tableName, "channel_type")
-	_monitorAlertLog.ReceiverNames = field.NewString(tableName, "receiver_names")
 	_monitorAlertLog.ErrorMessage = field.NewString(tableName, "error_message")
 	_monitorAlertLog.SentAt = field.NewTime(tableName, "sent_at")
+	_monitorAlertLog.ReceiverNames = field.NewString(tableName, "receiver_names")
 
 	_monitorAlertLog.fillFieldMap()
 
@@ -52,9 +52,9 @@ type monitorAlertLog struct {
 	Status        field.String
 	Message       field.String
 	ChannelType   field.String
-	ReceiverNames field.String
 	ErrorMessage  field.String
 	SentAt        field.Time
+	ReceiverNames field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -77,9 +77,9 @@ func (m *monitorAlertLog) updateTableName(table string) *monitorAlertLog {
 	m.Status = field.NewString(table, "status")
 	m.Message = field.NewString(table, "message")
 	m.ChannelType = field.NewString(table, "channel_type")
-	m.ReceiverNames = field.NewString(table, "receiver_names")
 	m.ErrorMessage = field.NewString(table, "error_message")
 	m.SentAt = field.NewTime(table, "sent_at")
+	m.ReceiverNames = field.NewString(table, "receiver_names")
 
 	m.fillFieldMap()
 
@@ -115,9 +115,9 @@ func (m *monitorAlertLog) fillFieldMap() {
 	m.fieldMap["status"] = m.Status
 	m.fieldMap["message"] = m.Message
 	m.fieldMap["channel_type"] = m.ChannelType
-	m.fieldMap["receiver_names"] = m.ReceiverNames
 	m.fieldMap["error_message"] = m.ErrorMessage
 	m.fieldMap["sent_at"] = m.SentAt
+	m.fieldMap["receiver_names"] = m.ReceiverNames
 }
 
 func (m monitorAlertLog) clone(db *gorm.DB) monitorAlertLog {
