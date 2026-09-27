@@ -2,55 +2,55 @@
 -- Gops SQLite 最终基线结构。历史建表、字段调整与数据修复迁移已合并至此文件。
 
 CREATE TABLE IF NOT EXISTS role (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code VARCHAR(64) NOT NULL UNIQUE,
-  name VARCHAR(64) NOT NULL,
-  description VARCHAR(255),
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 角色ID */
+  code VARCHAR(64) NOT NULL UNIQUE, /* 角色编码 */
+  name VARCHAR(64) NOT NULL, /* 角色名称 */
+  description VARCHAR(255), /* 角色说明 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_role_code_active ON role(code) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS user (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username VARCHAR(64) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  nickname VARCHAR(64) NOT NULL,
-  email VARCHAR(255) NOT NULL DEFAULT '',
-  status BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 用户ID */
+  username VARCHAR(64) NOT NULL UNIQUE, /* 用户名 */
+  password_hash VARCHAR(255) NOT NULL, /* 密码哈希 */
+  nickname VARCHAR(64) NOT NULL, /* 用户昵称 */
+  email VARCHAR(255) NOT NULL DEFAULT '', /* 邮箱地址 */
+  status BOOLEAN NOT NULL DEFAULT TRUE, /* 是否启用 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_username_active ON user(username) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_email_active ON user(email) WHERE deleted_at IS NULL AND email <> '';
 
 CREATE TABLE IF NOT EXISTS user_role (
-  user_id INTEGER NOT NULL,
-  role_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL, /* 用户ID */
+  role_id INTEGER NOT NULL, /* 角色ID */
   PRIMARY KEY (user_id, role_id)
 );
 CREATE INDEX IF NOT EXISTS idx_user_role_role_id ON user_role(role_id);
 
 CREATE TABLE IF NOT EXISTS organization (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  parent_id INTEGER REFERENCES organization(id) ON DELETE RESTRICT,
-  name VARCHAR(64) NOT NULL,
-  code VARCHAR(64) NOT NULL,
-  manager VARCHAR(64) NOT NULL DEFAULT '',
-  status BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME,
-  sort_order INTEGER NOT NULL DEFAULT 0
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 组织ID */
+  parent_id INTEGER REFERENCES organization(id) ON DELETE RESTRICT, /* 上级组织ID */
+  name VARCHAR(64) NOT NULL, /* 组织名称 */
+  code VARCHAR(64) NOT NULL, /* 组织编码 */
+  manager VARCHAR(64) NOT NULL DEFAULT '', /* 负责人 */
+  status BOOLEAN NOT NULL DEFAULT TRUE, /* 是否启用 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME, /* 删除时间 */
+  sort_order INTEGER NOT NULL DEFAULT 0 /* 排序值 */
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_organization_code_active ON organization(code) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_organization_parent_id ON organization(parent_id);
 
 CREATE TABLE IF NOT EXISTS organization_user (
-  organization_id INTEGER NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
-  user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  organization_id INTEGER NOT NULL REFERENCES organization(id) ON DELETE CASCADE, /* 组织ID */
+  user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE, /* 用户ID */
   PRIMARY KEY (organization_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_organization_user_user_id ON organization_user(user_id);
@@ -70,373 +70,477 @@ WHERE root.code = 'root' AND root.deleted_at IS NULL
   );
 
 CREATE TABLE IF NOT EXISTS system_config (
-  config_key VARCHAR(128) PRIMARY KEY,
-  config_value TEXT NOT NULL DEFAULT '',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  config_key VARCHAR(128) PRIMARY KEY, /* 配置键 */
+  config_value TEXT NOT NULL DEFAULT '', /* 配置值 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 INSERT INTO system_config(config_key, config_value) VALUES ('system_name', 'Gops') ON CONFLICT(config_key) DO NOTHING;
 INSERT INTO system_config(config_key, config_value) VALUES ('system_description', '') ON CONFLICT(config_key) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS asset_group (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name VARCHAR(100) NOT NULL,
-  code VARCHAR(50) NOT NULL,
-  parent_id BIGINT NOT NULL DEFAULT 0,
-  description VARCHAR(500) NOT NULL DEFAULT '',
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  status BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 资产分组ID */
+  name VARCHAR(100) NOT NULL, /* 分组名称 */
+  code VARCHAR(50) NOT NULL, /* 分组编码 */
+  parent_id BIGINT NOT NULL DEFAULT 0, /* 上级分组ID */
+  description VARCHAR(500) NOT NULL DEFAULT '', /* 分组说明 */
+  sort_order INTEGER NOT NULL DEFAULT 0, /* 排序值 */
+  status BOOLEAN NOT NULL DEFAULT TRUE, /* 是否启用 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_group_code_active ON asset_group(code) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS credential (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name VARCHAR(100) NOT NULL,
-  credential_type VARCHAR(20) NOT NULL,
-  username VARCHAR(100) NOT NULL DEFAULT '',
-  password TEXT NOT NULL DEFAULT '',
-  private_key TEXT NOT NULL DEFAULT '',
-  passphrase TEXT NOT NULL DEFAULT '',
-  description VARCHAR(500) NOT NULL DEFAULT '',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 凭据ID */
+  name VARCHAR(100) NOT NULL, /* 凭据名称 */
+  credential_type VARCHAR(20) NOT NULL, /* 凭据类型 */
+  username VARCHAR(100) NOT NULL DEFAULT '', /* 登录用户名 */
+  password TEXT NOT NULL DEFAULT '', /* 加密密码 */
+  private_key TEXT NOT NULL DEFAULT '', /* 加密私钥 */
+  passphrase TEXT NOT NULL DEFAULT '', /* 私钥口令 */
+  description VARCHAR(500) NOT NULL DEFAULT '', /* 凭据说明 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 
 CREATE TABLE IF NOT EXISTS cloud_account (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name VARCHAR(100) NOT NULL,
-  provider VARCHAR(50) NOT NULL,
-  access_key TEXT NOT NULL DEFAULT '',
-  secret_key TEXT NOT NULL DEFAULT '',
-  region VARCHAR(100) NOT NULL DEFAULT '',
-  description VARCHAR(500) NOT NULL DEFAULT '',
-  status BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 云账号ID */
+  name VARCHAR(100) NOT NULL, /* 云账号名称 */
+  provider VARCHAR(50) NOT NULL, /* 云服务商 */
+  access_key TEXT NOT NULL DEFAULT '', /* 访问密钥 */
+  secret_key TEXT NOT NULL DEFAULT '', /* 加密访问密钥 */
+  region VARCHAR(100) NOT NULL DEFAULT '', /* 默认区域 */
+  description VARCHAR(500) NOT NULL DEFAULT '', /* 账号说明 */
+  status BOOLEAN NOT NULL DEFAULT TRUE, /* 是否启用 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 
 CREATE TABLE IF NOT EXISTS host (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name VARCHAR(100) NOT NULL,
-  group_id BIGINT REFERENCES asset_group(id) ON DELETE SET NULL,
-  host_type VARCHAR(20) NOT NULL DEFAULT 'self',
-  ip VARCHAR(255) NOT NULL,
-  port INTEGER NOT NULL DEFAULT 22,
-  credential_id BIGINT REFERENCES credential(id) ON DELETE SET NULL,
-  cloud_account_id BIGINT REFERENCES cloud_account(id) ON DELETE SET NULL,
-  tags VARCHAR(500) NOT NULL DEFAULT '',
-  description VARCHAR(500) NOT NULL DEFAULT '',
-  status SMALLINT NOT NULL DEFAULT -1,
-  last_seen_at DATETIME,
-  os VARCHAR(100) NOT NULL DEFAULT '',
-  kernel VARCHAR(100) NOT NULL DEFAULT '',
-  arch VARCHAR(50) NOT NULL DEFAULT '',
-  cpu_info TEXT NOT NULL DEFAULT '',
-  cpu_cores INTEGER NOT NULL DEFAULT 0,
-  cpu_usage REAL NOT NULL DEFAULT 0,
-  memory_total BIGINT NOT NULL DEFAULT 0,
-  memory_used BIGINT NOT NULL DEFAULT 0,
-  memory_usage REAL NOT NULL DEFAULT 0,
-  disk_total BIGINT NOT NULL DEFAULT 0,
-  disk_used BIGINT NOT NULL DEFAULT 0,
-  disk_usage REAL NOT NULL DEFAULT 0,
-  uptime VARCHAR(100) NOT NULL DEFAULT '',
-  hostname VARCHAR(100) NOT NULL DEFAULT '',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 主机ID */
+  name VARCHAR(100) NOT NULL, /* 主机名称 */
+  group_id BIGINT REFERENCES asset_group(id) ON DELETE SET NULL, /* 资产分组ID */
+  host_type VARCHAR(20) NOT NULL DEFAULT 'self', /* 主机类型 */
+  ip VARCHAR(255) NOT NULL, /* 主机地址 */
+  port INTEGER NOT NULL DEFAULT 22, /* SSH端口 */
+  credential_id BIGINT REFERENCES credential(id) ON DELETE SET NULL, /* 凭据ID */
+  cloud_account_id BIGINT REFERENCES cloud_account(id) ON DELETE SET NULL, /* 云账号ID */
+  tags VARCHAR(500) NOT NULL DEFAULT '', /* 主机标签 */
+  description VARCHAR(500) NOT NULL DEFAULT '', /* 主机说明 */
+  status SMALLINT NOT NULL DEFAULT -1, /* 在线状态 */
+  last_seen_at DATETIME, /* 最后在线时间 */
+  os VARCHAR(100) NOT NULL DEFAULT '', /* 操作系统 */
+  kernel VARCHAR(100) NOT NULL DEFAULT '', /* 内核版本 */
+  arch VARCHAR(50) NOT NULL DEFAULT '', /* 系统架构 */
+  cpu_info TEXT NOT NULL DEFAULT '', /* CPU信息 */
+  cpu_cores INTEGER NOT NULL DEFAULT 0, /* CPU核心数 */
+  cpu_usage REAL NOT NULL DEFAULT 0, /* CPU使用率 */
+  memory_total BIGINT NOT NULL DEFAULT 0, /* 内存总量 */
+  memory_used BIGINT NOT NULL DEFAULT 0, /* 已用内存 */
+  memory_usage REAL NOT NULL DEFAULT 0, /* 内存使用率 */
+  disk_total BIGINT NOT NULL DEFAULT 0, /* 磁盘总量 */
+  disk_used BIGINT NOT NULL DEFAULT 0, /* 已用磁盘 */
+  disk_usage REAL NOT NULL DEFAULT 0, /* 磁盘使用率 */
+  uptime VARCHAR(100) NOT NULL DEFAULT '', /* 运行时长 */
+  hostname VARCHAR(100) NOT NULL DEFAULT '', /* 系统主机名 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_host_group_active ON host(group_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS db_instance (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  group_id BIGINT NOT NULL DEFAULT 0,
-  name VARCHAR(255) NOT NULL,
-  db_type VARCHAR(50) NOT NULL,
-  host VARCHAR(255) NOT NULL,
-  port INTEGER NOT NULL,
-  version VARCHAR(50) NOT NULL DEFAULT '',
-  credential_id BIGINT REFERENCES credential(id) ON DELETE SET NULL,
-  tags VARCHAR(255) NOT NULL DEFAULT '',
-  description VARCHAR(500) NOT NULL DEFAULT '',
-  status BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 数据库实例ID */
+  group_id BIGINT NOT NULL DEFAULT 0, /* 资产分组ID */
+  name VARCHAR(255) NOT NULL, /* 实例名称 */
+  db_type VARCHAR(50) NOT NULL, /* 数据库类型 */
+  host VARCHAR(255) NOT NULL, /* 数据库地址 */
+  port INTEGER NOT NULL, /* 数据库端口 */
+  version VARCHAR(50) NOT NULL DEFAULT '', /* 数据库版本 */
+  credential_id BIGINT REFERENCES credential(id) ON DELETE SET NULL, /* 凭据ID */
+  tags VARCHAR(255) NOT NULL DEFAULT '', /* 实例标签 */
+  description VARCHAR(500) NOT NULL DEFAULT '', /* 实例说明 */
+  status BOOLEAN NOT NULL DEFAULT TRUE, /* 连接状态 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_db_instance_group_active ON db_instance(group_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS terminal_session (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id BIGINT NOT NULL,
-  host_id BIGINT REFERENCES host(id) ON DELETE SET NULL,
-  db_instance_id BIGINT REFERENCES db_instance(id) ON DELETE SET NULL,
-  session_type VARCHAR(20) NOT NULL,
-  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  ended_at DATETIME,
-  duration_seconds BIGINT NOT NULL DEFAULT 0,
-  command_count BIGINT NOT NULL DEFAULT 0,
-  recording TEXT NOT NULL DEFAULT '',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 终端会话ID */
+  user_id BIGINT NOT NULL, /* 用户ID */
+  host_id BIGINT REFERENCES host(id) ON DELETE SET NULL, /* 主机ID */
+  db_instance_id BIGINT REFERENCES db_instance(id) ON DELETE SET NULL, /* 数据库实例ID */
+  session_type VARCHAR(20) NOT NULL, /* 会话类型 */
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 开始时间 */
+  ended_at DATETIME, /* 结束时间 */
+  duration_seconds BIGINT NOT NULL DEFAULT 0, /* 会话时长秒数 */
+  command_count BIGINT NOT NULL DEFAULT 0, /* 命令数量 */
+  recording TEXT NOT NULL DEFAULT '', /* 会话录像 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 
 CREATE TABLE IF NOT EXISTS monitor_domain (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  domain VARCHAR(255) NOT NULL,
-  port INTEGER NOT NULL DEFAULT 443,
-  request_client VARCHAR(20) NOT NULL DEFAULT 'chrome',
-  status VARCHAR(20) NOT NULL DEFAULT 'unknown',
-  response_time INTEGER NOT NULL DEFAULT 0,
-  ssl_valid BOOLEAN NOT NULL DEFAULT FALSE,
-  ssl_expiry DATETIME,
-  ssl_root_ca VARCHAR(255) NOT NULL DEFAULT '',
-  check_interval INTEGER NOT NULL DEFAULT 300,
-  check_jitter INTEGER NOT NULL DEFAULT 30,
-  enable_ssl BOOLEAN NOT NULL DEFAULT TRUE,
-  verify_certificate BOOLEAN NOT NULL DEFAULT TRUE,
-  enable_alert BOOLEAN NOT NULL DEFAULT FALSE,
-  response_threshold INTEGER NOT NULL DEFAULT 1000,
-  ssl_expiry_days INTEGER NOT NULL DEFAULT 30,
-  last_check DATETIME,
-  next_check DATETIME,
-  last_error TEXT NOT NULL DEFAULT '',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME,
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 域名监控ID */
+  domain VARCHAR(255) NOT NULL, /* 域名 */
+  port INTEGER NOT NULL DEFAULT 443, /* 访问端口 */
+  request_client VARCHAR(20) NOT NULL DEFAULT 'chrome', /* 请求客户端类型 */
+  status VARCHAR(20) NOT NULL DEFAULT 'unknown', /* 监控状态 */
+  response_time INTEGER NOT NULL DEFAULT 0, /* 响应耗时毫秒 */
+  ssl_valid BOOLEAN NOT NULL DEFAULT FALSE, /* SSL证书是否有效 */
+  ssl_expiry DATETIME, /* SSL证书过期时间 */
+  ssl_root_ca VARCHAR(255) NOT NULL DEFAULT '', /* SSL根证书机构 */
+  check_interval INTEGER NOT NULL DEFAULT 300, /* 检查间隔秒数 */
+  check_jitter INTEGER NOT NULL DEFAULT 30, /* 检查抖动秒数 */
+  enable_ssl BOOLEAN NOT NULL DEFAULT TRUE, /* 是否检查SSL */
+  verify_certificate BOOLEAN NOT NULL DEFAULT TRUE, /* 是否验证证书 */
+  enable_alert BOOLEAN NOT NULL DEFAULT FALSE, /* 是否启用告警 */
+  response_threshold INTEGER NOT NULL DEFAULT 1000, /* 响应时间告警阈值 */
+  ssl_expiry_days INTEGER NOT NULL DEFAULT 30, /* 证书到期预警天数 */
+  last_check DATETIME, /* 上次检查时间 */
+  next_check DATETIME, /* 下次检查时间 */
+  last_error TEXT NOT NULL DEFAULT '', /* 最近错误 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME, /* 删除时间 */
   UNIQUE(domain, port)
 );
 CREATE INDEX IF NOT EXISTS idx_monitor_domain_next_check ON monitor_domain(next_check);
 
 CREATE TABLE IF NOT EXISTS monitor_check_history (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  domain_id INTEGER NOT NULL REFERENCES monitor_domain(id) ON DELETE CASCADE,
-  status VARCHAR(20) NOT NULL,
-  response_time INTEGER NOT NULL DEFAULT 0,
-  ssl_valid BOOLEAN NOT NULL DEFAULT FALSE,
-  ssl_expiry DATETIME,
-  status_code INTEGER NOT NULL DEFAULT 0,
-  error_message TEXT NOT NULL DEFAULT '',
-  checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 检查记录ID */
+  domain_id INTEGER NOT NULL REFERENCES monitor_domain(id) ON DELETE CASCADE, /* 域名监控ID */
+  status VARCHAR(20) NOT NULL, /* 检查状态 */
+  response_time INTEGER NOT NULL DEFAULT 0, /* 响应耗时毫秒 */
+  ssl_valid BOOLEAN NOT NULL DEFAULT FALSE, /* SSL证书是否有效 */
+  ssl_expiry DATETIME, /* SSL证书过期时间 */
+  status_code INTEGER NOT NULL DEFAULT 0, /* HTTP状态码 */
+  error_message TEXT NOT NULL DEFAULT '', /* 错误信息 */
+  checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 检查时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_monitor_check_history_domain_at ON monitor_check_history(domain_id, checked_at DESC);
 
 CREATE TABLE IF NOT EXISTS monitor_alert_channel (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name VARCHAR(100) NOT NULL,
-  channel_type VARCHAR(20) NOT NULL,
-  enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  config TEXT NOT NULL DEFAULT '{}',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 告警渠道ID */
+  name VARCHAR(100) NOT NULL, /* 渠道名称 */
+  channel_type VARCHAR(20) NOT NULL, /* 渠道类型 */
+  enabled BOOLEAN NOT NULL DEFAULT TRUE, /* 是否启用 */
+  config TEXT NOT NULL DEFAULT '{}', /* 渠道配置JSON */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 
 CREATE TABLE IF NOT EXISTS monitor_alert_receiver (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name VARCHAR(100) NOT NULL,
-  email VARCHAR(255) NOT NULL DEFAULT '',
-  phone VARCHAR(30) NOT NULL DEFAULT '',
-  webhook VARCHAR(500) NOT NULL DEFAULT '',
-  wechat_id VARCHAR(100) NOT NULL DEFAULT '',
-  dingtalk_id VARCHAR(100) NOT NULL DEFAULT '',
-  feishu_id VARCHAR(100) NOT NULL DEFAULT '',
-  enable_email BOOLEAN NOT NULL DEFAULT TRUE,
-  enable_webhook BOOLEAN NOT NULL DEFAULT FALSE,
-  enable_wechat BOOLEAN NOT NULL DEFAULT FALSE,
-  enable_dingtalk BOOLEAN NOT NULL DEFAULT FALSE,
-  enable_feishu BOOLEAN NOT NULL DEFAULT FALSE,
-  enable_system_msg BOOLEAN NOT NULL DEFAULT TRUE,
-  enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 告警接收人ID */
+  name VARCHAR(100) NOT NULL, /* 接收人名称 */
+  email VARCHAR(255) NOT NULL DEFAULT '', /* 邮箱地址 */
+  phone VARCHAR(30) NOT NULL DEFAULT '', /* 手机号码 */
+  webhook VARCHAR(500) NOT NULL DEFAULT '', /* Webhook地址 */
+  wechat_id VARCHAR(100) NOT NULL DEFAULT '', /* 企业微信接收标识 */
+  dingtalk_id VARCHAR(100) NOT NULL DEFAULT '', /* 钉钉接收标识 */
+  feishu_id VARCHAR(100) NOT NULL DEFAULT '', /* 飞书接收标识 */
+  enable_email BOOLEAN NOT NULL DEFAULT TRUE, /* 是否接收邮件告警 */
+  enable_webhook BOOLEAN NOT NULL DEFAULT FALSE, /* 是否接收Webhook告警 */
+  enable_wechat BOOLEAN NOT NULL DEFAULT FALSE, /* 是否接收企业微信告警 */
+  enable_dingtalk BOOLEAN NOT NULL DEFAULT FALSE, /* 是否接收钉钉告警 */
+  enable_feishu BOOLEAN NOT NULL DEFAULT FALSE, /* 是否接收飞书告警 */
+  enable_system_msg BOOLEAN NOT NULL DEFAULT TRUE, /* 是否接收系统消息 */
+  enabled BOOLEAN NOT NULL DEFAULT TRUE, /* 是否启用 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 
 CREATE TABLE IF NOT EXISTS monitor_alert_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  domain_id INTEGER REFERENCES monitor_domain(id) ON DELETE SET NULL,
-  alert_type VARCHAR(50) NOT NULL,
-  status VARCHAR(20) NOT NULL,
-  message TEXT NOT NULL DEFAULT '',
-  channel_type VARCHAR(20) NOT NULL DEFAULT '',
-  receiver_names TEXT NOT NULL DEFAULT '',
-  error_message TEXT NOT NULL DEFAULT '',
-  sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 告警日志ID */
+  domain_id INTEGER REFERENCES monitor_domain(id) ON DELETE SET NULL, /* 域名监控ID */
+  alert_type VARCHAR(50) NOT NULL, /* 告警类型 */
+  status VARCHAR(20) NOT NULL, /* 发送状态 */
+  message TEXT NOT NULL DEFAULT '', /* 告警内容 */
+  channel_type VARCHAR(20) NOT NULL DEFAULT '', /* 发送渠道类型 */
+  receiver_names TEXT NOT NULL DEFAULT '', /* 接收人名称列表 */
+  error_message TEXT NOT NULL DEFAULT '', /* 发送错误信息 */
+  sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 发送时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_monitor_alert_log_sent_at ON monitor_alert_log(sent_at DESC);
 
 CREATE TABLE IF NOT EXISTS nginx_source (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  source_type TEXT NOT NULL DEFAULT 'host',
-  description TEXT NOT NULL DEFAULT '',
-  status INTEGER NOT NULL DEFAULT 1,
-  host_id INTEGER NOT NULL DEFAULT 0,
-  log_path TEXT NOT NULL DEFAULT '',
-  log_format TEXT NOT NULL DEFAULT 'combined',
-  collect_interval INTEGER NOT NULL DEFAULT 60,
-  retention_days INTEGER NOT NULL DEFAULT 30,
-  last_collect_at DATETIME,
-  last_collect_logs INTEGER NOT NULL DEFAULT 0,
-  last_error TEXT NOT NULL DEFAULT '',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* Nginx数据源ID */
+  name TEXT NOT NULL, /* 数据源名称 */
+  source_type TEXT NOT NULL DEFAULT 'host', /* 数据源类型 */
+  description TEXT NOT NULL DEFAULT '', /* 数据源说明 */
+  status INTEGER NOT NULL DEFAULT 1, /* 是否启用 */
+  host_id INTEGER NOT NULL DEFAULT 0, /* 主机ID */
+  log_path TEXT NOT NULL DEFAULT '', /* 日志文件路径 */
+  log_format TEXT NOT NULL DEFAULT 'combined', /* 日志格式 */
+  collect_interval INTEGER NOT NULL DEFAULT 60, /* 采集间隔秒数 */
+  retention_days INTEGER NOT NULL DEFAULT 30, /* 日志保留天数 */
+  last_collect_at DATETIME, /* 最近采集时间 */
+  last_collect_logs INTEGER NOT NULL DEFAULT 0, /* 最近采集条数 */
+  last_error TEXT NOT NULL DEFAULT '', /* 最近错误 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 
 CREATE TABLE IF NOT EXISTS nginx_access_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  source_id INTEGER NOT NULL,
-  occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  remote_addr TEXT NOT NULL DEFAULT '',
-  method TEXT NOT NULL DEFAULT '',
-  uri TEXT NOT NULL DEFAULT '',
-  status INTEGER NOT NULL DEFAULT 0,
-  body_bytes_sent INTEGER NOT NULL DEFAULT 0,
-  request_time REAL NOT NULL DEFAULT 0,
-  user_agent TEXT NOT NULL DEFAULT '',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 访问日志ID */
+  source_id INTEGER NOT NULL, /* Nginx数据源ID */
+  occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 请求发生时间 */
+  remote_addr TEXT NOT NULL DEFAULT '', /* 客户端地址 */
+  method TEXT NOT NULL DEFAULT '', /* 请求方法 */
+  uri TEXT NOT NULL DEFAULT '', /* 请求地址 */
+  status INTEGER NOT NULL DEFAULT 0, /* HTTP状态码 */
+  body_bytes_sent INTEGER NOT NULL DEFAULT 0, /* 响应字节数 */
+  request_time REAL NOT NULL DEFAULT 0, /* 请求耗时 */
+  user_agent TEXT NOT NULL DEFAULT '', /* 客户端标识 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 创建时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_nginx_access_log_source_time ON nginx_access_log(source_id, occurred_at DESC);
 
 CREATE TABLE IF NOT EXISTS task_template (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
-  description TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '', variables TEXT NOT NULL DEFAULT '',
-  category TEXT NOT NULL DEFAULT 'script', platform TEXT NOT NULL DEFAULT '', timeout INTEGER NOT NULL DEFAULT 300,
-  sort_order INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 1, created_by INTEGER NOT NULL DEFAULT 0,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 任务模板ID */
+  name TEXT NOT NULL, /* 模板名称 */
+  code TEXT NOT NULL UNIQUE, /* 模板编码 */
+  description TEXT NOT NULL DEFAULT '', /* 模板说明 */
+  content TEXT NOT NULL DEFAULT '', /* 模板内容 */
+  variables TEXT NOT NULL DEFAULT '', /* 模板变量JSON */
+  category TEXT NOT NULL DEFAULT 'script', /* 模板分类 */
+  platform TEXT NOT NULL DEFAULT '', /* 适用平台 */
+  timeout INTEGER NOT NULL DEFAULT 300, /* 超时时间秒数 */
+  sort_order INTEGER NOT NULL DEFAULT 0, /* 排序值 */
+  status INTEGER NOT NULL DEFAULT 1, /* 是否启用 */
+  created_by INTEGER NOT NULL DEFAULT 0, /* 创建用户ID */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE TABLE IF NOT EXISTS task_job (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, template_id INTEGER NOT NULL DEFAULT 0,
-  task_type TEXT NOT NULL DEFAULT 'manual', status TEXT NOT NULL DEFAULT 'pending', target_hosts TEXT NOT NULL DEFAULT '',
-  parameters TEXT NOT NULL DEFAULT '', execute_time DATETIME, result TEXT NOT NULL DEFAULT '', error_message TEXT NOT NULL DEFAULT '',
-  created_by INTEGER NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 任务ID */
+  name TEXT NOT NULL, /* 任务名称 */
+  template_id INTEGER NOT NULL DEFAULT 0, /* 任务模板ID */
+  task_type TEXT NOT NULL DEFAULT 'manual', /* 任务类型 */
+  status TEXT NOT NULL DEFAULT 'pending', /* 执行状态 */
+  target_hosts TEXT NOT NULL DEFAULT '', /* 目标主机列表 */
+  parameters TEXT NOT NULL DEFAULT '', /* 执行参数JSON */
+  execute_time DATETIME, /* 计划执行时间 */
+  result TEXT NOT NULL DEFAULT '', /* 执行结果 */
+  error_message TEXT NOT NULL DEFAULT '', /* 错误信息 */
+  created_by INTEGER NOT NULL DEFAULT 0, /* 创建用户ID */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE TABLE IF NOT EXISTS task_execution (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
-  output TEXT NOT NULL DEFAULT '', error_message TEXT NOT NULL DEFAULT '', started_at DATETIME, ended_at DATETIME,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 执行记录ID */
+  job_id INTEGER NOT NULL, /* 任务ID */
+  status TEXT NOT NULL DEFAULT 'pending', /* 执行状态 */
+  output TEXT NOT NULL DEFAULT '', /* 执行输出 */
+  error_message TEXT NOT NULL DEFAULT '', /* 错误信息 */
+  started_at DATETIME, /* 开始时间 */
+  ended_at DATETIME, /* 结束时间 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 创建时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_task_job_status ON task_job(status);
 CREATE INDEX IF NOT EXISTS idx_task_execution_job ON task_execution(job_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS ssl_certificate (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, domain TEXT NOT NULL, san_domains TEXT NOT NULL DEFAULT '',
-  source_type TEXT NOT NULL DEFAULT 'manual', ca_provider TEXT NOT NULL DEFAULT 'letsencrypt', certificate TEXT NOT NULL DEFAULT '',
-  private_key TEXT NOT NULL DEFAULT '', issuer TEXT NOT NULL DEFAULT '', not_after DATETIME, status TEXT NOT NULL DEFAULT 'pending',
-  auto_renew BOOLEAN NOT NULL DEFAULT TRUE, renew_days_before INTEGER NOT NULL DEFAULT 30, last_error TEXT NOT NULL DEFAULT '',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* SSL证书ID */
+  name TEXT NOT NULL, /* 证书名称 */
+  domain TEXT NOT NULL, /* 主域名 */
+  san_domains TEXT NOT NULL DEFAULT '', /* 备用域名列表 */
+  source_type TEXT NOT NULL DEFAULT 'manual', /* 证书来源 */
+  ca_provider TEXT NOT NULL DEFAULT 'letsencrypt', /* 证书颁发机构 */
+  certificate TEXT NOT NULL DEFAULT '', /* 证书内容 */
+  private_key TEXT NOT NULL DEFAULT '', /* 私钥内容 */
+  issuer TEXT NOT NULL DEFAULT '', /* 签发者 */
+  not_after DATETIME, /* 过期时间 */
+  status TEXT NOT NULL DEFAULT 'pending', /* 证书状态 */
+  auto_renew BOOLEAN NOT NULL DEFAULT TRUE, /* 是否自动续期 */
+  renew_days_before INTEGER NOT NULL DEFAULT 30, /* 提前续期天数 */
+  last_error TEXT NOT NULL DEFAULT '', /* 最近错误 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE TABLE IF NOT EXISTS ssl_dns_provider (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, provider TEXT NOT NULL, config TEXT NOT NULL DEFAULT '',
-  email TEXT NOT NULL DEFAULT '', enabled BOOLEAN NOT NULL DEFAULT TRUE, last_test_at DATETIME,
-  last_test_ok BOOLEAN NOT NULL DEFAULT FALSE, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* DNS服务商配置ID */
+  name TEXT NOT NULL, /* 配置名称 */
+  provider TEXT NOT NULL, /* DNS服务商 */
+  config TEXT NOT NULL DEFAULT '', /* 服务商配置JSON */
+  email TEXT NOT NULL DEFAULT '', /* 联系邮箱 */
+  enabled BOOLEAN NOT NULL DEFAULT TRUE, /* 是否启用 */
+  last_test_at DATETIME, /* 最近测试时间 */
+  last_test_ok BOOLEAN NOT NULL DEFAULT FALSE, /* 最近测试是否成功 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_ssl_certificate_domain ON ssl_certificate(domain);
 
 CREATE TABLE IF NOT EXISTS audit_operation_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL DEFAULT 0, username TEXT NOT NULL DEFAULT '',
-  module TEXT NOT NULL DEFAULT '', action TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', method TEXT NOT NULL DEFAULT 'POST',
-  path TEXT NOT NULL DEFAULT '', status INTEGER NOT NULL DEFAULT 200, error_message TEXT NOT NULL DEFAULT '',
-  cost_time INTEGER NOT NULL DEFAULT 0, ip TEXT NOT NULL DEFAULT '', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 操作日志ID */
+  user_id INTEGER NOT NULL DEFAULT 0, /* 操作用户ID */
+  username TEXT NOT NULL DEFAULT '', /* 操作用户名 */
+  module TEXT NOT NULL DEFAULT '', /* 业务模块 */
+  action TEXT NOT NULL DEFAULT '', /* 操作类型 */
+  description TEXT NOT NULL DEFAULT '', /* 操作描述 */
+  method TEXT NOT NULL DEFAULT 'POST', /* 请求方法 */
+  path TEXT NOT NULL DEFAULT '', /* 请求路径 */
+  status INTEGER NOT NULL DEFAULT 200, /* 响应状态码 */
+  error_message TEXT NOT NULL DEFAULT '', /* 错误信息 */
+  cost_time INTEGER NOT NULL DEFAULT 0, /* 请求耗时毫秒 */
+  ip TEXT NOT NULL DEFAULT '', /* 客户端IP */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 创建时间 */
 );
 CREATE TABLE IF NOT EXISTS audit_login_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL DEFAULT 0, username TEXT NOT NULL DEFAULT '',
-  login_type TEXT NOT NULL DEFAULT 'web', status TEXT NOT NULL DEFAULT 'success', ip TEXT NOT NULL DEFAULT '',
-  message TEXT NOT NULL DEFAULT '', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 登录日志ID */
+  user_id INTEGER NOT NULL DEFAULT 0, /* 登录用户ID */
+  username TEXT NOT NULL DEFAULT '', /* 登录账号 */
+  login_type TEXT NOT NULL DEFAULT 'web', /* 登录类型 */
+  status TEXT NOT NULL DEFAULT 'success', /* 登录状态 */
+  ip TEXT NOT NULL DEFAULT '', /* 客户端IP */
+  message TEXT NOT NULL DEFAULT '', /* 登录结果说明 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 创建时间 */
 );
 CREATE TABLE IF NOT EXISTS audit_data_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL DEFAULT 0, username TEXT NOT NULL DEFAULT '',
-  table_name TEXT NOT NULL DEFAULT '', record_id INTEGER NOT NULL DEFAULT 0, action TEXT NOT NULL DEFAULT '',
-  old_data TEXT NOT NULL DEFAULT '', new_data TEXT NOT NULL DEFAULT '', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 数据审计日志ID */
+  user_id INTEGER NOT NULL DEFAULT 0, /* 操作用户ID */
+  username TEXT NOT NULL DEFAULT '', /* 操作用户名 */
+  table_name TEXT NOT NULL DEFAULT '', /* 数据表名称 */
+  record_id INTEGER NOT NULL DEFAULT 0, /* 数据记录ID */
+  action TEXT NOT NULL DEFAULT '', /* 数据操作类型 */
+  old_data TEXT NOT NULL DEFAULT '', /* 变更前数据JSON */
+  new_data TEXT NOT NULL DEFAULT '', /* 变更后数据JSON */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 创建时间 */
 );
 
 CREATE TABLE IF NOT EXISTS kubernetes_cluster (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', api_endpoint TEXT NOT NULL DEFAULT '',
-  kube_config TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '', status INTEGER NOT NULL DEFAULT 0,
-  node_count INTEGER NOT NULL DEFAULT 0, pod_count INTEGER NOT NULL DEFAULT 0, region TEXT NOT NULL DEFAULT '',
-  provider TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at DATETIME
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 集群ID */
+  name TEXT NOT NULL, /* 集群名称 */
+  alias TEXT NOT NULL DEFAULT '', /* 集群别名 */
+  api_endpoint TEXT NOT NULL DEFAULT '', /* API服务地址 */
+  kube_config TEXT NOT NULL DEFAULT '', /* KubeConfig内容 */
+  version TEXT NOT NULL DEFAULT '', /* Kubernetes版本 */
+  status INTEGER NOT NULL DEFAULT 0, /* 集群状态 */
+  node_count INTEGER NOT NULL DEFAULT 0, /* 节点数量 */
+  pod_count INTEGER NOT NULL DEFAULT 0, /* Pod数量 */
+  region TEXT NOT NULL DEFAULT '', /* 所属区域 */
+  provider TEXT NOT NULL DEFAULT '', /* 集群提供商 */
+  description TEXT NOT NULL DEFAULT '', /* 集群说明 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE TABLE IF NOT EXISTS kubernetes_terminal_session (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, cluster_id INTEGER NOT NULL, namespace TEXT NOT NULL DEFAULT '',
-  pod_name TEXT NOT NULL DEFAULT '', container_name TEXT NOT NULL DEFAULT '', user_id INTEGER NOT NULL,
-  recording TEXT NOT NULL DEFAULT '', duration INTEGER NOT NULL DEFAULT 0, command_count INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'completed', started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, ended_at DATETIME,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* Kubernetes终端会话ID */
+  cluster_id INTEGER NOT NULL, /* 集群ID */
+  namespace TEXT NOT NULL DEFAULT '', /* 命名空间 */
+  pod_name TEXT NOT NULL DEFAULT '', /* Pod名称 */
+  container_name TEXT NOT NULL DEFAULT '', /* 容器名称 */
+  user_id INTEGER NOT NULL, /* 用户ID */
+  recording TEXT NOT NULL DEFAULT '', /* 会话录像 */
+  duration INTEGER NOT NULL DEFAULT 0, /* 会话时长秒数 */
+  command_count INTEGER NOT NULL DEFAULT 0, /* 命令数量 */
+  status TEXT NOT NULL DEFAULT 'completed', /* 会话状态 */
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 开始时间 */
+  ended_at DATETIME, /* 结束时间 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 更新时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_kubernetes_terminal_session_cluster ON kubernetes_terminal_session(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_kubernetes_terminal_session_user ON kubernetes_terminal_session(user_id);
 
 CREATE TABLE IF NOT EXISTS kubernetes_cluster_inspection (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, cluster_id INTEGER NOT NULL, cluster_name TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'running', score INTEGER NOT NULL DEFAULT 0, check_count INTEGER NOT NULL DEFAULT 0,
-  pass_count INTEGER NOT NULL DEFAULT 0, warning_count INTEGER NOT NULL DEFAULT 0, fail_count INTEGER NOT NULL DEFAULT 0,
-  duration INTEGER NOT NULL DEFAULT 0, report_data TEXT NOT NULL DEFAULT '', user_id INTEGER NOT NULL,
-  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, ended_at DATETIME,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 集群巡检ID */
+  cluster_id INTEGER NOT NULL, /* 集群ID */
+  cluster_name TEXT NOT NULL DEFAULT '', /* 集群名称快照 */
+  status TEXT NOT NULL DEFAULT 'running', /* 巡检状态 */
+  score INTEGER NOT NULL DEFAULT 0, /* 巡检得分 */
+  check_count INTEGER NOT NULL DEFAULT 0, /* 检查项总数 */
+  pass_count INTEGER NOT NULL DEFAULT 0, /* 通过数量 */
+  warning_count INTEGER NOT NULL DEFAULT 0, /* 警告数量 */
+  fail_count INTEGER NOT NULL DEFAULT 0, /* 失败数量 */
+  duration INTEGER NOT NULL DEFAULT 0, /* 巡检耗时秒数 */
+  report_data TEXT NOT NULL DEFAULT '', /* 巡检报告JSON */
+  user_id INTEGER NOT NULL, /* 执行用户ID */
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 开始时间 */
+  ended_at DATETIME, /* 结束时间 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 更新时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_kubernetes_cluster_inspection_cluster ON kubernetes_cluster_inspection(cluster_id);
 
 CREATE TABLE IF NOT EXISTS kubernetes_user_kube_config (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, cluster_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
-  service_account TEXT NOT NULL, namespace TEXT NOT NULL DEFAULT 'gops-auth', is_active INTEGER NOT NULL DEFAULT 1,
-  created_by INTEGER NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, revoked_at DATETIME,
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 用户KubeConfig ID */
+  cluster_id INTEGER NOT NULL, /* 集群ID */
+  user_id INTEGER NOT NULL, /* 用户ID */
+  service_account TEXT NOT NULL, /* ServiceAccount名称 */
+  namespace TEXT NOT NULL DEFAULT 'gops-auth', /* ServiceAccount命名空间 */
+  is_active INTEGER NOT NULL DEFAULT 1, /* 是否有效 */
+  created_by INTEGER NOT NULL, /* 创建用户ID */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  revoked_at DATETIME, /* 撤销时间 */
   UNIQUE(cluster_id, user_id, service_account)
 );
 CREATE INDEX IF NOT EXISTS idx_kubernetes_user_kube_config_cluster ON kubernetes_user_kube_config(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_kubernetes_user_kube_config_user ON kubernetes_user_kube_config(user_id);
 
 CREATE TABLE IF NOT EXISTS kubernetes_user_role_binding (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, cluster_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
-  role_name TEXT NOT NULL, role_namespace TEXT NOT NULL DEFAULT '', role_type TEXT NOT NULL, bound_by INTEGER NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 用户角色绑定ID */
+  cluster_id INTEGER NOT NULL, /* 集群ID */
+  user_id INTEGER NOT NULL, /* 用户ID */
+  role_name TEXT NOT NULL, /* 角色名称 */
+  role_namespace TEXT NOT NULL DEFAULT '', /* 角色命名空间 */
+  role_type TEXT NOT NULL, /* 角色类型 */
+  bound_by INTEGER NOT NULL, /* 绑定操作用户ID */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
   UNIQUE(cluster_id, user_id, role_name, role_namespace)
 );
 CREATE INDEX IF NOT EXISTS idx_kubernetes_user_role_binding_cluster ON kubernetes_user_role_binding(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_kubernetes_user_role_binding_user ON kubernetes_user_role_binding(user_id);
 
 CREATE TABLE IF NOT EXISTS user_mfa_totp (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL UNIQUE REFERENCES user(id) ON DELETE CASCADE,
-  name TEXT NOT NULL DEFAULT '身份验证器',
-  secret TEXT NOT NULL DEFAULT '',
-  enabled INTEGER NOT NULL DEFAULT 1,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* TOTP配置ID */
+  user_id INTEGER NOT NULL UNIQUE REFERENCES user(id) ON DELETE CASCADE, /* 用户ID */
+  name TEXT NOT NULL DEFAULT '身份验证器', /* 验证器名称 */
+  secret TEXT NOT NULL DEFAULT '', /* TOTP密钥 */
+  enabled INTEGER NOT NULL DEFAULT 1, /* 是否启用 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 更新时间 */
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_mfa_totp_user_id_unique ON user_mfa_totp(user_id);
 
 CREATE TABLE IF NOT EXISTS user_mfa_passkey (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
-  name TEXT NOT NULL DEFAULT '',
-  credential_id TEXT NOT NULL UNIQUE,
-  credential_json TEXT NOT NULL,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  direct_login_enabled INTEGER NOT NULL DEFAULT 0,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* Passkey配置ID */
+  user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE, /* 用户ID */
+  name TEXT NOT NULL DEFAULT '', /* Passkey名称 */
+  credential_id TEXT NOT NULL UNIQUE, /* WebAuthn凭据ID */
+  credential_json TEXT NOT NULL, /* WebAuthn凭据JSON */
+  enabled INTEGER NOT NULL DEFAULT 1, /* 是否启用二次验证 */
+  direct_login_enabled INTEGER NOT NULL DEFAULT 0, /* 是否允许直接登录 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 更新时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_user_mfa_passkey_user_id ON user_mfa_passkey(user_id);
 
 CREATE TABLE IF NOT EXISTS user_mfa_email (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL UNIQUE REFERENCES user(id) ON DELETE CASCADE,
-  mfa_enabled INTEGER NOT NULL DEFAULT 0,
-  direct_login_enabled INTEGER NOT NULL DEFAULT 0,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 邮箱MFA配置ID */
+  user_id INTEGER NOT NULL UNIQUE REFERENCES user(id) ON DELETE CASCADE, /* 用户ID */
+  mfa_enabled INTEGER NOT NULL DEFAULT 0, /* 是否启用二次验证 */
+  direct_login_enabled INTEGER NOT NULL DEFAULT 0, /* 是否允许邮箱验证码直接登录 */
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 更新时间 */
 );
 
 -- +goose Down
