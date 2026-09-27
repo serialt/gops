@@ -25,7 +25,7 @@ type SslCertificate struct {
 	Issuer          string         `gorm:"column:issuer;not null;default:''" json:"issuer"`
 	NotAfter        time.Time      `gorm:"column:not_after" json:"not_after"`
 	Status          string         `gorm:"column:status;not null;default:'pending'" json:"status"`
-	AutoRenew       bool           `gorm:"column:auto_renew;not null;default:TRUE" json:"auto_renew"`
+	AutoRenew       bool           `gorm:"column:auto_renew;not null;default:1" json:"auto_renew"`
 	RenewDaysBefore int64          `gorm:"column:renew_days_before;not null;default:30" json:"renew_days_before"`
 	LastError       string         `gorm:"column:last_error;not null;default:''" json:"last_error"`
 	CreatedAt       time.Time      `gorm:"column:created_at;not null" json:"created_at"`

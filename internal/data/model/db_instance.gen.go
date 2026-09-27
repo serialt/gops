@@ -15,7 +15,6 @@ const TableNameDbInstance = "db_instance"
 // DbInstance mapped from table <db_instance>
 type DbInstance struct {
 	ID           int64          `gorm:"column:id;primaryKey" json:"id"`
-	GroupID      int64          `gorm:"column:group_id;not null" json:"group_id"`
 	Name         string         `gorm:"column:name;not null" json:"name"`
 	DbType       string         `gorm:"column:db_type;not null" json:"db_type"`
 	Host         string         `gorm:"column:host;not null" json:"host"`
@@ -28,6 +27,7 @@ type DbInstance struct {
 	CreatedAt    time.Time      `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt    time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	GroupID      int64          `gorm:"column:group_id;not null" json:"group_id"`
 }
 
 // TableName DbInstance's table name

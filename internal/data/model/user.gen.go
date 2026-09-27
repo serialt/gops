@@ -18,11 +18,11 @@ type User struct {
 	Username      string          `gorm:"column:username;not null" json:"username"`
 	PasswordHash  string          `gorm:"column:password_hash;not null" json:"password_hash"`
 	Nickname      string          `gorm:"column:nickname;not null" json:"nickname"`
-	Email         string          `gorm:"column:email;not null;default:''" json:"email"`
 	Status        bool            `gorm:"column:status;not null;default:TRUE" json:"status"`
 	CreatedAt     time.Time       `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt     time.Time       `gorm:"column:updated_at;not null" json:"updated_at"`
 	DeletedAt     gorm.DeletedAt  `gorm:"column:deleted_at" json:"deleted_at"`
+	Email         string          `gorm:"column:email;not null;default:''" json:"email"`
 	Roles         []*Role         `gorm:"many2many:user_role" json:"roles"`
 	Organizations []*Organization `gorm:"many2many:organization_user" json:"organizations"`
 }

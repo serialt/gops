@@ -15,10 +15,14 @@ const TableNameMonitorAlertReceiver = "monitor_alert_receiver"
 // MonitorAlertReceiver mapped from table <monitor_alert_receiver>
 type MonitorAlertReceiver struct {
 	ID              int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name            string         `gorm:"column:name;not null" json:"name"`
-	Email           string         `gorm:"column:email;not null;default:''" json:"email"`
-	Phone           string         `gorm:"column:phone;not null;default:''" json:"phone"`
-	Webhook         string         `gorm:"column:webhook;not null;default:''" json:"webhook"`
+	Name            string         `gorm:"column:name;type:VARCHAR(100)" json:"name"`
+	Email           string         `gorm:"column:email;type:VARCHAR(255)" json:"email"`
+	Phone           string         `gorm:"column:phone;type:VARCHAR(30)" json:"phone"`
+	Webhook         string         `gorm:"column:webhook;type:VARCHAR(500)" json:"webhook"`
+	Enabled         bool           `gorm:"column:enabled;type:BOOLEAN" json:"enabled"`
+	CreatedAt       time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
+	UpdatedAt       time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
 	WechatID        string         `gorm:"column:wechat_id;not null;default:''" json:"wechat_id"`
 	DingtalkID      string         `gorm:"column:dingtalk_id;not null;default:''" json:"dingtalk_id"`
 	FeishuID        string         `gorm:"column:feishu_id;not null;default:''" json:"feishu_id"`
@@ -28,10 +32,6 @@ type MonitorAlertReceiver struct {
 	EnableDingtalk  bool           `gorm:"column:enable_dingtalk;not null;default:FALSE" json:"enable_dingtalk"`
 	EnableFeishu    bool           `gorm:"column:enable_feishu;not null;default:FALSE" json:"enable_feishu"`
 	EnableSystemMsg bool           `gorm:"column:enable_system_msg;not null;default:TRUE" json:"enable_system_msg"`
-	Enabled         bool           `gorm:"column:enabled;not null;default:TRUE" json:"enabled"`
-	CreatedAt       time.Time      `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt       time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName MonitorAlertReceiver's table name

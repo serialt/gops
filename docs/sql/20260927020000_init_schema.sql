@@ -510,43 +510,7 @@ CREATE TABLE IF NOT EXISTS kubernetes_user_role_binding (
 CREATE INDEX IF NOT EXISTS idx_kubernetes_user_role_binding_cluster ON kubernetes_user_role_binding(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_kubernetes_user_role_binding_user ON kubernetes_user_role_binding(user_id);
 
-CREATE TABLE IF NOT EXISTS user_mfa_totp (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, /* TOTP配置ID */
-  user_id INTEGER NOT NULL UNIQUE REFERENCES user(id) ON DELETE CASCADE, /* 用户ID */
-  name TEXT NOT NULL DEFAULT '身份验证器', /* 验证器名称 */
-  secret TEXT NOT NULL DEFAULT '', /* TOTP密钥 */
-  enabled INTEGER NOT NULL DEFAULT 1, /* 是否启用 */
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 更新时间 */
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_mfa_totp_user_id_unique ON user_mfa_totp(user_id);
-
-CREATE TABLE IF NOT EXISTS user_mfa_passkey (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, /* Passkey配置ID */
-  user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE, /* 用户ID */
-  name TEXT NOT NULL DEFAULT '', /* Passkey名称 */
-  credential_id TEXT NOT NULL UNIQUE, /* WebAuthn凭据ID */
-  credential_json TEXT NOT NULL, /* WebAuthn凭据JSON */
-  enabled INTEGER NOT NULL DEFAULT 1, /* 是否启用二次验证 */
-  direct_login_enabled INTEGER NOT NULL DEFAULT 0, /* 是否允许直接登录 */
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 更新时间 */
-);
-CREATE INDEX IF NOT EXISTS idx_user_mfa_passkey_user_id ON user_mfa_passkey(user_id);
-
-CREATE TABLE IF NOT EXISTS user_mfa_email (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 邮箱MFA配置ID */
-  user_id INTEGER NOT NULL UNIQUE REFERENCES user(id) ON DELETE CASCADE, /* 用户ID */
-  mfa_enabled INTEGER NOT NULL DEFAULT 0, /* 是否启用二次验证 */
-  direct_login_enabled INTEGER NOT NULL DEFAULT 0, /* 是否允许邮箱验证码直接登录 */
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 更新时间 */
-);
-
 -- +goose Down
-DROP TABLE IF EXISTS user_mfa_email;
-DROP TABLE IF EXISTS user_mfa_passkey;
-DROP TABLE IF EXISTS user_mfa_totp;
 DROP TABLE IF EXISTS kubernetes_user_role_binding;
 DROP TABLE IF EXISTS kubernetes_user_kube_config;
 DROP TABLE IF EXISTS kubernetes_cluster_inspection;

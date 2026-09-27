@@ -115,8 +115,8 @@ func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigRespo
 	for _, method := range config.LoginVerificationMethods {
 		switch method {
 		case "email":
-			var row model.UserMfaEmail
-			if config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != "" && b.db.Where("user_id = ? AND mfa_enabled = ?", userID, 1).First(&row).Error == nil {
+			var row model.UserMfa
+			if config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != "" && b.db.Where("user_id = ? AND mfa_type = ? AND enabled = ?", userID, "email", 1).First(&row).Error == nil {
 				methods = append(methods, "email")
 			}
 		case "webhook":
@@ -126,7 +126,7 @@ func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigRespo
 		case "passkey":
 			var count int64
 			if config.VerificationPasskeyEnabled {
-				if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
+				if err := b.db.Model(&model.UserMfa{}).Where("user_id = ? AND mfa_type = ? AND enabled = ?", userID, "passkey", 1).Count(&count).Error; err != nil {
 					return nil, err
 				}
 				if count > 0 {
@@ -136,7 +136,7 @@ func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigRespo
 		case "totp":
 			var count int64
 			if config.VerificationTOTPEnabled {
-				if err := b.db.Model(&model.UserMfaTotp{}).Where("user_id = ? AND enabled = ?", userID, 1).Count(&count).Error; err != nil {
+				if err := b.db.Model(&model.UserMfa{}).Where("user_id = ? AND mfa_type = ? AND enabled = ?", userID, "totp", 1).Count(&count).Error; err != nil {
 					return nil, err
 				}
 				if count > 0 {
@@ -543,21 +543,21 @@ func (b *AuthBiz) MFAStatus(userID uint) (*api.MFAStatusResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	var totp model.UserMfaTotp
-	totpConfigured := b.db.Where("user_id = ?", userID).First(&totp).Error == nil
+	var totp model.UserMfa
+	totpConfigured := b.db.Where("user_id = ? AND mfa_type = ?", userID, "totp").First(&totp).Error == nil
 	totpEnabled := totpConfigured && totp.Enabled == 1
-	var passkeys []model.UserMfaPasskey
-	if err := b.db.Where("user_id = ?", userID).Order("id DESC").Find(&passkeys).Error; err != nil {
+	var passkeys []model.UserMfa
+	if err := b.db.Where("user_id = ? AND mfa_type = ?", userID, "passkey").Order("id DESC").Find(&passkeys).Error; err != nil {
 		return nil, err
 	}
 	items := make([]*api.MFAPasskeyResponse, 0, len(passkeys))
 	for _, passkey := range passkeys {
 		items = append(items, &api.MFAPasskeyResponse{ID: passkey.ID, Name: passkey.Name, MFAEnabled: passkey.Enabled == 1, DirectLoginEnabled: passkey.DirectLoginEnabled == 1})
 	}
-	var emailMFA model.UserMfaEmail
-	_ = b.db.Where("user_id = ?", userID).First(&emailMFA).Error
+	var emailMFA model.UserMfa
+	_ = b.db.Where("user_id = ? AND mfa_type = ?", userID, "email").First(&emailMFA).Error
 	emailAvailable := config.VerificationEmailEnabled && strings.TrimSpace(user.Email) != ""
-	return &api.MFAStatusResponse{CodeAvailable: passwordResetVerificationMethod(config, &user) != "", EmailAvailable: emailAvailable, Email: user.Email, EmailMFAEnabled: emailAvailable && emailMFA.MfaEnabled == 1, EmailDirectLoginEnabled: emailAvailable && emailMFA.DirectLoginEnabled == 1, TOTPConfigured: totpConfigured, TOTPEnabled: totpEnabled, Passkeys: items}, nil
+	return &api.MFAStatusResponse{CodeAvailable: passwordResetVerificationMethod(config, &user) != "", EmailAvailable: emailAvailable, Email: user.Email, EmailMFAEnabled: emailAvailable && emailMFA.Enabled == 1, EmailDirectLoginEnabled: emailAvailable && emailMFA.DirectLoginEnabled == 1, TOTPConfigured: totpConfigured, TOTPEnabled: totpEnabled, Passkeys: items}, nil
 }
 
 func (b *AuthBiz) BeginTOTPSetup(userID uint) (*api.TOTPSetupResponse, error) {
@@ -599,8 +599,8 @@ func (b *AuthBiz) ConfirmTOTPSetup(userID uint, req *api.TOTPConfirmRequest) err
 	if err != nil {
 		return err
 	}
-	row := &model.UserMfaTotp{UserID: int64(userID), Secret: encrypted, Enabled: 1}
-	if err := b.db.Where("user_id = ?", userID).Assign(map[string]any{"secret": encrypted, "enabled": 1, "updated_at": time.Now()}).FirstOrCreate(row).Error; err != nil {
+	row := &model.UserMfa{UserID: int64(userID), MfaType: "totp", Name: "身份验证器", Secret: encrypted, Enabled: 1}
+	if err := b.db.Where("user_id = ? AND mfa_type = ?", userID, "totp").Assign(map[string]any{"secret": encrypted, "enabled": 1, "updated_at": time.Now()}).FirstOrCreate(row).Error; err != nil {
 		return err
 	}
 	b.mu.Lock()
@@ -610,8 +610,8 @@ func (b *AuthBiz) ConfirmTOTPSetup(userID uint, req *api.TOTPConfirmRequest) err
 }
 
 func (b *AuthBiz) DisableTOTP(userID uint, req *api.TOTPConfirmRequest) error {
-	var row model.UserMfaTotp
-	if err := b.db.Where("user_id = ? AND enabled = ?", userID, 1).First(&row).Error; err != nil {
+	var row model.UserMfa
+	if err := b.db.Where("user_id = ? AND mfa_type = ? AND enabled = ?", userID, "totp", 1).First(&row).Error; err != nil {
 		return ErrNotFound
 	}
 	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)
@@ -625,8 +625,8 @@ func (b *AuthBiz) DisableTOTP(userID uint, req *api.TOTPConfirmRequest) error {
 }
 
 func (b *AuthBiz) EnableTOTP(userID uint, req *api.TOTPConfirmRequest) error {
-	var row model.UserMfaTotp
-	if err := b.db.Where("user_id = ? AND enabled = ?", userID, 0).First(&row).Error; err != nil {
+	var row model.UserMfa
+	if err := b.db.Where("user_id = ? AND mfa_type = ? AND enabled = ?", userID, "totp", 0).First(&row).Error; err != nil {
 		return ErrNotFound
 	}
 	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)
@@ -640,8 +640,8 @@ func (b *AuthBiz) EnableTOTP(userID uint, req *api.TOTPConfirmRequest) error {
 }
 
 func (b *AuthBiz) DeleteTOTP(userID uint, req *api.TOTPConfirmRequest) error {
-	var row model.UserMfaTotp
-	if err := b.db.Where("user_id = ?", userID).First(&row).Error; err != nil {
+	var row model.UserMfa
+	if err := b.db.Where("user_id = ? AND mfa_type = ?", userID, "totp").First(&row).Error; err != nil {
 		return ErrNotFound
 	}
 	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)

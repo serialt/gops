@@ -19,9 +19,9 @@ type SslDNSProvider struct {
 	Provider   string         `gorm:"column:provider;not null" json:"provider"`
 	Config     string         `gorm:"column:config;not null;default:''" json:"config"`
 	Email      string         `gorm:"column:email;not null;default:''" json:"email"`
-	Enabled    bool           `gorm:"column:enabled;not null;default:TRUE" json:"enabled"`
+	Enabled    bool           `gorm:"column:enabled;not null;default:1" json:"enabled"`
 	LastTestAt time.Time      `gorm:"column:last_test_at" json:"last_test_at"`
-	LastTestOk bool           `gorm:"column:last_test_ok;not null;default:FALSE" json:"last_test_ok"`
+	LastTestOk bool           `gorm:"column:last_test_ok;not null" json:"last_test_ok"`
 	CreatedAt  time.Time      `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt  time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`

@@ -120,8 +120,8 @@ func (b *AuthBiz) VerifyMFA(req *api.MFAVerifyRequest) (*api.LoginResponse, erro
 		if !config.VerificationTOTPEnabled {
 			return nil, errors.New("系统未开启 TOTP 验证")
 		}
-		var row model.UserMfaTotp
-		if err := b.db.Where("user_id = ? AND enabled = ?", challenge.userID, 1).First(&row).Error; err == nil {
+		var row model.UserMfa
+		if err := b.db.Where("user_id = ? AND mfa_type = ? AND enabled = ?", challenge.userID, "totp", 1).First(&row).Error; err == nil {
 			secret, decryptErr := cryptox.Decrypt(b.config.aesKey, row.Secret)
 			valid = decryptErr == nil && auth.ValidateTOTP(secret, req.Code, time.Now())
 		}
@@ -160,8 +160,8 @@ func (b *AuthBiz) loadWebAuthnUser(userID uint, usage string) (*webAuthnUser, er
 	if err := b.db.First(&user, userID).Error; err != nil {
 		return nil, ErrNotFound
 	}
-	var rows []model.UserMfaPasskey
-	query := b.db.Where("user_id = ?", userID)
+	var rows []model.UserMfa
+	query := b.db.Where("user_id = ? AND mfa_type = ?", userID, "passkey")
 	if usage == "mfa" {
 		query = query.Where("enabled = ?", 1)
 	} else if usage == "direct" {
@@ -255,12 +255,12 @@ func (b *AuthBiz) FinishPasskeyRegistration(userID uint, req *api.PasskeyRegiste
 	if err != nil {
 		return err
 	}
-	row := &model.UserMfaPasskey{UserID: int64(userID), Name: strings.TrimSpace(req.Name), CredentialID: credentialID(credential.ID), CredentialJSON: encrypted, Enabled: 1}
+	row := &model.UserMfa{UserID: int64(userID), MfaType: "passkey", Name: strings.TrimSpace(req.Name), CredentialID: credentialID(credential.ID), CredentialJSON: encrypted, Enabled: 1}
 	return b.db.Create(row).Error
 }
 
 func (b *AuthBiz) DeletePasskey(userID uint, req *api.PasskeyDeleteRequest) error {
-	result := b.db.Where("id = ? AND user_id = ?", req.ID, userID).Delete(&model.UserMfaPasskey{})
+	result := b.db.Where("id = ? AND user_id = ? AND mfa_type = ?", req.ID, userID, "passkey").Delete(&model.UserMfa{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -271,7 +271,7 @@ func (b *AuthBiz) DeletePasskey(userID uint, req *api.PasskeyDeleteRequest) erro
 }
 
 func (b *AuthBiz) UpdatePasskeyStatus(userID uint, req *api.PasskeyStatusRequest) error {
-	result := b.db.Model(&model.UserMfaPasskey{}).Where("id = ? AND user_id = ?", req.ID, userID).Updates(map[string]any{"enabled": req.MFAEnabled, "direct_login_enabled": req.DirectLoginEnabled, "updated_at": time.Now()})
+	result := b.db.Model(&model.UserMfa{}).Where("id = ? AND user_id = ? AND mfa_type = ?", req.ID, userID, "passkey").Updates(map[string]any{"enabled": req.MFAEnabled, "direct_login_enabled": req.DirectLoginEnabled, "updated_at": time.Now()})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -289,7 +289,7 @@ func (b *AuthBiz) RenamePasskey(userID uint, req *api.PasskeyRenameRequest) erro
 	if len([]rune(name)) > 64 {
 		return errors.New("Passkey 名称不能超过 64 个字符")
 	}
-	result := b.db.Model(&model.UserMfaPasskey{}).Where("id = ? AND user_id = ?", req.ID, userID).Updates(map[string]any{"name": name, "updated_at": time.Now()})
+	result := b.db.Model(&model.UserMfa{}).Where("id = ? AND user_id = ? AND mfa_type = ?", req.ID, userID, "passkey").Updates(map[string]any{"name": name, "updated_at": time.Now()})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -311,9 +311,9 @@ func (b *AuthBiz) UpdateEmailMFAStatus(userID uint, req *api.EmailMFAStatusReque
 	if !config.VerificationEmailEnabled || strings.TrimSpace(user.Email) == "" {
 		return errors.New("请先配置用户邮箱并在系统配置中开启邮件验证码")
 	}
-	values := map[string]any{"mfa_enabled": req.MFAEnabled, "direct_login_enabled": req.DirectLoginEnabled, "updated_at": time.Now()}
-	row := &model.UserMfaEmail{UserID: int64(userID), MfaEnabled: boolInt(req.MFAEnabled), DirectLoginEnabled: boolInt(req.DirectLoginEnabled)}
-	return b.db.Where("user_id = ?", userID).Assign(values).FirstOrCreate(row).Error
+	values := map[string]any{"enabled": req.MFAEnabled, "direct_login_enabled": req.DirectLoginEnabled, "updated_at": time.Now()}
+	row := &model.UserMfa{UserID: int64(userID), MfaType: "email", Name: "邮箱验证码", Enabled: boolInt(req.MFAEnabled), DirectLoginEnabled: boolInt(req.DirectLoginEnabled)}
+	return b.db.Where("user_id = ? AND mfa_type = ?", userID, "email").Assign(values).FirstOrCreate(row).Error
 }
 
 func boolInt(value bool) int64 {
@@ -335,8 +335,8 @@ func (b *AuthBiz) BeginDirectEmailLogin(req *api.DirectEmailLoginBeginRequest, i
 	if config.CaptchaEnabled && !b.verifyCaptcha(req.CaptchaID, req.CaptchaCode, true) {
 		return nil, ErrInvalidCaptcha
 	}
-	var emailMFA model.UserMfaEmail
-	if !config.VerificationEmailEnabled || !config.DirectVerificationEmailEnabled || strings.TrimSpace(user.Email) == "" || b.db.Where("user_id = ? AND direct_login_enabled = ?", user.ID, 1).First(&emailMFA).Error != nil {
+	var emailMFA model.UserMfa
+	if !config.VerificationEmailEnabled || !config.DirectVerificationEmailEnabled || strings.TrimSpace(user.Email) == "" || b.db.Where("user_id = ? AND mfa_type = ? AND direct_login_enabled = ?", user.ID, "email", 1).First(&emailMFA).Error != nil {
 		return nil, errors.New("当前用户未开启邮箱验证码直接登录")
 	}
 	token, err := randomToken()
@@ -419,8 +419,8 @@ func (b *AuthBiz) VerifyPasswordResetTOTP(req *api.PasswordResetTOTPRequest) (*a
 	if !config.VerificationTOTPEnabled {
 		return nil, errors.New("系统未开启 TOTP 验证")
 	}
-	var row model.UserMfaTotp
-	if err := b.db.Where("user_id = ? AND enabled = ?", user.ID, 1).First(&row).Error; err != nil {
+	var row model.UserMfa
+	if err := b.db.Where("user_id = ? AND mfa_type = ? AND enabled = ?", user.ID, "totp", 1).First(&row).Error; err != nil {
 		return nil, errors.New("当前用户未启用 TOTP")
 	}
 	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)
@@ -505,7 +505,7 @@ func (b *AuthBiz) FinishPasswordResetPasskey(req *api.PasswordResetPasskeyFinish
 	if err != nil {
 		return nil, err
 	}
-	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND credential_id = ?", session.userID, credentialID(credential.ID)).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
+	if err := b.db.Model(&model.UserMfa{}).Where("user_id = ? AND mfa_type = ? AND credential_id = ?", session.userID, "passkey", credentialID(credential.ID)).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
 		return nil, err
 	}
 	return b.createPasswordResetToken(session.username)
@@ -580,7 +580,7 @@ func (b *AuthBiz) FinishPasskeyLogin(req *api.PasskeyLoginFinishRequest) (*api.L
 	if err != nil {
 		return nil, err
 	}
-	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND credential_id = ?", challenge.userID, credentialID(credential.ID)).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
+	if err := b.db.Model(&model.UserMfa{}).Where("user_id = ? AND mfa_type = ? AND credential_id = ?", challenge.userID, "passkey", credentialID(credential.ID)).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
 		return nil, err
 	}
 	return b.finishMFALogin(req.MFAToken, challenge)
@@ -661,7 +661,7 @@ func (b *AuthBiz) FinishDirectPasskeyLogin(req *api.DirectPasskeyLoginFinishRequ
 	if err != nil {
 		return nil, err
 	}
-	if err := b.db.Model(&model.UserMfaPasskey{}).Where("user_id = ? AND credential_id = ? AND direct_login_enabled = ?", user.id, credentialID(credential.ID), 1).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
+	if err := b.db.Model(&model.UserMfa{}).Where("user_id = ? AND mfa_type = ? AND credential_id = ? AND direct_login_enabled = ?", user.id, "passkey", credentialID(credential.ID), 1).Updates(map[string]any{"credential_json": encrypted, "updated_at": time.Now()}).Error; err != nil {
 		return nil, err
 	}
 	tokens, err := b.jwt.GeneratePair(user.id)
@@ -687,8 +687,8 @@ func (b *AuthBiz) DirectTOTPLogin(req *api.DirectTOTPLoginRequest, ip string) (*
 	if !config.VerificationTOTPEnabled || !config.DirectVerificationTOTPEnabled {
 		return nil, errors.New("系统未开启 TOTP 直接登录")
 	}
-	var row model.UserMfaTotp
-	if err := b.db.Where("user_id = ? AND enabled = ?", user.ID, 1).First(&row).Error; err != nil {
+	var row model.UserMfa
+	if err := b.db.Where("user_id = ? AND mfa_type = ? AND enabled = ?", user.ID, "totp", 1).First(&row).Error; err != nil {
 		return nil, errors.New("当前用户未启用 TOTP")
 	}
 	secret, err := cryptox.Decrypt(b.config.aesKey, row.Secret)

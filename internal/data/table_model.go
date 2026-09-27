@@ -37,9 +37,7 @@ func gopsTable(g *gen.Generator) {
 	kubernetesUserKubeConfig := g.GenerateModel("kubernetes_user_kube_config")
 	kubernetesUserRoleBinding := g.GenerateModel("kubernetes_user_role_binding")
 	userRole := g.GenerateModel("user_role")
-	userMFATOTP := g.GenerateModel("user_mfa_totp")
-	userMFAPasskey := g.GenerateModel("user_mfa_passkey")
-	userMFAEmail := g.GenerateModel("user_mfa_email")
+	userMFA := g.GenerateModel("user_mfa")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
 		&field.RelateConfig{
 			RelateSlicePointer: true,
@@ -56,9 +54,7 @@ func gopsTable(g *gen.Generator) {
 		role,
 		userRole,
 		user,
-		userMFATOTP,
-		userMFAPasskey,
-		userMFAEmail,
+		userMFA,
 		organization,
 		organizationUser,
 		systemConfig,

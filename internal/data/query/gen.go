@@ -48,9 +48,7 @@ var (
 	TaskTemplate                *taskTemplate
 	TerminalSession             *terminalSession
 	User                        *user
-	UserMfaEmail                *userMfaEmail
-	UserMfaPasskey              *userMfaPasskey
-	UserMfaTotp                 *userMfaTotp
+	UserMfa                     *userMfa
 	UserRole                    *userRole
 )
 
@@ -87,9 +85,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	TaskTemplate = &Q.TaskTemplate
 	TerminalSession = &Q.TerminalSession
 	User = &Q.User
-	UserMfaEmail = &Q.UserMfaEmail
-	UserMfaPasskey = &Q.UserMfaPasskey
-	UserMfaTotp = &Q.UserMfaTotp
+	UserMfa = &Q.UserMfa
 	UserRole = &Q.UserRole
 }
 
@@ -127,9 +123,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		TaskTemplate:                newTaskTemplate(db, opts...),
 		TerminalSession:             newTerminalSession(db, opts...),
 		User:                        newUser(db, opts...),
-		UserMfaEmail:                newUserMfaEmail(db, opts...),
-		UserMfaPasskey:              newUserMfaPasskey(db, opts...),
-		UserMfaTotp:                 newUserMfaTotp(db, opts...),
+		UserMfa:                     newUserMfa(db, opts...),
 		UserRole:                    newUserRole(db, opts...),
 	}
 }
@@ -168,9 +162,7 @@ type Query struct {
 	TaskTemplate                taskTemplate
 	TerminalSession             terminalSession
 	User                        user
-	UserMfaEmail                userMfaEmail
-	UserMfaPasskey              userMfaPasskey
-	UserMfaTotp                 userMfaTotp
+	UserMfa                     userMfa
 	UserRole                    userRole
 }
 
@@ -212,9 +204,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		TaskTemplate:                q.TaskTemplate.clone(db),
 		TerminalSession:             q.TerminalSession.clone(db),
 		User:                        q.User.clone(db),
-		UserMfaEmail:                q.UserMfaEmail.clone(db),
-		UserMfaPasskey:              q.UserMfaPasskey.clone(db),
-		UserMfaTotp:                 q.UserMfaTotp.clone(db),
+		UserMfa:                     q.UserMfa.clone(db),
 		UserRole:                    q.UserRole.clone(db),
 	}
 }
@@ -261,9 +251,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		TaskTemplate:                q.TaskTemplate.replaceDB(db),
 		TerminalSession:             q.TerminalSession.replaceDB(db),
 		User:                        q.User.replaceDB(db),
-		UserMfaEmail:                q.UserMfaEmail.replaceDB(db),
-		UserMfaPasskey:              q.UserMfaPasskey.replaceDB(db),
-		UserMfaTotp:                 q.UserMfaTotp.replaceDB(db),
+		UserMfa:                     q.UserMfa.replaceDB(db),
 		UserRole:                    q.UserRole.replaceDB(db),
 	}
 }
@@ -300,9 +288,7 @@ type queryCtx struct {
 	TaskTemplate                *taskTemplateDo
 	TerminalSession             *terminalSessionDo
 	User                        *userDo
-	UserMfaEmail                *userMfaEmailDo
-	UserMfaPasskey              *userMfaPasskeyDo
-	UserMfaTotp                 *userMfaTotpDo
+	UserMfa                     *userMfaDo
 	UserRole                    *userRoleDo
 }
 
@@ -339,9 +325,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		TaskTemplate:                q.TaskTemplate.WithContext(ctx),
 		TerminalSession:             q.TerminalSession.WithContext(ctx),
 		User:                        q.User.WithContext(ctx),
-		UserMfaEmail:                q.UserMfaEmail.WithContext(ctx),
-		UserMfaPasskey:              q.UserMfaPasskey.WithContext(ctx),
-		UserMfaTotp:                 q.UserMfaTotp.WithContext(ctx),
+		UserMfa:                     q.UserMfa.WithContext(ctx),
 		UserRole:                    q.UserRole.WithContext(ctx),
 	}
 }

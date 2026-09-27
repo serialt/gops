@@ -15,21 +15,21 @@ const TableNameNginxSource = "nginx_source"
 // NginxSource mapped from table <nginx_source>
 type NginxSource struct {
 	ID              int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name            string         `gorm:"column:name;not null" json:"name"`
-	SourceType      string         `gorm:"column:source_type;not null;default:'host'" json:"source_type"`
-	Description     string         `gorm:"column:description;not null;default:''" json:"description"`
-	Status          int64          `gorm:"column:status;not null;default:1" json:"status"`
-	HostID          int64          `gorm:"column:host_id;not null" json:"host_id"`
-	LogPath         string         `gorm:"column:log_path;not null;default:''" json:"log_path"`
-	LogFormat       string         `gorm:"column:log_format;not null;default:'combined'" json:"log_format"`
-	CollectInterval int64          `gorm:"column:collect_interval;not null;default:60" json:"collect_interval"`
-	RetentionDays   int64          `gorm:"column:retention_days;not null;default:30" json:"retention_days"`
-	LastCollectAt   time.Time      `gorm:"column:last_collect_at" json:"last_collect_at"`
-	LastCollectLogs int64          `gorm:"column:last_collect_logs;not null" json:"last_collect_logs"`
-	LastError       string         `gorm:"column:last_error;not null;default:''" json:"last_error"`
-	CreatedAt       time.Time      `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt       time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	Name            string         `gorm:"column:name;type:TEXT" json:"name"`
+	SourceType      string         `gorm:"column:source_type;type:TEXT" json:"source_type"`
+	Description     string         `gorm:"column:description;type:TEXT" json:"description"`
+	Status          int64          `gorm:"column:status;type:INTEGER" json:"status"`
+	HostID          int64          `gorm:"column:host_id;type:INTEGER" json:"host_id"`
+	LogPath         string         `gorm:"column:log_path;type:TEXT" json:"log_path"`
+	LogFormat       string         `gorm:"column:log_format;type:TEXT" json:"log_format"`
+	CollectInterval int64          `gorm:"column:collect_interval;type:INTEGER" json:"collect_interval"`
+	RetentionDays   int64          `gorm:"column:retention_days;type:INTEGER" json:"retention_days"`
+	LastCollectAt   time.Time      `gorm:"column:last_collect_at;type:DATETIME" json:"last_collect_at"`
+	LastCollectLogs int64          `gorm:"column:last_collect_logs;type:INTEGER" json:"last_collect_logs"`
+	LastError       string         `gorm:"column:last_error;type:TEXT" json:"last_error"`
+	CreatedAt       time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
+	UpdatedAt       time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
 }
 
 // TableName NginxSource's table name

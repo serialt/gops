@@ -13,16 +13,16 @@ const TableNameNginxAccessLog = "nginx_access_log"
 // NginxAccessLog mapped from table <nginx_access_log>
 type NginxAccessLog struct {
 	ID            int64     `gorm:"column:id;primaryKey" json:"id"`
-	SourceID      int64     `gorm:"column:source_id;not null" json:"source_id"`
-	OccurredAt    time.Time `gorm:"column:occurred_at;not null;default:CURRENT_TIMESTAMP" json:"occurred_at"`
-	RemoteAddr    string    `gorm:"column:remote_addr;not null;default:''" json:"remote_addr"`
-	Method        string    `gorm:"column:method;not null;default:''" json:"method"`
-	URI           string    `gorm:"column:uri;not null;default:''" json:"uri"`
-	Status        int64     `gorm:"column:status;not null" json:"status"`
-	BodyBytesSent int64     `gorm:"column:body_bytes_sent;not null" json:"body_bytes_sent"`
-	RequestTime   float64   `gorm:"column:request_time;not null" json:"request_time"`
-	UserAgent     string    `gorm:"column:user_agent;not null;default:''" json:"user_agent"`
-	CreatedAt     time.Time `gorm:"column:created_at;not null" json:"created_at"`
+	SourceID      int64     `gorm:"column:source_id;type:INTEGER" json:"source_id"`
+	OccurredAt    time.Time `gorm:"column:occurred_at;type:DATETIME" json:"occurred_at"`
+	RemoteAddr    string    `gorm:"column:remote_addr;type:TEXT" json:"remote_addr"`
+	Method        string    `gorm:"column:method;type:TEXT" json:"method"`
+	URI           string    `gorm:"column:uri;type:TEXT" json:"uri"`
+	Status        int64     `gorm:"column:status;type:INTEGER" json:"status"`
+	BodyBytesSent int64     `gorm:"column:body_bytes_sent;type:INTEGER" json:"body_bytes_sent"`
+	RequestTime   float64   `gorm:"column:request_time;type:REAL" json:"request_time"`
+	UserAgent     string    `gorm:"column:user_agent;type:TEXT" json:"user_agent"`
+	CreatedAt     time.Time `gorm:"column:created_at;type:DATETIME" json:"created_at"`
 }
 
 // TableName NginxAccessLog's table name

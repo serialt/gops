@@ -15,13 +15,13 @@ const TableNameMonitorAlertChannel = "monitor_alert_channel"
 // MonitorAlertChannel mapped from table <monitor_alert_channel>
 type MonitorAlertChannel struct {
 	ID          int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name        string         `gorm:"column:name;not null" json:"name"`
-	ChannelType string         `gorm:"column:channel_type;not null" json:"channel_type"`
-	Enabled     bool           `gorm:"column:enabled;not null;default:TRUE" json:"enabled"`
-	Config      string         `gorm:"column:config;not null;default:'{}'" json:"config"`
-	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	Name        string         `gorm:"column:name;type:VARCHAR(100)" json:"name"`
+	ChannelType string         `gorm:"column:channel_type;type:VARCHAR(20)" json:"channel_type"`
+	Enabled     bool           `gorm:"column:enabled;type:BOOLEAN" json:"enabled"`
+	Config      string         `gorm:"column:config;type:TEXT" json:"config"`
+	CreatedAt   time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
 }
 
 // TableName MonitorAlertChannel's table name
