@@ -18,6 +18,7 @@ func NewMonitorHandler(monitorBiz *biz.MonitorBiz) *MonitorHandler {
 
 func (h *MonitorHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/monitor/domains/list", h.ListDomains)
+	g.POST("/monitor/domains/list-option", h.ListDomainOption)
 	g.POST("/monitor/domains/create", h.CreateDomain)
 	g.POST("/monitor/domains/update", h.UpdateDomain)
 	g.POST("/monitor/domains/delete", h.DeleteDomain)
@@ -37,6 +38,12 @@ func (h *MonitorHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/monitor/receivers/delete", h.DeleteReceiver)
 
 	g.POST("/monitor/logs/list", h.ListLogs)
+}
+
+// ListDomainOption POST /api/v1/monitor/domains/list-option 查询域名监控筛选选项。
+func (h *MonitorHandler) ListDomainOption(c *gin.Context) {
+	data, err := h.biz.ListDomainOption()
+	monitorResult(c, data, err)
 }
 
 func (h *MonitorHandler) StartScheduler(ctx context.Context) {

@@ -13,13 +13,17 @@ export interface MonitorAlertChannelRequest { id?: number; name: string; channel
 export interface MonitorAlertReceiver { id: number; name: string; email: string; phone: string; webhook: string; wechat_id: string; dingtalk_id: string; feishu_id: string; enable_email: boolean; enable_webhook: boolean; enable_wechat: boolean; enable_dingtalk: boolean; enable_feishu: boolean; enable_system_msg: boolean; enabled: boolean; created_at: string; updated_at: string }
 export interface MonitorAlertReceiverRequest { id?: number; name: string; email: string; phone: string; webhook: string; wechat_id: string; dingtalk_id: string; feishu_id: string; enable_email: boolean; enable_webhook: boolean; enable_wechat: boolean; enable_dingtalk: boolean; enable_feishu: boolean; enable_system_msg: boolean; enabled: boolean }
 export interface MonitorAlertLog { id: number; domain_id: number; alert_type: string; status: string; message: string; channel_type: string; receiver_names: string; error_message: string; sent_at: string }
-export const listMonitorDomains = (keyword = '', status = '', page = 1, limit = 20, ssl_status = '', ssl_expiry_start = '', ssl_expiry_end = '') => request.post<PageResponse<MonitorDomain>>('/monitor/domains/list', { keyword, status, page, limit, ssl_status, ssl_expiry_start, ssl_expiry_end })
+export interface MonitorDomainFilters { keyword?: string; domain?: string; port?: number; status?: string; ssl_status?: string; ssl_root_ca?: string; ssl_expiry_start?: string; ssl_expiry_end?: string; last_check_start?: string; last_check_end?: string }
+export interface MonitorFilterOption { label: string; value: string }
+export interface MonitorDomainFilterOptions { domains: string[]; ports: number[]; statuses: MonitorFilterOption[]; ssl_statuses: MonitorFilterOption[]; root_cas: string[] }
+export const listMonitorDomains = (filters: MonitorDomainFilters = {}, page = 1, limit = 20) => request.post<PageResponse<MonitorDomain>>('/monitor/domains/list', { ...filters, page, limit })
+export const listMonitorDomainOption = () => request.post<MonitorDomainFilterOptions>('/monitor/domains/list-option', {})
 export const createMonitorDomain = (data: MonitorDomainRequest) => request.post<MonitorDomain>('/monitor/domains/create', data)
 export const updateMonitorDomain = (data: MonitorDomainRequest & { id: number }) => request.post<MonitorDomain>('/monitor/domains/update', data)
 export const deleteMonitorDomain = (id: number) => request.post<null>('/monitor/domains/delete', { id })
 export const checkMonitorDomain = (id: number) => request.post<MonitorDomain>('/monitor/domains/check', { id })
 export const listMonitorCheckHistory = (domain_id: number, page = 1, limit = 30) => request.post<PageResponse<MonitorCheckHistory>>('/monitor/domains/history', { domain_id, page, limit })
-export const monitorStats = (keyword = '', status = '', ssl_status = '', ssl_expiry_start = '', ssl_expiry_end = '') => request.post<MonitorStats>('/monitor/domains/stats', { keyword, status, ssl_status, ssl_expiry_start, ssl_expiry_end })
+export const monitorStats = (filters: MonitorDomainFilters = {}) => request.post<MonitorStats>('/monitor/domains/stats', filters)
 export const exportMonitorDomains = (keyword = '', ids: number[] = []) => request.post<Blob>('/monitor/domains/export', { keyword, status: '', ids }, { responseType: 'blob' })
 export const importMonitorDomains = (file: File) => { const form = new FormData(); form.append('file', file, file.name); return request.post<MonitorDomainExcelImportResult>('/monitor/domains/import', form) }
 export const listMonitorChannels = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<MonitorAlertChannel>>('/monitor/channels/list', { keyword, page, limit })

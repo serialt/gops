@@ -5,10 +5,15 @@ import "time"
 type MonitorDomainListRequest struct {
 	PageRequest
 	Keyword        string  `json:"keyword"`
+	Domain         string  `json:"domain"`
+	Port           int64   `json:"port"`
 	Status         string  `json:"status"`
 	SSLStatus      string  `json:"ssl_status"`
+	SSLRootCA      string  `json:"ssl_root_ca"`
 	SSLExpiryStart string  `json:"ssl_expiry_start"`
 	SSLExpiryEnd   string  `json:"ssl_expiry_end"`
+	LastCheckStart string  `json:"last_check_start"`
+	LastCheckEnd   string  `json:"last_check_end"`
 	IDs            []int64 `json:"ids"`
 }
 type MonitorDomainRequest struct {
@@ -70,12 +75,28 @@ type MonitorStatsResponse struct {
 	Abnormal int64 `json:"abnormal"`
 	Paused   int64 `json:"paused"`
 }
+type MonitorFilterOption struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+type MonitorDomainFilterOptionsResponse struct {
+	Domains     []string               `json:"domains"`
+	Ports       []int64                `json:"ports"`
+	Statuses    []*MonitorFilterOption `json:"statuses"`
+	SSLStatuses []*MonitorFilterOption `json:"ssl_statuses"`
+	RootCAs     []string               `json:"root_cas"`
+}
 type MonitorStatsRequest struct {
 	Keyword        string `json:"keyword"`
+	Domain         string `json:"domain"`
+	Port           int64  `json:"port"`
 	Status         string `json:"status"`
 	SSLStatus      string `json:"ssl_status"`
+	SSLRootCA      string `json:"ssl_root_ca"`
 	SSLExpiryStart string `json:"ssl_expiry_start"`
 	SSLExpiryEnd   string `json:"ssl_expiry_end"`
+	LastCheckStart string `json:"last_check_start"`
+	LastCheckEnd   string `json:"last_check_end"`
 }
 type MonitorDomainExcelImportResponse struct {
 	Created int `json:"created"`
@@ -170,9 +191,9 @@ type MonitorAlertReceiverResponse struct {
 
 type MonitorAlertLogListRequest struct {
 	PageRequest
-	DomainID int64  `json:"domain_id"`
-	Status   string `json:"status"`
-	Keyword  string `json:"keyword"`
+	DomainID     int64  `json:"domain_id"`
+	Status       string `json:"status"`
+	Keyword      string `json:"keyword"`
 	ReceiverName string `json:"receiver_name"`
 }
 type MonitorAlertLogResponse struct {

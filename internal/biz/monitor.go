@@ -75,7 +75,7 @@ func (b *MonitorBiz) CheckDueDomains() {
 
 func (b *MonitorBiz) ListDomains(req *api.MonitorDomainListRequest) (*api.PageResponse[*api.MonitorDomainResponse], error) {
 	q := b.db.Model(&model.MonitorDomain{}).Order("id DESC")
-	q = filterMonitorDomains(q, req.Keyword, req.Status, req.SSLStatus, req.SSLExpiryStart, req.SSLExpiryEnd)
+	q = filterMonitorDomains(q, req.Keyword, req.Domain, req.Port, req.Status, req.SSLStatus, req.SSLRootCA, req.SSLExpiryStart, req.SSLExpiryEnd, req.LastCheckStart, req.LastCheckEnd)
 	if len(req.IDs) > 0 {
 		q = q.Where("id IN ?", req.IDs)
 	}
@@ -90,10 +90,47 @@ func (b *MonitorBiz) ListDomains(req *api.MonitorDomainListRequest) (*api.PageRe
 	return &api.PageResponse[*api.MonitorDomainResponse]{List: out, Total: total}, nil
 }
 
-func filterMonitorDomains(query *gorm.DB, keyword, status, sslStatus, expiryStart, expiryEnd string) *gorm.DB {
+func (b *MonitorBiz) ListDomainOption() (*api.MonitorDomainFilterOptionsResponse, error) {
+	domains := make([]string, 0)
+	if err := b.db.Model(&model.MonitorDomain{}).Distinct().Where("domain <> ?", "").Order("domain ASC").Pluck("domain", &domains).Error; err != nil {
+		return nil, err
+	}
+	ports := make([]int64, 0)
+	if err := b.db.Model(&model.MonitorDomain{}).Distinct().Where("port > ?", 0).Order("port ASC").Pluck("port", &ports).Error; err != nil {
+		return nil, err
+	}
+	rootCAs := make([]string, 0)
+	if err := b.db.Model(&model.MonitorDomain{}).Distinct().Where("ssl_root_ca <> ?", "").Order("ssl_root_ca ASC").Pluck("ssl_root_ca", &rootCAs).Error; err != nil {
+		return nil, err
+	}
+	return &api.MonitorDomainFilterOptionsResponse{
+		Domains: domains,
+		Ports:   ports,
+		Statuses: []*api.MonitorFilterOption{
+			{Label: "正常", Value: "normal"},
+			{Label: "异常", Value: "abnormal"},
+			{Label: "暂停", Value: "paused"},
+			{Label: "未知", Value: "unknown"},
+		},
+		SSLStatuses: []*api.MonitorFilterOption{
+			{Label: "有效", Value: "valid"},
+			{Label: "无效", Value: "invalid"},
+			{Label: "未启用", Value: "disabled"},
+		},
+		RootCAs: rootCAs,
+	}, nil
+}
+
+func filterMonitorDomains(query *gorm.DB, keyword, domain string, port int64, status, sslStatus, sslRootCA, expiryStart, expiryEnd, lastCheckStart, lastCheckEnd string) *gorm.DB {
 	if keyword = strings.TrimSpace(keyword); keyword != "" {
 		pattern := "%" + keyword + "%"
 		query = query.Where("domain LIKE ? OR CAST(port AS TEXT) LIKE ? OR ssl_root_ca LIKE ?", pattern, pattern, pattern)
+	}
+	if domain = strings.TrimSpace(domain); domain != "" {
+		query = query.Where("domain = ?", domain)
+	}
+	if port > 0 {
+		query = query.Where("port = ?", port)
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)
@@ -106,11 +143,20 @@ func filterMonitorDomains(query *gorm.DB, keyword, status, sslStatus, expiryStar
 	case "disabled":
 		query = query.Where("enable_ssl = ?", false)
 	}
+	if sslRootCA = strings.TrimSpace(sslRootCA); sslRootCA != "" {
+		query = query.Where("ssl_root_ca = ?", sslRootCA)
+	}
 	if expiryStart != "" {
 		query = query.Where("DATE(ssl_expiry) >= DATE(?)", expiryStart)
 	}
 	if expiryEnd != "" {
 		query = query.Where("DATE(ssl_expiry) <= DATE(?)", expiryEnd)
+	}
+	if lastCheckStart != "" {
+		query = query.Where("DATE(last_check) >= DATE(?)", lastCheckStart)
+	}
+	if lastCheckEnd != "" {
+		query = query.Where("DATE(last_check) <= DATE(?)", lastCheckEnd)
 	}
 	return query
 }
@@ -534,7 +580,7 @@ func signDingTalkWebhook(endpoint, secret string) (string, error) {
 func (b *MonitorBiz) DomainStats(req *api.MonitorStatsRequest) (*api.MonitorStatsResponse, error) {
 	out := &api.MonitorStatsResponse{}
 	filteredQuery := func() *gorm.DB {
-		return filterMonitorDomains(b.db.Model(&model.MonitorDomain{}), req.Keyword, req.Status, req.SSLStatus, req.SSLExpiryStart, req.SSLExpiryEnd)
+		return filterMonitorDomains(b.db.Model(&model.MonitorDomain{}), req.Keyword, req.Domain, req.Port, req.Status, req.SSLStatus, req.SSLRootCA, req.SSLExpiryStart, req.SSLExpiryEnd, req.LastCheckStart, req.LastCheckEnd)
 	}
 	if err := filteredQuery().Count(&out.Total).Error; err != nil {
 		return nil, err

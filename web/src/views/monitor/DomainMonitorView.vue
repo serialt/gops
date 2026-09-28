@@ -4,16 +4,21 @@ import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Filter, Upload } from '@element-plus/icons-vue'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
+import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomainOption, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorFilterOption, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
 import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
-const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const statusFilter = ref(''); const sslStatusFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const filtersExpanded = ref(false); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
-const activeFilterCount = () => Number(Boolean(statusFilter.value)) + Number(Boolean(sslStatusFilter.value)) + Number(Boolean(sslExpiryRange.value))
+const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const domainFilter = ref(''); const portFilter = ref<number>(); const statusFilter = ref(''); const sslStatusFilter = ref(''); const rootCAFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const lastCheckRange = ref<[string, string] | null>(null); const filtersExpanded = ref(false); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
+const domainOptions = ref<string[]>([]); const portOptions = ref<number[]>([]); const statusOptions = ref<MonitorFilterOption[]>([]); const sslStatusOptions = ref<MonitorFilterOption[]>([]); const rootCAOptions = ref<string[]>([])
+const activeFilterCount = () => [domainFilter.value, portFilter.value, statusFilter.value, sslStatusFilter.value, rootCAFilter.value, sslExpiryRange.value, lastCheckRange.value].filter(Boolean).length
 const filterPanelRef = ref<HTMLElement>()
 function clearFilters() {
+    domainFilter.value = ''
+    portFilter.value = undefined
     statusFilter.value = ''
     sslStatusFilter.value = ''
+    rootCAFilter.value = ''
     sslExpiryRange.value = null
+    lastCheckRange.value = null
 }
 async function fitSelectFilters() {
     await nextTick()
@@ -22,8 +27,11 @@ async function fitSelectFilters() {
     const context = document.createElement('canvas').getContext('2d')
     if (!context) return
     const selects = [
-        { selector: '.status-filter', placeholder: '全部状态', labels: ['正常', '异常', '暂停', '未知'] },
-        { selector: '.ssl-filter', placeholder: 'SSL 证书', labels: ['有效', '无效', '未启用'] },
+        { selector: '.domain-filter', placeholder: '选择域名', labels: domainOptions.value },
+        { selector: '.port-filter', placeholder: '选择端口', labels: portOptions.value.map(String) },
+        { selector: '.status-filter', placeholder: '选择状态', labels: ['正常', '异常', '暂停', '未知'] },
+        { selector: '.ssl-filter', placeholder: '选择 SSL 证书', labels: ['有效', '无效', '未启用'] },
+        { selector: '.root-ca-filter', placeholder: '选择根 CA', labels: rootCAOptions.value },
     ]
     for (const select of selects) {
         const root = panel.querySelector<HTMLElement>(select.selector)
@@ -52,13 +60,25 @@ const form = ref<MonitorDomainRequest>({ domain: '', port: 443, request_client: 
 async function load() {
     const expiryStart = sslExpiryRange.value?.[0] || ''
     const expiryEnd = sslExpiryRange.value?.[1] || ''
+    const lastCheckStart = lastCheckRange.value?.[0] || ''
+    const lastCheckEnd = lastCheckRange.value?.[1] || ''
+    const filters = { keyword: keyword.value, domain: domainFilter.value, port: portFilter.value, status: statusFilter.value, ssl_status: sslStatusFilter.value, ssl_root_ca: rootCAFilter.value, ssl_expiry_start: expiryStart, ssl_expiry_end: expiryEnd, last_check_start: lastCheckStart, last_check_end: lastCheckEnd }
     const [listResponse, statsResponse] = await Promise.all([
-        listMonitorDomains(keyword.value, statusFilter.value, page.value, pageSize.value, sslStatusFilter.value, expiryStart, expiryEnd),
-        monitorStats(keyword.value, statusFilter.value, sslStatusFilter.value, expiryStart, expiryEnd),
+        listMonitorDomains(filters, page.value, pageSize.value),
+        monitorStats(filters),
     ])
     rows.value = listResponse.data.data.list
     total.value = listResponse.data.data.total
     stats.value = statsResponse.data.data
+}
+async function loadFilterOptions() {
+    const { data } = await listMonitorDomainOption()
+    domainOptions.value = data.data.domains
+    portOptions.value = data.data.ports
+    statusOptions.value = data.data.statuses
+    sslStatusOptions.value = data.data.ssl_statuses
+    rootCAOptions.value = data.data.root_cas
+    await fitSelectFilters()
 }
 function open(row?: MonitorDomain) { editing.value = row ?? null; form.value = row ? { id: row.id, domain: row.domain, port: row.port, request_client: row.request_client || 'chrome', check_interval: row.check_interval, check_jitter: row.check_jitter ?? 30, enable_ssl: row.enable_ssl, verify_certificate: row.verify_certificate, enable_alert: row.enable_alert, response_threshold: row.response_threshold, ssl_expiry_days: row.ssl_expiry_days } : { domain: '', port: 443, request_client: 'chrome', check_interval: 300, check_jitter: 30, enable_ssl: true, verify_certificate: true, enable_alert: true, response_threshold: 3000, ssl_expiry_days: 30 }; dialog.value = true }
 function handleHTTPSChange(value: boolean | string | number) { if (!value) form.value.verify_certificate = false }
@@ -97,8 +117,8 @@ async function importExcel(event: Event) {
         ElMessage.success(`导入完成：新增 ${data.data.created} 条，更新 ${data.data.updated} 条`)
     } finally { importing.value = false; input.value = '' }
 }
-watch([keyword, statusFilter, sslStatusFilter, sslExpiryRange], () => { page.value = 1; void load() })
-watch([filtersExpanded, statusFilter, sslStatusFilter], () => { void fitSelectFilters() })
+watch([keyword, domainFilter, portFilter, statusFilter, sslStatusFilter, rootCAFilter, sslExpiryRange, lastCheckRange], () => { page.value = 1; void load() })
+watch([filtersExpanded, domainFilter, portFilter, statusFilter, sslStatusFilter, rootCAFilter], () => { void fitSelectFilters() })
 function formatDate(value?: string) { return value && !value.startsWith('0001-') ? value.replace('T', ' ').slice(0, 19) : '—' }
 function statusText(status?: string) { return status === 'normal' ? '正常' : status === 'abnormal' ? '异常' : status === 'paused' ? '暂停' : '未知' }
 function intervalText(seconds?: number) { if (!seconds) return '—'; return seconds % 60 === 0 ? `${seconds / 60}分钟` : `${seconds}秒` }
@@ -129,7 +149,7 @@ function operationRenderer(p: any) {
     return actions
 }
 const columns: ColDef[] = [{ headerName: '序号', valueGetter: (p: any) => (page.value - 1) * pageSize.value + p.node!.rowIndex! + 1, width: 70 }, { field: 'domain', headerName: '域名', minWidth: 160 }, { field: 'port', headerName: '端口', width: 80 }, { field: 'status', headerName: '状态', width: 90, cellRenderer: (p: any) => statusRenderer(p.value === 'normal' ? '正常' : p.value === 'abnormal' ? '异常' : p.value === 'paused' ? '暂停' : '未知', p.value === 'normal' ? 'is-success' : p.value === 'abnormal' ? 'is-danger' : 'is-muted') }, { field: 'response_time', headerName: '响应时间', width: 105, valueFormatter: (p: any) => p.value ? `${p.value} ms` : '—' }, { field: 'ssl_valid', headerName: 'SSL 证书', width: 100, cellRenderer: (p: any) => statusRenderer(p.data.enable_ssl ? (p.value ? '有效' : '无效') : '未启用', p.data.enable_ssl ? (p.value ? 'is-success' : 'is-danger') : 'is-muted') }, { field: 'ssl_root_ca', headerName: '根 CA', minWidth: 150, valueFormatter: (p: any) => p.value || '—' }, { field: 'ssl_expiry', headerName: 'SSL 到期时间', minWidth: 155, valueFormatter: (p: any) => formatDate(p.value) }, { field: 'check_interval', headerName: '检查间隔', width: 100, valueFormatter: (p: any) => `${p.value} 秒` }, { field: 'last_check', headerName: '最后检查', minWidth: 155, valueFormatter: (p: any) => formatDate(p.value) }, { headerName: '操作', pinned: 'right', cellClass: 'monitor-operation-cell', cellRenderer: operationRenderer }]
-onMounted(load)
+onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
 </script>
 <template>
     <section class="page">
@@ -166,21 +186,35 @@ onMounted(load)
                     @change="importExcel" /><el-button type="primary" @click="open()">新增监控</el-button></div>
         </div>
         <div v-if="filtersExpanded" ref="filterPanelRef" class="monitor-filter-panel">
+            <el-select v-model="domainFilter" class="domain-filter content-adaptive-select"
+                popper-class="monitor-filter-select-popper" placeholder="选择域名" filterable allow-create
+                default-first-option clearable>
+                <el-option v-for="domain in domainOptions" :key="domain" :label="domain" :value="domain" />
+            </el-select>
+            <el-select v-model="portFilter" class="port-filter content-adaptive-select"
+                popper-class="monitor-filter-select-popper" placeholder="选择端口" filterable clearable>
+                <el-option v-for="port in portOptions" :key="port" :label="String(port)" :value="port" />
+            </el-select>
             <el-select v-model="statusFilter" class="status-filter content-adaptive-select"
-                popper-class="monitor-filter-select-popper" placeholder="全部状态" clearable>
-                <el-option label="正常" value="normal" />
-                <el-option label="异常" value="abnormal" />
-                <el-option label="暂停" value="paused" />
-                <el-option label="未知" value="unknown" />
+                popper-class="monitor-filter-select-popper" placeholder="选择状态" clearable>
+                <el-option v-for="option in statusOptions" :key="option.value" :label="option.label"
+                    :value="option.value" />
             </el-select>
             <el-select v-model="sslStatusFilter" class="ssl-filter content-adaptive-select"
-                popper-class="monitor-filter-select-popper" placeholder="SSL 证书" clearable>
-                <el-option label="有效" value="valid" />
-                <el-option label="无效" value="invalid" />
-                <el-option label="未启用" value="disabled" />
+                popper-class="monitor-filter-select-popper" placeholder="选择 SSL 证书" clearable>
+                <el-option v-for="option in sslStatusOptions" :key="option.value" :label="option.label"
+                    :value="option.value" />
+            </el-select>
+            <el-select v-model="rootCAFilter" class="root-ca-filter content-adaptive-select"
+                popper-class="monitor-filter-select-popper" placeholder="选择根 CA" filterable allow-create
+                default-first-option clearable>
+                <el-option v-for="rootCA in rootCAOptions" :key="rootCA" :label="rootCA" :value="rootCA" />
             </el-select>
             <el-date-picker v-model="sslExpiryRange" class="expiry-filter" type="daterange" value-format="YYYY-MM-DD"
-                start-placeholder="到期开始" end-placeholder="到期结束" range-separator="至" clearable />
+                start-placeholder="选择到期开始" end-placeholder="选择到期结束" range-separator="至" clearable />
+            <el-date-picker v-model="lastCheckRange" class="last-check-filter" type="daterange"
+                value-format="YYYY-MM-DD" start-placeholder="选择检查开始" end-placeholder="选择检查结束" range-separator="至"
+                clearable />
         </div>
         <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
             :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove"
@@ -208,7 +242,7 @@ onMounted(load)
             <template v-if="detailMonitor">
                 <div class="detail-overview">
                     <div class="detail-item"><span>域名：</span><strong class="domain-value">{{ detailMonitor.domain
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>状态：</span><strong class="detail-status"
                             :class="`is-${detailMonitor.status}`">{{ statusText(detailMonitor.status) }}</strong></div>
                     <div class="detail-item"><span>端口：</span><strong>{{ detailMonitor.port }}</strong></div>
@@ -222,16 +256,16 @@ onMounted(load)
                     <div class="detail-item"><span>根 CA：</span><strong>{{ detailMonitor.ssl_root_ca || '—' }}</strong>
                     </div>
                     <div class="detail-item"><span>SSL到期：</span><strong>{{ formatDate(detailMonitor.ssl_expiry)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>检查间隔：</span><strong>{{ intervalText(detailMonitor.check_interval)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>抖动：</span><strong>0～{{ detailMonitor.check_jitter }}秒</strong></div>
                     <div class="detail-item"><span>最后检查：</span><strong>{{ formatDate(detailMonitor.last_check)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>创建时间：</span><strong>{{ formatDate(detailMonitor.created_at)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-item"><span>更新时间：</span><strong>{{ formatDate(detailMonitor.updated_at)
-                            }}</strong></div>
+                    }}</strong></div>
                 </div>
                 <div class="history-panel">
                     <h3>检查历史 <small>最近 {{ historyRows.length }} 条</small></h3>
@@ -241,7 +275,7 @@ onMounted(load)
                             <div class="history-time">{{ formatDate(item.checked_at) }}</div>
                             <div class="history-result">
                                 <span class="detail-status" :class="`is-${item.status}`">{{ statusText(item.status)
-                                    }}</span>
+                                }}</span>
                                 <strong>{{ item.response_time }}ms</strong>
                                 <span v-if="item.status_code" class="history-code">HTTP {{ item.status_code }}</span>
                             </div>
@@ -319,7 +353,8 @@ onMounted(load)
     width: calc(100% - 1px);
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    column-gap: 6px;
+    row-gap: 1px;
     margin-right: 1px;
     padding: 1px;
     border: 1px solid var(--line);
@@ -333,15 +368,28 @@ onMounted(load)
     max-width: 100%;
 }
 
+.monitor-filter-panel :deep(.el-select__wrapper),
+.monitor-filter-panel :deep(.el-date-editor.el-input__wrapper) {
+    height: 32px;
+    min-height: 32px;
+    box-sizing: border-box;
+}
+
 .monitor-filter-panel :deep(.content-adaptive-select .el-select__placeholder) {
     font-size: 10px;
+    color: var(--el-text-color-placeholder);
+}
+
+.monitor-filter-panel :deep(.el-range-input::placeholder) {
+    color: var(--el-text-color-placeholder);
 }
 
 :global(.monitor-filter-select-popper .el-select-dropdown__item) {
     font-size: 11px;
 }
 
-.monitor-filter-panel :deep(.expiry-filter) {
+.monitor-filter-panel :deep(.expiry-filter),
+.monitor-filter-panel :deep(.last-check-filter) {
     flex: 0 0 280px;
     width: 280px;
 }
