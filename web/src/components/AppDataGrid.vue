@@ -44,6 +44,7 @@ const rowSelection: RowSelectionOptions = {
   mode: 'multiRow',
   checkboxes: true,
   headerCheckbox: true,
+  selectAll: 'all',
   enableClickSelection: false,
 }
 const selectionColumnDef: SelectionColumnDef = {
@@ -433,10 +434,14 @@ function handleGridReady(event: any) {
 
 .app-data-grid :deep(.ag-header-cell[col-id='ag-Grid-SelectionColumn'] .ag-header-select-all) {
   position: absolute;
-  left: 50%;
-  margin-left: 0;
-  margin-right: 0;
-  transform: translateX(-50%);
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 !important;
+  transform: none;
+  cursor: pointer;
 }
 
 .app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn']) {
@@ -446,19 +451,23 @@ function handleGridReady(event: any) {
   padding: 0;
 }
 
-.app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn'] .ag-cell-wrapper),
-.app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn'] .ag-cell-value) {
+.app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn'] .ag-cell-wrapper) {
   display: flex;
   justify-content: center;
   width: 100%;
 }
 
+.app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn'] .ag-cell-value) {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+}
+
 .app-data-grid :deep(.ag-cell[col-id='ag-Grid-SelectionColumn'] .ag-selection-checkbox) {
-  position: absolute;
-  left: 50%;
-  margin-left: 0;
-  margin-right: 0;
-  transform: translateX(-50%);
+  position: static;
+  margin: 0 !important;
+  transform: none;
+  cursor: pointer;
 }
 
 .app-data-grid :deep(.app-data-grid-index-cell),
