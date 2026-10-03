@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Cpu, Delete, Download, Edit, Folder, Monitor, Refresh, Search, Upload } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectHostInfo, createCredential, createHost, deleteHost, downloadHostImportTemplate, exportHosts, importHosts, listAssetGroups, listCloudAccounts, listCredentials, listHosts, testHostConnection, type AssetGroup, type CloudAccount, type Credential, type Host, updateHost } from '@/api/asset'
+import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Cpu, Delete, Download, Edit, Monitor, Refresh, Search, Upload } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectHostInfo, createCredential, createHost, deleteHost, downloadHostImportTemplate, exportHosts, importHosts, listAssetGroups, listCloudAccounts, listCredentials, listHosts, testHostConnection, type AssetGroup, type CloudAccount, type Credential, type Host, updateHost } from '@/api/asset'
 import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
 interface AssetTreeNode { id: number; label: string; count: number; children: AssetTreeNode[] }
@@ -13,19 +13,19 @@ const vncCredentials = computed(() => credentials.value.filter(credential => cre
 const hostTypeLabels: Record<string, string> = { self: '自建主机', cloud: '云主机' }
 const treeData = computed<AssetTreeNode[]>(() => { const counts = new Map<number, number>(); rows.value.forEach(row => counts.set(row.group_id, (counts.get(row.group_id) || 0) + 1)); const nodes = new Map<number, AssetTreeNode>(); const roots: AssetTreeNode[] = []; groups.value.forEach(group => nodes.set(group.id, { id: group.id, label: group.name, count: counts.get(group.id) || 0, children: [] })); groups.value.forEach(group => { const node = nodes.get(group.id); const parent = nodes.get(group.parent_id); if (!node) return; if (group.parent_id && parent) parent.children.push(node); else roots.push(node) }); return roots })
 function componentIcon(icon: Component, className = 'el-icon') { const root = document.createElement('span'); root.className = className; render(h(icon), root); return root }
-function hostRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = `host-summary status-${p.data.status}`; const icon = componentIcon(Monitor, 'host-summary-icon el-icon'); const text = document.createElement('span'); text.className = 'host-summary-text'; const name = document.createElement('strong'); name.textContent = p.data.name || '-'; const address = document.createElement('small'); address.textContent = `${p.data.ip || '-'}:${p.data.port || 22}`; text.append(name, address); wrap.append(icon, text); return wrap }
+function hasSSHConnection(host: Host) { return Boolean(host.port && host.credential_id) }
+function hostRenderer(p: any) { const host = p.data as Host; const wrap = document.createElement('div'); wrap.className = `host-summary status-${hasSSHConnection(host) ? host.status : 'unavailable'}`; const icon = componentIcon(Monitor, 'host-summary-icon el-icon'); const text = document.createElement('span'); text.className = 'host-summary-text'; const name = document.createElement('strong'); name.textContent = host.name || '-'; const address = document.createElement('small'); const port = hasSSHConnection(host) ? host.port : host.vnc_port; address.textContent = port ? `${host.ip || '-'}:${port}` : (host.ip || '-'); text.append(name, address); wrap.append(icon, text); return wrap }
 function typeRenderer(p: any) { const tag = document.createElement('span'); tag.className = `host-type is-${p.value || 'unknown'}`; tag.textContent = hostTypeLabels[String(p.value || '')] || '未知'; return tag }
-function statusRenderer(p: any) { const tag = document.createElement('span'); tag.className = `host-status is-${p.value}`; tag.textContent = p.value === 1 ? '在线' : p.value === 0 ? '离线' : '未知'; return tag }
+function statusRenderer(p: any) { const host = p.data as Host; const collectable = hasSSHConnection(host); const tag = document.createElement('span'); tag.className = `host-status ${collectable ? `is-${p.value}` : 'is-unavailable'}`; tag.textContent = collectable ? (p.value === 1 ? '在线' : p.value === 0 ? '离线' : '未知') : '未采集'; return tag }
 function tagsRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-tags'; const tags = String(p.value || '').split(',').map((tag: string) => tag.trim()).filter(Boolean); if (!tags.length) { wrap.textContent = '-'; return wrap }; tags.slice(0, 2).forEach((value: string) => { const tag = document.createElement('span'); tag.textContent = value; wrap.append(tag) }); if (tags.length > 2) { const more = document.createElement('small'); more.textContent = `+${tags.length - 2}`; wrap.append(more) }; return wrap }
-function actionIcon(title: string, kind: string, icon: Component, fn: () => void) { const root = document.createElement('span'); render(h(ElTooltip, { content: title, placement: 'top', showAfter: 250 }, { default: () => h('button', { type: 'button', 'aria-label': title, class: `host-action-icon ${kind}`, onClick: fn }, [h('span', { class: 'el-icon' }, [h(icon)])]) }), root); return root }
+function actionIcon(title: string, kind: string, icon: Component, fn: () => void, disabled = false) { const root = document.createElement('span'); render(h(ElTooltip, { content: title, placement: 'top', showAfter: 250 }, { default: () => h('button', { type: 'button', 'aria-label': title, class: `host-action-icon ${kind}`, disabled, onClick: disabled ? undefined : fn }, [h('span', { class: 'el-icon' }, [h(icon)])]) }), root); return root }
 function openTerminal() { window.open('/assets/terminal', '_blank', 'noopener,noreferrer') }
 async function collectHost(row: Host) { await collectHostInfo(row.id); ElMessage.success(`${row.name} 信息采集成功`); await load() }
-function openFiles(row: Host) { ElMessage.info(`正在准备打开 ${row.name} 的文件管理`) }
-function actionRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-actions'; if (auth.hasPermission('POST /api/v1/assets/hosts/collect')) wrap.append(actionIcon('采集信息', 'collect', Refresh, () => { void collectHost(p.data) })); wrap.append(actionIcon('文件管理', 'files', Folder, () => openFiles(p.data))); if (auth.hasPermission('POST /api/v1/assets/hosts/update')) wrap.append(actionIcon('编辑', 'edit', Edit, () => edit(p.data))); if (auth.hasPermission('POST /api/v1/assets/hosts/delete')) wrap.append(actionIcon('删除', 'delete', Delete, () => remove(p.data))); return wrap }
+function actionRenderer(p: any) { const host = p.data as Host; const wrap = document.createElement('div'); wrap.className = 'host-actions'; if (auth.hasPermission('POST /api/v1/assets/hosts/collect')) { const collectable = hasSSHConnection(host); wrap.append(actionIcon(collectable ? '采集信息' : '未配置 SSH，无法采集', 'collect', Refresh, () => { void collectHost(host) }, !collectable)) }; if (auth.hasPermission('POST /api/v1/assets/hosts/update')) wrap.append(actionIcon('编辑', 'edit', Edit, () => edit(host))); if (auth.hasPermission('POST /api/v1/assets/hosts/delete')) wrap.append(actionIcon('删除', 'delete', Delete, () => remove(host))); return wrap }
 function formatBytes(value: number) { if (!value) return '-'; const units = ['B', 'K', 'M', 'G', 'T']; let size = value; let index = 0; while (size >= 1024 && index < units.length - 1) { size /= 1024; index++ }; return `${size.toFixed(index > 2 ? 1 : 0)}${units[index]}` }
 function metricRenderer(kind: 'cpu' | 'memory' | 'disk') { return (p: any) => { const row = p.data as Host; const usage = kind === 'cpu' ? row.cpu_usage : kind === 'memory' ? row.memory_usage : row.disk_usage; const headline = kind === 'cpu' ? (row.cpu_cores ? `${row.cpu_cores}核` : '-') : `${formatBytes(kind === 'memory' ? row.memory_used : row.disk_used)} / ${formatBytes(kind === 'memory' ? row.memory_total : row.disk_total)}`; const wrap = document.createElement('div'); wrap.className = `host-metric${usage >= 70 ? ' is-warning' : ''}`; const text = document.createElement('span'); text.textContent = headline; const details = document.createElement('div'); const bar = document.createElement('i'); const fill = document.createElement('b'); fill.style.width = `${Math.max(0, Math.min(100, usage || 0))}%`; bar.append(fill); const percent = document.createElement('small'); percent.textContent = usage ? `${usage.toFixed(1)}%` : '-'; details.append(bar, percent); wrap.append(text, details); return wrap } }
 function systemRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-system'; const os = document.createElement('span'); os.append(componentIcon(Monitor)); const osText = document.createElement('em'); osText.textContent = p.data.os || '-'; os.append(osText); const arch = document.createElement('small'); arch.append(componentIcon(Cpu)); const archText = document.createElement('em'); archText.textContent = p.data.arch || '-'; arch.append(archText); wrap.append(os, arch); return wrap }
-const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((page.value - 1) * pageSize.value + (p.node?.rowIndex ?? 0) + 1), width: 58 }, { field: 'name', headerName: '主机', minWidth: 190, cellRenderer: hostRenderer }, { field: 'status', headerName: '状态', width: 86, cellRenderer: statusRenderer }, { field: 'host_type', headerName: '类型', width: 90, cellRenderer: typeRenderer }, { headerName: 'CPU', width: 132, cellRenderer: metricRenderer('cpu') }, { headerName: '内存', width: 160, cellRenderer: metricRenderer('memory') }, { headerName: '磁盘', width: 160, cellRenderer: metricRenderer('disk') }, { field: 'tags', headerName: '标签', width: 115, cellClass: 'host-tags-cell', cellRenderer: tagsRenderer }, { headerName: '系统信息', minWidth: 170, flex: 1, cellRenderer: systemRenderer }, { headerName: '操作', pinned: 'right', width: 170, cellRenderer: actionRenderer }])
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((page.value - 1) * pageSize.value + (p.node?.rowIndex ?? 0) + 1), width: 58 }, { field: 'name', headerName: '主机', minWidth: 190, cellRenderer: hostRenderer }, { field: 'status', headerName: '状态', width: 86, cellRenderer: statusRenderer }, { field: 'host_type', headerName: '类型', width: 90, cellRenderer: typeRenderer }, { headerName: 'CPU', width: 132, cellRenderer: metricRenderer('cpu') }, { headerName: '内存', width: 160, cellRenderer: metricRenderer('memory') }, { headerName: '磁盘', width: 160, cellRenderer: metricRenderer('disk') }, { field: 'tags', headerName: '标签', width: 115, cellClass: 'host-tags-cell', cellRenderer: tagsRenderer }, { headerName: '系统信息', minWidth: 170, flex: 1, cellRenderer: systemRenderer }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: actionRenderer }])
 async function load(reset = false) { if (reset) page.value = 1; const { data } = await listHosts(keyword.value, selectedGroupID.value || 0, page.value, pageSize.value, statusFilter.value); rows.value = data.data.list; total.value = data.data.total }
 function changePage(value: number) { page.value = value; void load() }
 function changePageSize(value: number) { pageSize.value = value; page.value = 1; void load() }
@@ -54,10 +54,12 @@ async function batchRemove(selectedRows: unknown[]) {
     await load()
 }
 async function batchCollect(selectedRows: unknown[]) {
-    const hosts = selectedRows as Host[]
-    if (!hosts.length) return
+    const selected = selectedRows as Host[]
+    const hosts = selected.filter(hasSSHConnection)
+    if (!hosts.length) return ElMessage.warning('选中的主机均未配置 SSH，无法采集')
     await Promise.all(hosts.map(host => collectHostInfo(host.id)))
-    ElMessage.success(`已完成 ${hosts.length} 台主机的信息采集`)
+    const skipped = selected.length - hosts.length
+    ElMessage.success(`已完成 ${hosts.length} 台主机的信息采集${skipped ? `，跳过 ${skipped} 台未配置 SSH 的主机` : ''}`)
     await load()
 }
 async function exportExcel() {
@@ -627,6 +629,10 @@ onMounted(() => { void load(); void loadFormOptions() })
     color: #ef6262;
 }
 
+:deep(.host-status.is-unavailable) {
+    color: var(--text-muted);
+}
+
 :deep(.host-type) {
     display: inline-flex;
     align-items: center;
@@ -781,6 +787,15 @@ onMounted(() => { void load(); void loadFormOptions() })
     border-color: var(--line);
     background: #f6f7fa;
     color: var(--primary);
+}
+
+:deep(.host-action-icon:disabled),
+:deep(.host-action-icon:disabled:hover) {
+    border-color: transparent;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: .45;
 }
 
 :deep(.host-action-icon.delete:hover) {
