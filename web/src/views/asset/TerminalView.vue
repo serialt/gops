@@ -21,6 +21,7 @@ interface SftpTransferRecord {
   status: 'processing' | 'success' | 'failed'
   progress: number
 }
+interface SftpUploadFile { file: File; relativePath: string }
 
 const systemConfig = useSystemConfigStore()
 const treeData = ref<TreeNode[]>([])
@@ -46,12 +47,14 @@ const sftpUploadMenuVisible = ref(false)
 const sftpFileInput = ref<HTMLInputElement>()
 const sftpDirectoryInput = ref<HTMLInputElement>()
 const sftpUploading = ref(false)
+const sftpDragActive = ref(false)
 const sftpSelected = ref<string[]>([])
 const sftpUploadRecords = ref<SftpTransferRecord[]>([])
 const sftpDownloadRecords = ref<SftpTransferRecord[]>([])
 const sftpRecordPanel = ref<'upload' | 'download' | null>(null)
 const sftpDownloadNames = new Set<string>()
 let sftpTransferRecordID = 0
+let sftpDragDepth = 0
 type SftpColumn = 'size' | 'modified' | 'permissions'
 const sftpColumnWidths = ref({ size: 144, modified: 210, permissions: 150 })
 const sftpResizingColumn = ref<SftpColumn | null>(null)
@@ -226,6 +229,19 @@ function toggleSftpEntry(name: string) {
     ? sftpSelected.value.filter(item => item !== name)
     : [...sftpSelected.value, name]
 }
+function formatSftpSize(entry: SftpEntry) {
+  if (entry.type === 'directory') return '-'
+  const bytes = Math.max(0, entry.size || 0)
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB', 'PB']
+  let size = bytes / 1024
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex += 1
+  }
+  return `${size.toFixed(size >= 100 ? 0 : 1)} ${units[unitIndex]}`
+}
 function startSftpColumnResize(event: PointerEvent, column: SftpColumn) {
   if (event.button !== 0) return
   event.preventDefault()
@@ -308,8 +324,17 @@ async function handleSftpUpload(event: Event) {
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files || [])
   input.value = ''
-  if (sftpOriginKey.value === null || !files.length) return
-  const records = files.map(file => createSftpTransferRecord(file.webkitRelativePath || file.name))
+  await startSftpUpload(files.map(file => ({ file, relativePath: file.webkitRelativePath || file.name })))
+}
+async function startSftpUpload(uploadFiles: SftpUploadFile[]) {
+  if (sftpOriginKey.value === null || !uploadFiles.length) return
+  if (sftpUploading.value) {
+    ElMessage.warning('当前已有文件正在上传')
+    return
+  }
+  const files = uploadFiles.map(item => item.file)
+  const relativePaths = uploadFiles.map(item => item.relativePath)
+  const records = uploadFiles.map(item => createSftpTransferRecord(item.relativePath))
   sftpUploadRecords.value.unshift(...records)
   sftpRecordPanel.value = 'upload'
   sftpUploading.value = true
@@ -318,7 +343,7 @@ async function handleSftpUpload(event: Event) {
   try {
     await uploadSftp(sftpOriginKey.value, sftpCommittedPath.value, files, transferID, progress => {
       records.forEach(record => { record.progress = Math.max(record.progress, Math.round(progress * .2)) })
-    })
+    }, relativePaths)
     records.forEach(record => { record.progress = 100; record.status = 'success' })
     ElMessage.success('上传成功')
     await loadSftpDirectory()
@@ -328,6 +353,54 @@ async function handleSftpUpload(event: Event) {
   } finally {
     sftpUploading.value = false
   }
+}
+function readDroppedFile(entry: FileSystemFileEntry, relativePath: string) {
+  return new Promise<SftpUploadFile>((resolve, reject) => {
+    entry.file(file => resolve({ file, relativePath }), reject)
+  })
+}
+async function readDroppedEntries(reader: FileSystemDirectoryReader) {
+  const entries: FileSystemEntry[] = []
+  while (true) {
+    const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject))
+    if (!batch.length) return entries
+    entries.push(...batch)
+  }
+}
+async function collectDroppedEntry(entry: FileSystemEntry, parentPath = ''): Promise<SftpUploadFile[]> {
+  const relativePath = parentPath ? `${parentPath}/${entry.name}` : entry.name
+  if (entry.isFile) return [await readDroppedFile(entry as FileSystemFileEntry, relativePath)]
+  if (!entry.isDirectory) return []
+  const children = await readDroppedEntries((entry as FileSystemDirectoryEntry).createReader())
+  const nested = await Promise.all(children.map(child => collectDroppedEntry(child, relativePath)))
+  return nested.flat()
+}
+function enterSftpDropZone(event: DragEvent) {
+  if (!event.dataTransfer?.types.includes('Files')) return
+  sftpDragDepth += 1
+  sftpDragActive.value = true
+}
+function leaveSftpDropZone() {
+  sftpDragDepth = Math.max(0, sftpDragDepth - 1)
+  if (sftpDragDepth === 0) sftpDragActive.value = false
+}
+async function dropSftpFiles(event: DragEvent) {
+  sftpDragDepth = 0
+  sftpDragActive.value = false
+  const items = Array.from(event.dataTransfer?.items || [])
+  const entries = items.map(item => item.webkitGetAsEntry?.()).filter((entry): entry is FileSystemEntry => Boolean(entry))
+  let uploadFiles: SftpUploadFile[] = []
+  if (entries.length) {
+    const nested = await Promise.all(entries.map(entry => collectDroppedEntry(entry)))
+    uploadFiles = nested.flat()
+  } else {
+    uploadFiles = Array.from(event.dataTransfer?.files || []).map(file => ({ file, relativePath: file.name }))
+  }
+  if (!uploadFiles.length) {
+    ElMessage.warning('未识别到可上传的文件')
+    return
+  }
+  await startSftpUpload(uploadFiles)
 }
 async function downloadSelectedSftp() {
   if (sftpOriginKey.value === null || !sftpSelected.value.length) return
@@ -493,8 +566,11 @@ onBeforeUnmount(() => {
             :ref="element => setTerminalElement(session.key, element)" class="terminal-body" />
         </div>
         <div v-if="sftpVisible" class="sftp-overlay">
-          <section class="sftp-panel" aria-label="SFTP 文件管理"
+          <section class="sftp-panel" :class="{ 'is-drag-active': sftpDragActive }" aria-label="SFTP 文件管理"
+            @dragenter.prevent="enterSftpDropZone" @dragover.prevent @dragleave.prevent="leaveSftpDropZone"
+            @drop.prevent="void dropSftpFiles($event)"
             @click="sftpSearchVisible = false; sftpUploadMenuVisible = false; sftpRecordPanel = null">
+            <div v-if="sftpDragActive" class="sftp-drop-hint"><el-icon><Upload /></el-icon><strong>松开以上传</strong><span>文件将上传到 {{ sftpCommittedPath }}</span></div>
             <header class="sftp-toolbar">
               <strong>SFTP</strong>
               <button type="button" class="sftp-icon-button" aria-label="返回上级目录" title="返回上级目录"
@@ -606,7 +682,7 @@ onBeforeUnmount(() => {
                       <FolderOpened v-if="entry.type === 'directory'" />
                       <Document v-else />
                     </el-icon>{{ entry.name }}</span>
-                  <span>{{ entry.size }}</span><span>{{ entry.modified }}</span><span>{{ entry.permissions }}</span>
+                  <span :title="entry.type === 'file' ? `${entry.size} 字节` : ''">{{ formatSftpSize(entry) }}</span><span>{{ entry.modified }}</span><span>{{ entry.permissions }}</span>
                 </button>
                 <div v-if="!filteredSftpEntries.length" class="sftp-empty">暂无目录数据</div>
               </div>
@@ -1095,6 +1171,7 @@ onBeforeUnmount(() => {
 }
 
 .sftp-panel {
+  position: relative;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -1103,6 +1180,41 @@ onBeforeUnmount(() => {
   overflow: hidden;
   color: #c8cbd1;
   background: #1d1e20;
+  font-size: 10px
+}
+
+.sftp-panel.is-drag-active {
+  box-shadow: inset 0 0 0 2px #55cbb5
+}
+
+.sftp-drop-hint {
+  position: absolute;
+  inset: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed #55cbb5;
+  border-radius: 10px;
+  color: #b7c0cc;
+  background: rgb(29 30 32 / 90%);
+  pointer-events: none
+}
+
+.sftp-drop-hint .el-icon {
+  color: #55cbb5;
+  font-size: 30px
+}
+
+.sftp-drop-hint strong {
+  color: #fff;
+  font-size: 13px
+}
+
+.sftp-drop-hint span {
+  color: #8f98a6;
   font-size: 10px
 }
 

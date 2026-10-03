@@ -66,15 +66,15 @@ export const importHosts = (file: File) => {
 export interface SftpEntry { name: string; type: 'directory' | 'file'; size: number; modified: string; permissions: string }
 export interface SftpTransferProgress { transferred: number; total: number; status: 'processing' | 'success' | 'failed'; message: string }
 export const listSftp = (host_id: number, path: string, page = 1, limit = 1000) => request.post<PageResponse<SftpEntry>>('/assets/terminal/sftp/list', { host_id, path, page, limit })
-export const uploadSftp = (host_id: number, path: string, files: File[], transfer_id: string, onProgress?: (progress: number) => void) => {
+export const uploadSftp = (host_id: number, path: string, files: File[], transfer_id: string, onProgress?: (progress: number) => void, relativePaths?: string[]) => {
   const form = new FormData()
   const fileBytes = files.reduce((total, file) => total + file.size, 0)
   form.append('host_id', String(host_id))
   form.append('path', path)
   form.append('transfer_id', transfer_id)
-  files.forEach(file => {
+  files.forEach((file, index) => {
     form.append('files', file, file.name)
-    form.append('relative_paths', file.webkitRelativePath || file.name)
+    form.append('relative_paths', relativePaths?.[index] || file.webkitRelativePath || file.name)
   })
   return request.post<null>('/assets/terminal/sftp/upload', form, {
     timeout: 0,
