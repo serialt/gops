@@ -460,22 +460,22 @@ func (b *AssetBiz) StartSSH(hostID, userID int64, cols, rows int) (*SSHConnectio
 }
 
 func (b *AssetBiz) dialHostSSH(hostID int64) (*model.Host, *ssh.Client, error) {
-	var host model.Host
-	if err := b.db.First(&host, hostID).Error; err != nil {
+	host, err := b.repo.GetHost(context.Background(), b.db, hostID)
+	if err != nil {
 		return nil, nil, ErrNotFound
 	}
 	if host.CredentialID == nil {
 		return nil, nil, fmt.Errorf("主机未配置凭证")
 	}
-	var credential model.Credential
-	if err := b.db.First(&credential, *host.CredentialID).Error; err != nil {
+	credential, err := b.repo.GetCredential(context.Background(), b.db, *host.CredentialID)
+	if err != nil {
 		return nil, nil, fmt.Errorf("加载主机凭证: %w", err)
 	}
-	client, err := b.dialSSH(&host, &credential)
+	client, err := b.dialSSH(host, credential)
 	if err != nil {
 		return nil, nil, err
 	}
-	return &host, client, nil
+	return host, client, nil
 }
 
 func (b *AssetBiz) dialSSH(host *model.Host, credential *model.Credential) (*ssh.Client, error) {

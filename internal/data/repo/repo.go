@@ -8,6 +8,7 @@ import (
 
 var ProviderSet = wire.NewSet(
 	NewAssetRepo,
+	NewTaskRepo,
 	NewDashboardRepo,
 	rbac.NewRbacRepo,
 )

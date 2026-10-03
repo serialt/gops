@@ -118,6 +118,12 @@ func Catalog() []Permission {
 		{Group: "监控管理", Name: "查看告警日志", Path: "/api/v1/monitor/logs/list", Method: "POST"},
 		{Group: "Nginx 管理", Name: "查看数据源", Path: "/api/v1/nginx/sources/list", Method: "POST"},
 		{Group: "任务中心", Name: "查看任务作业", Path: "/api/v1/tasks/jobs/list", Method: "POST"},
+		{Group: "任务中心", Name: "执行任务", Path: "/api/v1/tasks/execute", Method: "POST"},
+		{Group: "任务中心", Name: "文件分发", Path: "/api/v1/tasks/distribute", Method: "POST"},
+		{Group: "任务中心", Name: "查看任务模板", Path: "/api/v1/tasks/templates/list", Method: "POST"},
+		{Group: "任务中心", Name: "新建任务模板", Path: "/api/v1/tasks/templates/create", Method: "POST"},
+		{Group: "任务中心", Name: "编辑任务模板", Path: "/api/v1/tasks/templates/update", Method: "POST"},
+		{Group: "任务中心", Name: "删除任务模板", Path: "/api/v1/tasks/templates/delete", Method: "POST"},
 		{Group: "SSL 证书", Name: "查看证书", Path: "/api/v1/ssl-cert/certificates/list", Method: "POST"},
 	}
 	for i := range items {

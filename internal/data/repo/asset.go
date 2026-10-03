@@ -77,6 +77,11 @@ func (r *AssetRepo) GetHostByIP(ctx context.Context, db *gorm.DB, ip string) (*m
 	return q.WithContext(ctx).Where(q.IP.Eq(ip)).First()
 }
 
+func (r *AssetRepo) GetHost(ctx context.Context, db *gorm.DB, id int64) (*model.Host, error) {
+	q := query.Use(db).Host
+	return q.WithContext(ctx).Where(q.ID.Eq(id)).First()
+}
+
 func (r *AssetRepo) GetHostAndVNCCredential(ctx context.Context, db *gorm.DB, id int64) (*model.Host, *model.Credential, error) {
 	q := query.Use(db)
 	host, err := q.Host.WithContext(ctx).Where(q.Host.ID.Eq(id)).First()

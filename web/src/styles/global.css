@@ -20,6 +20,7 @@
   --text: #182235;
   --text-soft: #667085;
   --text-muted: #98a2b3;
+  --el-text-color-placeholder: var(--text-muted);
   --line: #e6eaf1;
   --shadow: 0 8px 24px rgba(31, 42, 68, 0.06);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "PingFang SC", "Microsoft YaHei";
@@ -60,6 +61,18 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+/* 表单提示文字统一使用弱化灰色，避免局部组件继承正文颜色。 */
+input::placeholder,
+textarea::placeholder,
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder,
+.el-range-input::placeholder,
+.el-select__placeholder {
+  color: var(--text-muted) !important;
+  -webkit-text-fill-color: var(--text-muted) !important;
+  opacity: 1;
 }
 
 .page-container {
