@@ -56,6 +56,7 @@ func newHost(db *gorm.DB, opts ...gen.DOOption) host {
 	_host.DiskUsage = field.NewFloat64(tableName, "disk_usage")
 	_host.Uptime = field.NewString(tableName, "uptime")
 	_host.Hostname = field.NewString(tableName, "hostname")
+	_host.VncCredentialID = field.NewInt64(tableName, "vnc_credential_id")
 
 	_host.fillFieldMap()
 
@@ -65,36 +66,37 @@ func newHost(db *gorm.DB, opts ...gen.DOOption) host {
 type host struct {
 	hostDo hostDo
 
-	ALL            field.Asterisk
-	ID             field.Int64
-	Name           field.String
-	GroupID        field.Int64
-	HostType       field.String
-	IP             field.String
-	Port           field.Int64
-	CredentialID   field.Int64
-	CloudAccountID field.Int64
-	Tags           field.String
-	Description    field.String
-	Status         field.Int64
-	LastSeenAt     field.Time
-	Os             field.String
-	Kernel         field.String
-	Arch           field.String
-	CreatedAt      field.Time
-	UpdatedAt      field.Time
-	DeletedAt      field.Field
-	CPUInfo        field.String
-	CPUCores       field.Int64
-	CPUUsage       field.Float64
-	MemoryTotal    field.Int64
-	MemoryUsed     field.Int64
-	MemoryUsage    field.Float64
-	DiskTotal      field.Int64
-	DiskUsed       field.Int64
-	DiskUsage      field.Float64
-	Uptime         field.String
-	Hostname       field.String
+	ALL             field.Asterisk
+	ID              field.Int64
+	Name            field.String
+	GroupID         field.Int64
+	HostType        field.String
+	IP              field.String
+	Port            field.Int64
+	CredentialID    field.Int64
+	CloudAccountID  field.Int64
+	Tags            field.String
+	Description     field.String
+	Status          field.Int64
+	LastSeenAt      field.Time
+	Os              field.String
+	Kernel          field.String
+	Arch            field.String
+	CreatedAt       field.Time
+	UpdatedAt       field.Time
+	DeletedAt       field.Field
+	CPUInfo         field.String
+	CPUCores        field.Int64
+	CPUUsage        field.Float64
+	MemoryTotal     field.Int64
+	MemoryUsed      field.Int64
+	MemoryUsage     field.Float64
+	DiskTotal       field.Int64
+	DiskUsed        field.Int64
+	DiskUsage       field.Float64
+	Uptime          field.String
+	Hostname        field.String
+	VncCredentialID field.Int64
 
 	fieldMap map[string]field.Expr
 }
@@ -140,6 +142,7 @@ func (h *host) updateTableName(table string) *host {
 	h.DiskUsage = field.NewFloat64(table, "disk_usage")
 	h.Uptime = field.NewString(table, "uptime")
 	h.Hostname = field.NewString(table, "hostname")
+	h.VncCredentialID = field.NewInt64(table, "vnc_credential_id")
 
 	h.fillFieldMap()
 
@@ -164,7 +167,7 @@ func (h *host) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (h *host) fillFieldMap() {
-	h.fieldMap = make(map[string]field.Expr, 29)
+	h.fieldMap = make(map[string]field.Expr, 30)
 	h.fieldMap["id"] = h.ID
 	h.fieldMap["name"] = h.Name
 	h.fieldMap["group_id"] = h.GroupID
@@ -194,6 +197,7 @@ func (h *host) fillFieldMap() {
 	h.fieldMap["disk_usage"] = h.DiskUsage
 	h.fieldMap["uptime"] = h.Uptime
 	h.fieldMap["hostname"] = h.Hostname
+	h.fieldMap["vnc_credential_id"] = h.VncCredentialID
 }
 
 func (h host) clone(db *gorm.DB) host {

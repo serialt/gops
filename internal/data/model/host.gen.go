@@ -14,35 +14,36 @@ const TableNameHost = "host"
 
 // Host mapped from table <host>
 type Host struct {
-	ID             int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name           string         `gorm:"column:name;not null" json:"name"`
-	GroupID        int64          `gorm:"column:group_id" json:"group_id"`
-	HostType       string         `gorm:"column:host_type;not null;default:'self'" json:"host_type"`
-	IP             string         `gorm:"column:ip;not null" json:"ip"`
-	Port           int64          `gorm:"column:port;not null;default:22" json:"port"`
-	CredentialID   int64          `gorm:"column:credential_id" json:"credential_id"`
-	CloudAccountID int64          `gorm:"column:cloud_account_id" json:"cloud_account_id"`
-	Tags           string         `gorm:"column:tags;not null;default:''" json:"tags"`
-	Description    string         `gorm:"column:description;not null;default:''" json:"description"`
-	Status         int64          `gorm:"column:status;not null;default:-1" json:"status"`
-	LastSeenAt     time.Time      `gorm:"column:last_seen_at" json:"last_seen_at"`
-	Os             string         `gorm:"column:os;not null;default:''" json:"os"`
-	Kernel         string         `gorm:"column:kernel;not null;default:''" json:"kernel"`
-	Arch           string         `gorm:"column:arch;not null;default:''" json:"arch"`
-	CreatedAt      time.Time      `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
-	CPUInfo        string         `gorm:"column:cpu_info;not null;default:''" json:"cpu_info"`
-	CPUCores       int64          `gorm:"column:cpu_cores;not null" json:"cpu_cores"`
-	CPUUsage       float64        `gorm:"column:cpu_usage;not null" json:"cpu_usage"`
-	MemoryTotal    int64          `gorm:"column:memory_total;not null" json:"memory_total"`
-	MemoryUsed     int64          `gorm:"column:memory_used;not null" json:"memory_used"`
-	MemoryUsage    float64        `gorm:"column:memory_usage;not null" json:"memory_usage"`
-	DiskTotal      int64          `gorm:"column:disk_total;not null" json:"disk_total"`
-	DiskUsed       int64          `gorm:"column:disk_used;not null" json:"disk_used"`
-	DiskUsage      float64        `gorm:"column:disk_usage;not null" json:"disk_usage"`
-	Uptime         string         `gorm:"column:uptime;not null;default:''" json:"uptime"`
-	Hostname       string         `gorm:"column:hostname;not null;default:''" json:"hostname"`
+	ID              int64          `gorm:"column:id;primaryKey" json:"id"`
+	Name            string         `gorm:"column:name;not null" json:"name"`
+	GroupID         int64          `gorm:"column:group_id" json:"group_id"`
+	HostType        string         `gorm:"column:host_type;not null;default:'self'" json:"host_type"`
+	IP              string         `gorm:"column:ip;not null" json:"ip"`
+	Port            int64          `gorm:"column:port;not null;default:22" json:"port"`
+	CredentialID    int64          `gorm:"column:credential_id" json:"credential_id"`
+	CloudAccountID  int64          `gorm:"column:cloud_account_id" json:"cloud_account_id"`
+	Tags            string         `gorm:"column:tags;not null;default:''" json:"tags"`
+	Description     string         `gorm:"column:description;not null;default:''" json:"description"`
+	Status          int64          `gorm:"column:status;not null;default:-1" json:"status"`
+	LastSeenAt      time.Time      `gorm:"column:last_seen_at" json:"last_seen_at"`
+	Os              string         `gorm:"column:os;not null;default:''" json:"os"`
+	Kernel          string         `gorm:"column:kernel;not null;default:''" json:"kernel"`
+	Arch            string         `gorm:"column:arch;not null;default:''" json:"arch"`
+	CreatedAt       time.Time      `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt       time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	CPUInfo         string         `gorm:"column:cpu_info;not null;default:''" json:"cpu_info"`
+	CPUCores        int64          `gorm:"column:cpu_cores;not null" json:"cpu_cores"`
+	CPUUsage        float64        `gorm:"column:cpu_usage;not null" json:"cpu_usage"`
+	MemoryTotal     int64          `gorm:"column:memory_total;not null" json:"memory_total"`
+	MemoryUsed      int64          `gorm:"column:memory_used;not null" json:"memory_used"`
+	MemoryUsage     float64        `gorm:"column:memory_usage;not null" json:"memory_usage"`
+	DiskTotal       int64          `gorm:"column:disk_total;not null" json:"disk_total"`
+	DiskUsed        int64          `gorm:"column:disk_used;not null" json:"disk_used"`
+	DiskUsage       float64        `gorm:"column:disk_usage;not null" json:"disk_usage"`
+	Uptime          string         `gorm:"column:uptime;not null;default:''" json:"uptime"`
+	Hostname        string         `gorm:"column:hostname;not null;default:''" json:"hostname"`
+	VncCredentialID int64          `gorm:"column:vnc_credential_id" json:"vnc_credential_id"`
 }
 
 // TableName Host's table name

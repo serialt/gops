@@ -114,17 +114,18 @@ type HostExcelImportResponse struct {
 	Updated int `json:"updated"`
 }
 type HostRequest struct {
-	ID             int64  `json:"id"`
-	Name           string `json:"name" binding:"required"`
-	GroupID        int64  `json:"group_id"`
-	HostType       string `json:"host_type"`
-	IP             string `json:"ip" binding:"required"`
-	Port           int64  `json:"port" binding:"min=1,max=65535"`
-	CredentialID   int64  `json:"credential_id" binding:"required"`
-	CloudAccountID int64  `json:"cloud_account_id"`
-	Tags           string `json:"tags"`
-	Description    string `json:"description"`
-	Status         int64  `json:"status"`
+	ID              int64  `json:"id"`
+	Name            string `json:"name" binding:"required"`
+	GroupID         int64  `json:"group_id"`
+	HostType        string `json:"host_type"`
+	IP              string `json:"ip" binding:"required"`
+	Port            int64  `json:"port" binding:"min=1,max=65535"`
+	CredentialID    int64  `json:"credential_id" binding:"required"`
+	VNCCredentialID int64  `json:"vnc_credential_id"`
+	CloudAccountID  int64  `json:"cloud_account_id"`
+	Tags            string `json:"tags"`
+	Description     string `json:"description"`
+	Status          int64  `json:"status"`
 }
 type HostIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
@@ -135,34 +136,35 @@ type HostTestRequest struct {
 	CredentialID int64  `json:"credential_id" binding:"required"`
 }
 type HostResponse struct {
-	ID             int64     `json:"id"`
-	Name           string    `json:"name"`
-	GroupID        int64     `json:"group_id"`
-	HostType       string    `json:"host_type"`
-	IP             string    `json:"ip"`
-	Port           int64     `json:"port"`
-	CredentialID   int64     `json:"credential_id"`
-	CloudAccountID int64     `json:"cloud_account_id"`
-	Tags           string    `json:"tags"`
-	Description    string    `json:"description"`
-	Status         int64     `json:"status"`
-	LastSeenAt     time.Time `json:"last_seen_at"`
-	OS             string    `json:"os"`
-	Kernel         string    `json:"kernel"`
-	Arch           string    `json:"arch"`
-	CPUInfo        string    `json:"cpu_info"`
-	CPUCores       int64     `json:"cpu_cores"`
-	CPUUsage       float64   `json:"cpu_usage"`
-	MemoryTotal    int64     `json:"memory_total"`
-	MemoryUsed     int64     `json:"memory_used"`
-	MemoryUsage    float64   `json:"memory_usage"`
-	DiskTotal      int64     `json:"disk_total"`
-	DiskUsed       int64     `json:"disk_used"`
-	DiskUsage      float64   `json:"disk_usage"`
-	Uptime         string    `json:"uptime"`
-	Hostname       string    `json:"hostname"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID              int64     `json:"id"`
+	Name            string    `json:"name"`
+	GroupID         int64     `json:"group_id"`
+	HostType        string    `json:"host_type"`
+	IP              string    `json:"ip"`
+	Port            int64     `json:"port"`
+	CredentialID    int64     `json:"credential_id"`
+	VNCCredentialID int64     `json:"vnc_credential_id"`
+	CloudAccountID  int64     `json:"cloud_account_id"`
+	Tags            string    `json:"tags"`
+	Description     string    `json:"description"`
+	Status          int64     `json:"status"`
+	LastSeenAt      time.Time `json:"last_seen_at"`
+	OS              string    `json:"os"`
+	Kernel          string    `json:"kernel"`
+	Arch            string    `json:"arch"`
+	CPUInfo         string    `json:"cpu_info"`
+	CPUCores        int64     `json:"cpu_cores"`
+	CPUUsage        float64   `json:"cpu_usage"`
+	MemoryTotal     int64     `json:"memory_total"`
+	MemoryUsed      int64     `json:"memory_used"`
+	MemoryUsage     float64   `json:"memory_usage"`
+	DiskTotal       int64     `json:"disk_total"`
+	DiskUsed        int64     `json:"disk_used"`
+	DiskUsage       float64   `json:"disk_usage"`
+	Uptime          string    `json:"uptime"`
+	Hostname        string    `json:"hostname"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type SFTPListRequest struct {
