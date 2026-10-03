@@ -17,10 +17,20 @@ func TimeoutResponse(c *gin.Context) {
 }
 
 func TimeoutMiddleware() gin.HandlerFunc {
-	return timeout.New(
+	defaultTimeout := timeout.New(
 		timeout.WithTimeout(50*time.Second),
 		timeout.WithResponse(TimeoutResponse),
 	)
+	return func(c *gin.Context) {
+		switch c.Request.URL.Path {
+		case "/api/v1/assets/terminal/sftp/upload", "/api/v1/assets/terminal/sftp/download":
+			// File transfers can legitimately exceed the ordinary API timeout and
+			// must stream directly instead of using timeout middleware's buffer.
+			c.Next()
+		default:
+			defaultTimeout(c)
+		}
+	}
 }
 
 func RegisterMiddleware(app *gin.Engine, cfg *config.Config, whitelistMap map[string]string) {

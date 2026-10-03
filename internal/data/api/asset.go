@@ -178,9 +178,19 @@ type SFTPEntryResponse struct {
 	Permissions string `json:"permissions"`
 }
 type SFTPDownloadRequest struct {
-	HostID int64    `json:"host_id" binding:"required"`
-	Path   string   `json:"path"`
-	Names  []string `json:"names" binding:"required,min=1"`
+	HostID     int64    `json:"host_id" binding:"required"`
+	Path       string   `json:"path"`
+	Names      []string `json:"names" binding:"required,min=1"`
+	TransferID string   `json:"transfer_id" binding:"required"`
+}
+type SFTPTransferProgressRequest struct {
+	TransferID string `json:"transfer_id" binding:"required"`
+}
+type SFTPTransferProgressResponse struct {
+	Transferred int64  `json:"transferred"`
+	Total       int64  `json:"total"`
+	Status      string `json:"status"`
+	Message     string `json:"message"`
 }
 
 type DbInstanceListRequest struct {

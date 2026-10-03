@@ -64,16 +64,33 @@ export const importHosts = (file: File) => {
   return request.post<HostExcelImportResult>('/assets/hosts/import', form)
 }
 export interface SftpEntry { name: string; type: 'directory' | 'file'; size: number; modified: string; permissions: string }
+export interface SftpTransferProgress { transferred: number; total: number; status: 'processing' | 'success' | 'failed'; message: string }
 export const listSftp = (host_id: number, path: string, page = 1, limit = 1000) => request.post<PageResponse<SftpEntry>>('/assets/terminal/sftp/list', { host_id, path, page, limit })
-export const uploadSftp = (host_id: number, path: string, files: File[]) => {
+export const uploadSftp = (host_id: number, path: string, files: File[], transfer_id: string, onProgress?: (progress: number) => void) => {
   const form = new FormData()
+  const fileBytes = files.reduce((total, file) => total + file.size, 0)
   form.append('host_id', String(host_id))
   form.append('path', path)
-  files.forEach(file => form.append('files', file, file.webkitRelativePath || file.name))
-  return request.post<null>('/assets/terminal/sftp/upload', form)
+  form.append('transfer_id', transfer_id)
+  files.forEach(file => {
+    form.append('files', file, file.name)
+    form.append('relative_paths', file.webkitRelativePath || file.name)
+  })
+  return request.post<null>('/assets/terminal/sftp/upload', form, {
+    timeout: 0,
+    onUploadProgress: event => {
+      const total = event.total || fileBytes
+      if (total > 0) onProgress?.(Math.min(100, Math.round((event.loaded / total) * 100)))
+    },
+  })
 }
-export const downloadSftp = (host_id: number, path: string, names: string[]) =>
-  request.post<Blob>('/assets/terminal/sftp/download', { host_id, path, names }, { responseType: 'blob' })
+export const downloadSftp = (host_id: number, path: string, names: string[], transfer_id: string) =>
+  request.post<Blob>('/assets/terminal/sftp/download', { host_id, path, names, transfer_id }, {
+    responseType: 'blob',
+    timeout: 0,
+  })
+export const getSftpTransferProgress = (transfer_id: string) =>
+  request.post<SftpTransferProgress>('/assets/terminal/sftp/progress', { transfer_id })
 
 export interface DbInstance { id: number; group_id: number; name: string; db_type: string; host: string; port: number; version: string; credential_id: number; tags: string; description: string; status: boolean; created_at: string; updated_at: string }
 export interface AssetTreeNode { id: string; label: string; type: 'group' | 'host' | 'database'; count?: number; host?: Host; database?: DbInstance; children?: AssetTreeNode[] }

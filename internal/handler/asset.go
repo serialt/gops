@@ -66,6 +66,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal/sftp/list", h.ListSFTP)
 	g.POST("/assets/terminal/sftp/upload", h.UploadSFTP)
 	g.POST("/assets/terminal/sftp/download", h.DownloadSFTP)
+	g.POST("/assets/terminal/sftp/progress", h.SFTPTransferProgress)
 
 	g.POST("/assets/db-instances/options", h.DatabaseTypeOptions)
 	g.POST("/assets/db-instances/list", h.ListDBInstances)
@@ -120,11 +121,31 @@ func (h *AssetHandler) UploadSFTP(c *gin.Context) {
 		response.Error(c, 400, "no files selected")
 		return
 	}
-	if err = h.biz.UploadSFTP(hostID, c.PostForm("path"), form.File["files"]); err != nil {
+	transferID := c.PostForm("transfer_id")
+	if transferID == "" {
+		response.Error(c, 400, "transfer ID is required")
+		return
+	}
+	if err = h.biz.UploadSFTP(hostID, c.PostForm("path"), transferID, form.File["files"], form.Value["relative_paths"]); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
 	response.OK(c, nil)
+}
+
+// SFTPTransferProgress POST /api/v1/assets/terminal/sftp/progress 查询文件传输进度。
+func (h *AssetHandler) SFTPTransferProgress(c *gin.Context) {
+	req := new(api.SFTPTransferProgressRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid SFTP transfer progress request")
+		return
+	}
+	result, ok := h.biz.SFTPTransferProgress(req.TransferID)
+	if !ok {
+		response.OK(c, &api.SFTPTransferProgressResponse{Status: "processing"})
+		return
+	}
+	response.OK(c, result)
 }
 
 // DownloadSFTP POST /api/v1/assets/terminal/sftp/download 下载选中的文件。

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"gops/internal/config"
@@ -26,10 +27,12 @@ import (
 )
 
 type AssetBiz struct {
-	db     *gorm.DB
-	repo   *repo.AssetRepo
-	aesKey string
-	log    *slog.Logger
+	db             *gorm.DB
+	repo           *repo.AssetRepo
+	aesKey         string
+	log            *slog.Logger
+	sftpTransferMu sync.RWMutex
+	sftpTransfers  map[string]*api.SFTPTransferProgressResponse
 }
 
 var cloudProviderOptions = []*api.CloudProviderOptionResponse{
@@ -69,7 +72,7 @@ func cloudRegions(values ...string) []*api.CloudRegionOptionResponse {
 }
 
 func NewAssetBiz(db *gorm.DB, assetRepo *repo.AssetRepo, cfg *config.Config, log *slog.Logger) *AssetBiz {
-	return &AssetBiz{db: db, repo: assetRepo, aesKey: cfg.Server.AESKey, log: log}
+	return &AssetBiz{db: db, repo: assetRepo, aesKey: cfg.Server.AESKey, log: log, sftpTransfers: make(map[string]*api.SFTPTransferProgressResponse)}
 }
 
 // CloudProviderOptions 返回后端定义的云服务商与区域枚举。

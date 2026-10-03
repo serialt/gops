@@ -1,18 +1,26 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, type ElTree } from 'element-plus'
-import { ArrowLeft, ArrowRight, Close, CollectionTag, Coin, Delete, Document, Download, Folder, FolderOpened, Monitor, Platform, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, ArrowRight, Close, CollectionTag, Coin, Delete, Document, Download, Folder, FolderOpened, Monitor, Platform, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import gopsLogoUrl from '@/assets/gops.svg'
-import { downloadSftp, getTerminalAssetTree, listSftp, uploadSftp, type AssetTreeNode, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
+import { downloadSftp, getSftpTransferProgress, getTerminalAssetTree, listSftp, uploadSftp, type AssetTreeNode, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
 import { useSystemConfigStore } from '@/stores/system-config'
 import { downloadAttachment } from '@/utils/download'
 
 type TreeNode = AssetTreeNode
 interface Session { key: string; kind: 'host' | 'database'; label: string; host?: Host; database?: DbInstance }
 interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout>; heartbeatTimer: ReturnType<typeof setInterval> }
+interface SftpTransferRecord {
+  id: number
+  name: string
+  path: string
+  createdAt: string
+  status: 'processing' | 'success' | 'failed'
+  progress: number
+}
 
 const systemConfig = useSystemConfigStore()
 const treeData = ref<TreeNode[]>([])
@@ -39,6 +47,11 @@ const sftpFileInput = ref<HTMLInputElement>()
 const sftpDirectoryInput = ref<HTMLInputElement>()
 const sftpUploading = ref(false)
 const sftpSelected = ref<string[]>([])
+const sftpUploadRecords = ref<SftpTransferRecord[]>([])
+const sftpDownloadRecords = ref<SftpTransferRecord[]>([])
+const sftpRecordPanel = ref<'upload' | 'download' | null>(null)
+const sftpDownloadNames = new Set<string>()
+let sftpTransferRecordID = 0
 type SftpColumn = 'size' | 'modified' | 'permissions'
 const sftpColumnWidths = ref({ size: 144, modified: 210, permissions: 150 })
 const sftpResizingColumn = ref<SftpColumn | null>(null)
@@ -176,6 +189,7 @@ function openSftp() {
   sftpVisible.value = true
   sftpSearchVisible.value = false
   sftpUploadMenuVisible.value = false
+  sftpRecordPanel.value = null
   sftpSelected.value = []
   sftpKeyword.value = ''
   sftpPath.value = '/root'
@@ -188,6 +202,7 @@ function closeSftp() {
   sftpOriginKey.value = null
   sftpSearchVisible.value = false
   sftpUploadMenuVisible.value = false
+  sftpRecordPanel.value = null
   sftpSelected.value = []
   const sessionKey = originKey === null ? null : `host:${originKey}`
   if (sessionKey !== null && sessions.value.some(session => session.key === sessionKey)) {
@@ -239,6 +254,51 @@ function stopSftpColumnResize() {
 function sftpAction(message: string) {
   ElMessage.info(message)
 }
+function createSftpTransferRecord(name: string): SftpTransferRecord {
+  return reactive({
+    id: ++sftpTransferRecordID,
+    name,
+    path: sftpCommittedPath.value,
+    createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    status: 'processing',
+    progress: 0,
+  })
+}
+function nextSftpDownloadName(filename: string) {
+  const dotIndex = filename.lastIndexOf('.')
+  const stem = dotIndex > 0 ? filename.slice(0, dotIndex) : filename
+  const extension = dotIndex > 0 ? filename.slice(dotIndex) : ''
+  let candidate = filename
+  let index = 1
+  while (sftpDownloadNames.has(candidate)) candidate = `${stem}_${index++}${extension}`
+  sftpDownloadNames.add(candidate)
+  return candidate
+}
+function toggleSftpRecordPanel(panel: 'upload' | 'download') {
+  sftpUploadMenuVisible.value = false
+  sftpRecordPanel.value = sftpRecordPanel.value === panel ? null : panel
+}
+async function trackSftpTransfer(transferID: string, records: SftpTransferRecord[], base = 0, span = 100) {
+  while (records.some(record => record.status === 'processing')) {
+    try {
+      const result = await getSftpTransferProgress(transferID)
+      const progress = result.data.data
+      const percentage = progress.total > 0 ? Math.min(100, Math.round((progress.transferred / progress.total) * 100)) : 0
+      records.forEach(record => { record.progress = Math.max(record.progress, Math.round(base + percentage * span / 100)) })
+      if (progress.status === 'success') {
+        records.forEach(record => { record.progress = 100; record.status = 'success' })
+        return
+      }
+      if (progress.status === 'failed') {
+        records.forEach(record => { record.status = 'failed' })
+        return
+      }
+    } catch {
+      // The transfer request owns user-facing error reporting; polling retries quietly.
+    }
+    await new Promise(resolve => window.setTimeout(resolve, 250))
+  }
+}
 function chooseSftpUpload(kind: 'file' | 'directory') {
   sftpUploadMenuVisible.value = false
   if (kind === 'file') sftpFileInput.value?.click()
@@ -249,19 +309,43 @@ async function handleSftpUpload(event: Event) {
   const files = Array.from(input.files || [])
   input.value = ''
   if (sftpOriginKey.value === null || !files.length) return
+  const records = files.map(file => createSftpTransferRecord(file.webkitRelativePath || file.name))
+  sftpUploadRecords.value.unshift(...records)
+  sftpRecordPanel.value = 'upload'
   sftpUploading.value = true
+  const transferID = crypto.randomUUID()
+  void trackSftpTransfer(transferID, records, 20, 80)
   try {
-    await uploadSftp(sftpOriginKey.value, sftpCommittedPath.value, files)
+    await uploadSftp(sftpOriginKey.value, sftpCommittedPath.value, files, transferID, progress => {
+      records.forEach(record => { record.progress = Math.max(record.progress, Math.round(progress * .2)) })
+    })
+    records.forEach(record => { record.progress = 100; record.status = 'success' })
     ElMessage.success('上传成功')
     await loadSftpDirectory()
+  } catch (error) {
+    records.forEach(record => { record.status = 'failed' })
+    throw error
   } finally {
     sftpUploading.value = false
   }
 }
 async function downloadSelectedSftp() {
   if (sftpOriginKey.value === null || !sftpSelected.value.length) return
-  const response = await downloadSftp(sftpOriginKey.value, sftpCommittedPath.value, sftpSelected.value)
-  downloadAttachment(response.data as unknown as Blob, response.headers['content-disposition'], 'sftp-download.zip')
+  const names = [...sftpSelected.value]
+  const record = createSftpTransferRecord(names.length === 1 ? names[0] : `${names.length} 个文件`)
+  sftpDownloadRecords.value.unshift(record)
+  sftpRecordPanel.value = 'download'
+  const transferID = crypto.randomUUID()
+  void trackSftpTransfer(transferID, [record])
+  try {
+    const response = await downloadSftp(sftpOriginKey.value, sftpCommittedPath.value, names, transferID)
+    downloadAttachment(response.data as unknown as Blob, undefined, nextSftpDownloadName('sftp-download.zip'))
+    record.progress = 100
+    record.status = 'success'
+  } catch (error) {
+    record.status = 'failed'
+    throw error
+  }
 }
 async function loadSftpDirectory(path = sftpPath.value) {
   if (sftpOriginKey.value === null) return
@@ -410,7 +494,7 @@ onBeforeUnmount(() => {
         </div>
         <div v-if="sftpVisible" class="sftp-overlay">
           <section class="sftp-panel" aria-label="SFTP 文件管理"
-            @click="sftpSearchVisible = false; sftpUploadMenuVisible = false">
+            @click="sftpSearchVisible = false; sftpUploadMenuVisible = false; sftpRecordPanel = null">
             <header class="sftp-toolbar">
               <strong>SFTP</strong>
               <button type="button" class="sftp-icon-button" aria-label="返回上级目录" title="返回上级目录"
@@ -435,12 +519,16 @@ onBeforeUnmount(() => {
               <button type="button" class="sftp-button" @click="sftpAction('新建功能尚未配置')"><el-icon>
                   <Plus />
                 </el-icon>新建</button>
-              <div class="sftp-upload-wrap" @click.stop>
-                <button type="button" class="sftp-button" :disabled="sftpUploading"
+              <div class="sftp-split-wrap" @click.stop>
+                <div class="sftp-split-button">
+                  <button type="button" class="sftp-button sftp-split-main" :disabled="sftpUploading"
                   @click="sftpUploadMenuVisible = !sftpUploadMenuVisible"><el-icon>
                     <Upload />
                   </el-icon>{{
                     sftpUploading ? '上传中' : '上传' }}</button>
+                  <button type="button" class="sftp-button sftp-split-toggle" aria-label="查看上传记录" title="上传记录"
+                    @click="toggleSftpRecordPanel('upload')"><el-icon><ArrowDown /></el-icon></button>
+                </div>
                 <div v-if="sftpUploadMenuVisible" class="sftp-upload-menu">
                   <button type="button" @click="chooseSftpUpload('file')"><el-icon>
                       <Upload />
@@ -452,11 +540,47 @@ onBeforeUnmount(() => {
                 <input ref="sftpFileInput" class="sftp-hidden-input" type="file" multiple @change="handleSftpUpload" />
                 <input ref="sftpDirectoryInput" class="sftp-hidden-input" type="file" webkitdirectory multiple
                   @change="handleSftpUpload" />
+                <div v-if="sftpRecordPanel === 'upload'" class="sftp-record-panel">
+                  <div class="sftp-record-title"><strong>上传记录</strong><button v-if="sftpUploadRecords.length" type="button"
+                      @click="sftpUploadRecords = []">清空</button></div>
+                  <div v-if="!sftpUploadRecords.length" class="sftp-record-empty">暂无上传记录</div>
+                  <div v-else class="sftp-record-list">
+                    <div v-for="record in sftpUploadRecords" :key="record.id" class="sftp-record-item">
+                      <div><strong :title="record.name">{{ record.name }}</strong><span>{{ record.path }}</span></div>
+                      <div><span>{{ record.createdAt }}</span><em :class="`is-${record.status}`">{{ record.status ===
+                        'processing' ? `上传中 ${record.progress}%` : record.status === 'success' ? '成功' : '失败' }}</em></div>
+                      <div class="sftp-record-progress" :class="{ 'is-failed': record.status === 'failed' }"><i
+                          :style="{ width: `${record.progress}%` }" /></div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <button type="button" class="sftp-button" :disabled="!sftpSelected.length"
-                @click="void downloadSelectedSftp()"><el-icon>
-                  <Download />
-                </el-icon>下载</button>
+              <div class="sftp-split-wrap" @click.stop>
+                <div class="sftp-split-button">
+                  <button type="button" class="sftp-button sftp-split-main" :disabled="!sftpSelected.length"
+                    @click="void downloadSelectedSftp()"><el-icon>
+                      <Download />
+                    </el-icon>下载</button>
+                  <button type="button" class="sftp-button sftp-split-toggle" aria-label="查看下载记录" title="下载记录"
+                    @click="toggleSftpRecordPanel('download')"><el-icon><ArrowDown /></el-icon></button>
+                </div>
+                <div v-if="sftpRecordPanel === 'download'" class="sftp-record-panel is-download">
+                  <div class="sftp-record-title"><strong>下载记录</strong><button v-if="sftpDownloadRecords.length" type="button"
+                      @click="sftpDownloadRecords = []">清空</button></div>
+                  <div v-if="!sftpDownloadRecords.length" class="sftp-record-empty">暂无下载记录</div>
+                  <div v-else class="sftp-record-list">
+                    <div v-for="record in sftpDownloadRecords" :key="record.id" class="sftp-record-item">
+                      <div><strong :title="record.name">{{ record.name }}</strong><span>{{ record.path }}</span></div>
+                      <div><span>{{ record.createdAt }}</span><em :class="`is-${record.status}`">{{ record.status ===
+                        'processing' ? (record.progress >= 0 ? `下载中 ${record.progress}%` : '下载中') : record.status ===
+                          'success' ? '成功' : '失败' }}</em></div>
+                      <div class="sftp-record-progress"
+                        :class="{ 'is-failed': record.status === 'failed', 'is-indeterminate': record.progress < 0 }"><i
+                          :style="{ width: record.progress < 0 ? '35%' : `${record.progress}%` }" /></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <button type="button" class="sftp-icon-button sftp-close" aria-label="关闭 SFTP" title="关闭 SFTP"
                 @click="closeSftp"><el-icon>
                   <Close />
@@ -1207,9 +1331,186 @@ onBeforeUnmount(() => {
   font-size: 10px
 }
 
-.sftp-upload-wrap {
+.sftp-split-wrap {
   position: relative;
   flex: none
+}
+
+.sftp-split-button {
+  display: inline-flex;
+  align-items: stretch
+}
+
+.sftp-split-button .sftp-button {
+  background: #1d1e20
+}
+
+.sftp-split-button .sftp-split-main {
+  border-radius: 9px 0 0 9px
+}
+
+.sftp-split-button .sftp-split-toggle {
+  width: 28px;
+  padding: 0;
+  margin-left: -1px;
+  border-radius: 0 9px 9px 0
+}
+
+.sftp-split-button .sftp-split-toggle .el-icon {
+  font-size: 9px
+}
+
+.sftp-record-panel {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  z-index: 5;
+  width: 300px;
+  overflow: hidden;
+  border: 1px solid #45464a;
+  border-radius: 8px;
+  color: #c8cbd1;
+  background: #252628;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 32%)
+}
+
+.sftp-record-panel.is-download {
+  right: 0
+}
+
+.sftp-record-title {
+  height: 34px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #3a3b3e
+}
+
+.sftp-record-title strong {
+  color: #f2f4f7;
+  font-size: 11px
+}
+
+.sftp-record-title button {
+  border: 0;
+  color: #8a95a6;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px
+}
+
+.sftp-record-title button:hover {
+  color: #fff
+}
+
+.sftp-record-empty {
+  padding: 28px 12px;
+  color: #8a95a6;
+  text-align: center;
+  font-size: 10px
+}
+
+.sftp-record-list {
+  max-height: 260px;
+  overflow-y: auto
+}
+
+.sftp-record-item {
+  padding: 8px 10px;
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid #343537;
+  font-size: 9px;
+  animation: sftp-record-enter .22s ease-out both
+}
+
+.sftp-record-item:last-child {
+  border-bottom: 0
+}
+
+.sftp-record-item>div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px
+}
+
+.sftp-record-item strong {
+  overflow: hidden;
+  color: #e4e7ec;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.sftp-record-item span {
+  overflow: hidden;
+  color: #8a95a6;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.sftp-record-item em {
+  flex: none;
+  color: #e6a23c;
+  font-style: normal
+}
+
+.sftp-record-item em.is-success {
+  color: #67c23a
+}
+
+.sftp-record-item em.is-failed {
+  color: #f56c6c
+}
+
+.sftp-record-item>.sftp-record-progress {
+  width: 100%;
+  height: 3px;
+  display: block;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #3a3b3e
+}
+
+.sftp-record-progress i {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: #55cbb5;
+  transition: width .18s ease
+}
+
+.sftp-record-progress.is-failed i {
+  background: #f56c6c
+}
+
+.sftp-record-progress.is-indeterminate i {
+  animation: sftp-progress-indeterminate 1s ease-in-out infinite
+}
+
+@keyframes sftp-record-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-5px)
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0)
+  }
+}
+
+@keyframes sftp-progress-indeterminate {
+  from {
+    transform: translateX(-100%)
+  }
+
+  to {
+    transform: translateX(285%)
+  }
 }
 
 .sftp-upload-menu {

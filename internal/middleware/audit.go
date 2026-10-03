@@ -57,6 +57,7 @@ func OperationAudit(db *gorm.DB) gin.HandlerFunc {
 
 func skipOperationAudit(path string) bool {
 	return path == "/api/v1/auth/me" ||
+		path == "/api/v1/assets/terminal/sftp/progress" ||
 		path == "/api/v1/audit/operation-logs/list" ||
 		path == "/api/v1/audit/login-logs/list" ||
 		path == "/api/v1/audit/data-logs/list"

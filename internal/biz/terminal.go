@@ -72,7 +72,19 @@ func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) (*api.PageResponse[*api.SF
 }
 
 // UploadSFTP uploads files into a remote directory over the host's SSH connection.
-func (b *AssetBiz) UploadSFTP(hostID int64, directory string, files []*multipart.FileHeader) error {
+func (b *AssetBiz) UploadSFTP(hostID int64, directory, transferID string, files []*multipart.FileHeader, relativePaths []string) (err error) {
+	total := int64(0)
+	for _, header := range files {
+		total += header.Size
+	}
+	b.setSFTPTransferProgress(transferID, 0, total, "processing", "")
+	defer func() {
+		if err != nil {
+			b.finishSFTPTransfer(transferID, "failed", err.Error())
+		} else {
+			b.finishSFTPTransfer(transferID, "success", "")
+		}
+	}()
 	_, client, err := b.dialHostSSH(hostID)
 	if err != nil {
 		return err
@@ -84,19 +96,51 @@ func (b *AssetBiz) UploadSFTP(hostID int64, directory string, files []*multipart
 	}
 	defer sftpClient.Close()
 	directory = cleanSFTPPath(directory)
-	for _, header := range files {
+	uploadPaths := make([]string, len(files))
+	directoryRoots := make(map[string]string)
+	for index, header := range files {
+		relativeName := header.Filename
+		if index < len(relativePaths) && relativePaths[index] != "" {
+			relativeName = relativePaths[index]
+		}
+		relativeName = cleanSFTPUploadPath(relativeName)
+		parts := strings.SplitN(relativeName, "/", 2)
+		if len(parts) == 2 {
+			root := parts[0]
+			mappedRoot, ok := directoryRoots[root]
+			if !ok {
+				availableRoot, availableErr := nextAvailableSFTPPath(sftpClient, path.Join(directory, root), true)
+				if availableErr != nil {
+					return availableErr
+				}
+				mappedRoot = path.Base(availableRoot)
+				directoryRoots[root] = mappedRoot
+			}
+			relativeName = path.Join(mappedRoot, parts[1])
+		}
+		uploadPaths[index] = relativeName
+	}
+	var transferred int64
+	for index, header := range files {
 		source, err := header.Open()
 		if err != nil {
 			return fmt.Errorf("open upload %s: %w", header.Filename, err)
 		}
-		relativeName := filepath.ToSlash(filepath.Clean(header.Filename))
-		relativeName = strings.TrimPrefix(relativeName, "../")
+		relativeName := uploadPaths[index]
 		target := path.Join(directory, relativeName)
 		if err = sftpClient.MkdirAll(path.Dir(target)); err == nil {
+			if !strings.Contains(relativeName, "/") {
+				target, err = nextAvailableSFTPPath(sftpClient, target, false)
+			}
+		}
+		if err == nil {
 			var destination *sftp.File
-			destination, err = sftpClient.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+			destination, err = sftpClient.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL)
 			if err == nil {
-				_, err = io.Copy(destination, source)
+				_, err = io.Copy(sftpProgressWriter{writer: destination, onProgress: func(written int64) {
+					transferred += written
+					b.setSFTPTransferProgress(transferID, transferred, total, "processing", "")
+				}}, source)
 				_ = destination.Close()
 			}
 		}
@@ -108,8 +152,104 @@ func (b *AssetBiz) UploadSFTP(hostID int64, directory string, files []*multipart
 	return nil
 }
 
+// SFTPTransferProgress returns the current server-side SFTP byte progress.
+func (b *AssetBiz) SFTPTransferProgress(transferID string) (*api.SFTPTransferProgressResponse, bool) {
+	b.sftpTransferMu.RLock()
+	defer b.sftpTransferMu.RUnlock()
+	progress, ok := b.sftpTransfers[transferID]
+	if !ok {
+		return nil, false
+	}
+	copy := *progress
+	return &copy, true
+}
+
+func (b *AssetBiz) setSFTPTransferProgress(transferID string, transferred, total int64, status, message string) {
+	if transferID == "" {
+		return
+	}
+	b.sftpTransferMu.Lock()
+	b.sftpTransfers[transferID] = &api.SFTPTransferProgressResponse{Transferred: transferred, Total: total, Status: status, Message: message}
+	b.sftpTransferMu.Unlock()
+}
+
+func (b *AssetBiz) finishSFTPTransfer(transferID, status, message string) {
+	if transferID == "" {
+		return
+	}
+	b.sftpTransferMu.Lock()
+	if progress := b.sftpTransfers[transferID]; progress != nil {
+		if status == "success" {
+			progress.Transferred = progress.Total
+		}
+		progress.Status = status
+		progress.Message = message
+	}
+	b.sftpTransferMu.Unlock()
+	time.AfterFunc(5*time.Minute, func() {
+		b.sftpTransferMu.Lock()
+		delete(b.sftpTransfers, transferID)
+		b.sftpTransferMu.Unlock()
+	})
+}
+
+type sftpProgressWriter struct {
+	writer     io.Writer
+	onProgress func(int64)
+}
+
+func (writer sftpProgressWriter) Write(data []byte) (int, error) {
+	written, err := writer.writer.Write(data)
+	if written > 0 && writer.onProgress != nil {
+		writer.onProgress(int64(written))
+	}
+	return written, err
+}
+
+func cleanSFTPUploadPath(value string) string {
+	cleaned := filepath.ToSlash(filepath.Clean(value))
+	for strings.HasPrefix(cleaned, "../") {
+		cleaned = strings.TrimPrefix(cleaned, "../")
+	}
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned == "" || cleaned == "." {
+		return "upload"
+	}
+	return cleaned
+}
+
+func nextAvailableSFTPPath(client *sftp.Client, target string, isDirectory bool) (string, error) {
+	if _, err := client.Lstat(target); os.IsNotExist(err) {
+		return target, nil
+	} else if err != nil {
+		return "", fmt.Errorf("check upload target %s: %w", target, err)
+	}
+	for index := 1; ; index++ {
+		candidateName := suffixedFilename(path.Base(target), index)
+		if isDirectory {
+			candidateName = fmt.Sprintf("%s_%d", path.Base(target), index)
+		}
+		candidate := path.Join(path.Dir(target), candidateName)
+		if _, err := client.Lstat(candidate); os.IsNotExist(err) {
+			return candidate, nil
+		} else if err != nil {
+			return "", fmt.Errorf("check upload target %s: %w", candidate, err)
+		}
+	}
+}
+
+func suffixedFilename(filename string, index int) string {
+	extension := path.Ext(filename)
+	stem := strings.TrimSuffix(filename, extension)
+	if stem == "" {
+		stem = filename
+		extension = ""
+	}
+	return fmt.Sprintf("%s_%d%s", stem, index, extension)
+}
+
 // DownloadSFTP writes selected remote files as a ZIP archive.
-func (b *AssetBiz) DownloadSFTP(req *api.SFTPDownloadRequest, output io.Writer) error {
+func (b *AssetBiz) DownloadSFTP(req *api.SFTPDownloadRequest, output io.Writer) (err error) {
 	_, client, err := b.dialHostSSH(req.HostID)
 	if err != nil {
 		return err
@@ -121,33 +261,116 @@ func (b *AssetBiz) DownloadSFTP(req *api.SFTPDownloadRequest, output io.Writer) 
 	}
 	defer sftpClient.Close()
 	archive := zip.NewWriter(output)
-	defer archive.Close()
+	archiveClosed := false
+	defer func() {
+		if !archiveClosed {
+			_ = archive.Close()
+		}
+	}()
 	directory := cleanSFTPPath(req.Path)
+	total := int64(0)
+	for _, name := range req.Names {
+		name = filepath.ToSlash(filepath.Clean(name))
+		if name == "." || strings.HasPrefix(name, "../") || path.IsAbs(name) {
+			return fmt.Errorf("invalid download path")
+		}
+		size, sizeErr := sftpRemoteSize(sftpClient, path.Join(directory, name))
+		if sizeErr != nil {
+			return sizeErr
+		}
+		total += size
+	}
+	b.setSFTPTransferProgress(req.TransferID, 0, total, "processing", "")
+	defer func() {
+		if err != nil {
+			b.finishSFTPTransfer(req.TransferID, "failed", err.Error())
+		} else {
+			b.finishSFTPTransfer(req.TransferID, "success", "")
+		}
+	}()
+	var transferred int64
 	for _, name := range req.Names {
 		name = filepath.ToSlash(filepath.Clean(name))
 		if name == "." || strings.HasPrefix(name, "../") || path.IsAbs(name) {
 			return fmt.Errorf("invalid download path")
 		}
 		remotePath := path.Join(directory, name)
-		info, err := sftpClient.Stat(remotePath)
-		if err != nil {
-			return fmt.Errorf("stat %s: %w", name, err)
+		if err = addSFTPPathToArchive(sftpClient, archive, remotePath, name, func(written int64) {
+			transferred += written
+			b.setSFTPTransferProgress(req.TransferID, transferred, total, "processing", "")
+		}); err != nil {
+			return err
 		}
-		if info.IsDir() {
-			return fmt.Errorf("directory download is not supported yet: %s", name)
+	}
+	if err = archive.Close(); err != nil {
+		return fmt.Errorf("finish download archive: %w", err)
+	}
+	archiveClosed = true
+	return nil
+}
+
+func sftpRemoteSize(client *sftp.Client, remotePath string) (int64, error) {
+	info, err := client.Lstat(remotePath)
+	if err != nil {
+		return 0, fmt.Errorf("read remote path %s: %w", remotePath, err)
+	}
+	if !info.IsDir() {
+		if !info.Mode().IsRegular() {
+			return 0, fmt.Errorf("unsupported remote file type: %s", remotePath)
 		}
-		file, err := sftpClient.Open(remotePath)
-		if err != nil {
-			return fmt.Errorf("open %s: %w", name, err)
+		return info.Size(), nil
+	}
+	children, err := client.ReadDir(remotePath)
+	if err != nil {
+		return 0, fmt.Errorf("read remote directory %s: %w", remotePath, err)
+	}
+	var total int64
+	for _, child := range children {
+		size, sizeErr := sftpRemoteSize(client, path.Join(remotePath, child.Name()))
+		if sizeErr != nil {
+			return 0, sizeErr
 		}
-		entry, err := archive.Create(name)
-		if err == nil {
-			_, err = io.Copy(entry, file)
+		total += size
+	}
+	return total, nil
+}
+
+func addSFTPPathToArchive(client *sftp.Client, archive *zip.Writer, remotePath, archivePath string, onProgress func(int64)) error {
+	info, err := client.Lstat(remotePath)
+	if err != nil {
+		return fmt.Errorf("read remote path %s: %w", remotePath, err)
+	}
+	if info.IsDir() {
+		children, readErr := client.ReadDir(remotePath)
+		if readErr != nil {
+			return fmt.Errorf("read remote directory %s: %w", remotePath, readErr)
 		}
-		_ = file.Close()
-		if err != nil {
-			return fmt.Errorf("download %s: %w", name, err)
+		if len(children) == 0 {
+			if _, createErr := archive.Create(strings.TrimSuffix(archivePath, "/") + "/"); createErr != nil {
+				return createErr
+			}
 		}
+		for _, child := range children {
+			if err = addSFTPPathToArchive(client, archive, path.Join(remotePath, child.Name()), path.Join(archivePath, child.Name()), onProgress); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("unsupported remote file type: %s", remotePath)
+	}
+	file, err := client.Open(remotePath)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", remotePath, err)
+	}
+	defer file.Close()
+	entry, err := archive.Create(archivePath)
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(sftpProgressWriter{writer: entry, onProgress: onProgress}, file); err != nil {
+		return fmt.Errorf("download %s: %w", remotePath, err)
 	}
 	return nil
 }
