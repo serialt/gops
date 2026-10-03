@@ -77,6 +77,22 @@ func (r *AssetRepo) GetHostByIP(ctx context.Context, db *gorm.DB, ip string) (*m
 	return q.WithContext(ctx).Where(q.IP.Eq(ip)).First()
 }
 
+func (r *AssetRepo) GetHostAndVNCCredential(ctx context.Context, db *gorm.DB, id int64) (*model.Host, *model.Credential, error) {
+	q := query.Use(db)
+	host, err := q.Host.WithContext(ctx).Where(q.Host.ID.Eq(id)).First()
+	if err != nil {
+		return nil, nil, err
+	}
+	if host.VncCredentialID == nil || *host.VncCredentialID <= 0 {
+		return nil, nil, gorm.ErrRecordNotFound
+	}
+	credential, err := q.Credential.WithContext(ctx).Where(q.Credential.ID.Eq(*host.VncCredentialID)).First()
+	if err != nil {
+		return nil, nil, err
+	}
+	return host, credential, nil
+}
+
 func (r *AssetRepo) CreateHost(ctx context.Context, db *gorm.DB, host *model.Host) error {
 	return query.Use(db).Host.WithContext(ctx).Create(host)
 }

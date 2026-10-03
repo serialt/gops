@@ -13,7 +13,12 @@ func gopsTable(g *gen.Generator) {
 	assetGroup := g.GenerateModel("asset_group")
 	credential := g.GenerateModel("credential")
 	cloudAccount := g.GenerateModel("cloud_account")
-	host := g.GenerateModel("host")
+	host := g.GenerateModel("host",
+		gen.FieldType("port", "*int64"),
+		gen.FieldType("credential_id", "*int64"),
+		gen.FieldType("vnc_port", "*int64"),
+		gen.FieldType("vnc_credential_id", "*int64"),
+	)
 	dbInstance := g.GenerateModel("db_instance")
 	terminalSession := g.GenerateModel("terminal_session")
 	monitorDomain := g.GenerateModel("monitor_domain")

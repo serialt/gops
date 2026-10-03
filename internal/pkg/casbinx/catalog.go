@@ -52,6 +52,7 @@ func Catalog() []Permission {
 		{Group: "资产管理", Name: "采集数据库信息", Path: "/api/v1/assets/db-instances/collect", Method: "POST"},
 		{Group: "资产管理", Name: "删除数据库实例", Path: "/api/v1/assets/db-instances/delete", Method: "POST"},
 		{Group: "资产管理", Name: "连接主机终端", Path: "/api/v1/assets/terminal/connect/:id", Method: "GET"},
+		{Group: "资产管理", Name: "连接 VNC 终端", Path: "/api/v1/assets/terminal/vnc/connect/:id", Method: "GET"},
 		{Group: "资产管理", Name: "连接数据库终端", Path: "/api/v1/assets/terminal/database/connect/:id", Method: "GET"},
 		{Group: "资产管理", Name: "查看终端审计", Path: "/api/v1/assets/terminal-sessions/list", Method: "POST"},
 		{Group: "资产管理", Name: "查看终端录制", Path: "/api/v1/assets/terminal-sessions/recording", Method: "POST"},

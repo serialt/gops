@@ -19,8 +19,7 @@ type Host struct {
 	GroupID         int64          `gorm:"column:group_id" json:"group_id"`
 	HostType        string         `gorm:"column:host_type;not null;default:'self'" json:"host_type"`
 	IP              string         `gorm:"column:ip;not null" json:"ip"`
-	Port            int64          `gorm:"column:port;not null;default:22" json:"port"`
-	CredentialID    int64          `gorm:"column:credential_id" json:"credential_id"`
+	CredentialID    *int64         `gorm:"column:credential_id" json:"credential_id"`
 	CloudAccountID  int64          `gorm:"column:cloud_account_id" json:"cloud_account_id"`
 	Tags            string         `gorm:"column:tags;not null;default:''" json:"tags"`
 	Description     string         `gorm:"column:description;not null;default:''" json:"description"`
@@ -43,7 +42,9 @@ type Host struct {
 	DiskUsage       float64        `gorm:"column:disk_usage;not null" json:"disk_usage"`
 	Uptime          string         `gorm:"column:uptime;not null;default:''" json:"uptime"`
 	Hostname        string         `gorm:"column:hostname;not null;default:''" json:"hostname"`
-	VncCredentialID int64          `gorm:"column:vnc_credential_id" json:"vnc_credential_id"`
+	VncCredentialID *int64         `gorm:"column:vnc_credential_id" json:"vnc_credential_id"`
+	Port            *int64         `gorm:"column:port" json:"port"`
+	VncPort         *int64         `gorm:"column:vnc_port" json:"vnc_port"`
 }
 
 // TableName Host's table name

@@ -32,7 +32,6 @@ func newHost(db *gorm.DB, opts ...gen.DOOption) host {
 	_host.GroupID = field.NewInt64(tableName, "group_id")
 	_host.HostType = field.NewString(tableName, "host_type")
 	_host.IP = field.NewString(tableName, "ip")
-	_host.Port = field.NewInt64(tableName, "port")
 	_host.CredentialID = field.NewInt64(tableName, "credential_id")
 	_host.CloudAccountID = field.NewInt64(tableName, "cloud_account_id")
 	_host.Tags = field.NewString(tableName, "tags")
@@ -57,6 +56,8 @@ func newHost(db *gorm.DB, opts ...gen.DOOption) host {
 	_host.Uptime = field.NewString(tableName, "uptime")
 	_host.Hostname = field.NewString(tableName, "hostname")
 	_host.VncCredentialID = field.NewInt64(tableName, "vnc_credential_id")
+	_host.Port = field.NewInt64(tableName, "port")
+	_host.VncPort = field.NewInt64(tableName, "vnc_port")
 
 	_host.fillFieldMap()
 
@@ -72,7 +73,6 @@ type host struct {
 	GroupID         field.Int64
 	HostType        field.String
 	IP              field.String
-	Port            field.Int64
 	CredentialID    field.Int64
 	CloudAccountID  field.Int64
 	Tags            field.String
@@ -97,6 +97,8 @@ type host struct {
 	Uptime          field.String
 	Hostname        field.String
 	VncCredentialID field.Int64
+	Port            field.Int64
+	VncPort         field.Int64
 
 	fieldMap map[string]field.Expr
 }
@@ -118,7 +120,6 @@ func (h *host) updateTableName(table string) *host {
 	h.GroupID = field.NewInt64(table, "group_id")
 	h.HostType = field.NewString(table, "host_type")
 	h.IP = field.NewString(table, "ip")
-	h.Port = field.NewInt64(table, "port")
 	h.CredentialID = field.NewInt64(table, "credential_id")
 	h.CloudAccountID = field.NewInt64(table, "cloud_account_id")
 	h.Tags = field.NewString(table, "tags")
@@ -143,6 +144,8 @@ func (h *host) updateTableName(table string) *host {
 	h.Uptime = field.NewString(table, "uptime")
 	h.Hostname = field.NewString(table, "hostname")
 	h.VncCredentialID = field.NewInt64(table, "vnc_credential_id")
+	h.Port = field.NewInt64(table, "port")
+	h.VncPort = field.NewInt64(table, "vnc_port")
 
 	h.fillFieldMap()
 
@@ -167,13 +170,12 @@ func (h *host) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (h *host) fillFieldMap() {
-	h.fieldMap = make(map[string]field.Expr, 30)
+	h.fieldMap = make(map[string]field.Expr, 31)
 	h.fieldMap["id"] = h.ID
 	h.fieldMap["name"] = h.Name
 	h.fieldMap["group_id"] = h.GroupID
 	h.fieldMap["host_type"] = h.HostType
 	h.fieldMap["ip"] = h.IP
-	h.fieldMap["port"] = h.Port
 	h.fieldMap["credential_id"] = h.CredentialID
 	h.fieldMap["cloud_account_id"] = h.CloudAccountID
 	h.fieldMap["tags"] = h.Tags
@@ -198,6 +200,8 @@ func (h *host) fillFieldMap() {
 	h.fieldMap["uptime"] = h.Uptime
 	h.fieldMap["hostname"] = h.Hostname
 	h.fieldMap["vnc_credential_id"] = h.VncCredentialID
+	h.fieldMap["port"] = h.Port
+	h.fieldMap["vnc_port"] = h.VncPort
 }
 
 func (h host) clone(db *gorm.DB) host {

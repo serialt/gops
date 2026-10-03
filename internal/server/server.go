@@ -108,6 +108,7 @@ func NewGinEngine(
 	terminal := api.Group("")
 	terminal.Use(middleware.WebSocketAuth(jwtManager), middleware.Casbin(casbinService))
 	terminal.GET("/assets/terminal/connect/:id", assetHandler.ConnectTerminal)
+	terminal.GET("/assets/terminal/vnc/connect/:id", assetHandler.ConnectVNCTerminal)
 	terminal.GET("/assets/terminal/database/connect/:id", assetHandler.ConnectDatabaseTerminal)
 
 	authorized := protected.Group("")

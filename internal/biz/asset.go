@@ -482,6 +482,9 @@ func (b *AssetBiz) ListHosts(ctx context.Context, req *api.HostListRequest) (*ap
 	return &api.PageResponse[*api.HostResponse]{List: result, Total: total}, nil
 }
 func (b *AssetBiz) CreateHost(req *api.HostRequest) (*api.HostResponse, error) {
+	if err := validateHostConnections(req); err != nil {
+		return nil, err
+	}
 	row := hostModel(req)
 	if err := b.db.Create(&row).Error; err != nil {
 		return nil, err
@@ -491,6 +494,9 @@ func (b *AssetBiz) CreateHost(req *api.HostRequest) (*api.HostResponse, error) {
 func (b *AssetBiz) UpdateHost(req *api.HostRequest) (*api.HostResponse, error) {
 	if req.ID == 0 {
 		return nil, ErrInvalid
+	}
+	if err := validateHostConnections(req); err != nil {
+		return nil, err
 	}
 	var row model.Host
 	if err := b.db.First(&row, req.ID).Error; err != nil {
@@ -512,6 +518,22 @@ func (b *AssetBiz) UpdateHost(req *api.HostRequest) (*api.HostResponse, error) {
 	}
 	return hostResponse(updated), nil
 }
+
+func validateHostConnections(req *api.HostRequest) error {
+	if req.CredentialID != nil && *req.CredentialID <= 0 {
+		return errors.New("SSH 凭据无效")
+	}
+	if req.VNCCredentialID != nil && *req.VNCCredentialID <= 0 {
+		return errors.New("VNC 凭据无效")
+	}
+	if (req.Port != nil) != (req.CredentialID != nil) {
+		return errors.New("SSH 端口和 SSH 凭据必须同时配置")
+	}
+	if (req.VNCPort != nil) != (req.VNCCredentialID != nil) {
+		return errors.New("VNC 端口和 VNC 凭据必须同时配置")
+	}
+	return nil
+}
 func (b *AssetBiz) DeleteHost(req *api.HostIDRequest) error {
 	result := b.db.Delete(&model.Host{}, req.ID)
 	if result.Error != nil {
@@ -528,7 +550,7 @@ func (b *AssetBiz) TestHostConnection(ctx context.Context, req *api.HostTestRequ
 	if err != nil {
 		return fmt.Errorf("加载主机凭证: %w", err)
 	}
-	client, err := b.dialSSH(&model.Host{IP: req.IP, Port: req.Port}, credential)
+	client, err := b.dialSSH(&model.Host{IP: req.IP, Port: &req.Port}, credential)
 	if err != nil {
 		return err
 	}
@@ -558,10 +580,10 @@ func (b *AssetBiz) CollectHostInfo(req *api.HostIDRequest) (*api.HostResponse, e
 	return hostResponse(*host), nil
 }
 func hostModel(req *api.HostRequest) model.Host {
-	return model.Host{Name: req.Name, GroupID: req.GroupID, HostType: req.HostType, IP: req.IP, Port: req.Port, CredentialID: req.CredentialID, VncCredentialID: req.VNCCredentialID, CloudAccountID: req.CloudAccountID, Tags: req.Tags, Description: req.Description, Status: req.Status}
+	return model.Host{Name: req.Name, GroupID: req.GroupID, HostType: req.HostType, IP: req.IP, Port: req.Port, CredentialID: req.CredentialID, VncCredentialID: req.VNCCredentialID, VncPort: req.VNCPort, CloudAccountID: req.CloudAccountID, Tags: req.Tags, Description: req.Description, Status: req.Status}
 }
 func hostResponse(r model.Host) *api.HostResponse {
-	return &api.HostResponse{ID: r.ID, Name: r.Name, GroupID: r.GroupID, HostType: r.HostType, IP: r.IP, Port: r.Port, CredentialID: r.CredentialID, VNCCredentialID: r.VncCredentialID, CloudAccountID: r.CloudAccountID, Tags: r.Tags, Description: r.Description, Status: r.Status, LastSeenAt: r.LastSeenAt, OS: r.Os, Kernel: r.Kernel, Arch: r.Arch, CPUInfo: r.CPUInfo, CPUCores: r.CPUCores, CPUUsage: r.CPUUsage, MemoryTotal: r.MemoryTotal, MemoryUsed: r.MemoryUsed, MemoryUsage: r.MemoryUsage, DiskTotal: r.DiskTotal, DiskUsed: r.DiskUsed, DiskUsage: r.DiskUsage, Uptime: r.Uptime, Hostname: r.Hostname, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	return &api.HostResponse{ID: r.ID, Name: r.Name, GroupID: r.GroupID, HostType: r.HostType, IP: r.IP, Port: r.Port, CredentialID: r.CredentialID, VNCCredentialID: r.VncCredentialID, VNCPort: r.VncPort, CloudAccountID: r.CloudAccountID, Tags: r.Tags, Description: r.Description, Status: r.Status, LastSeenAt: r.LastSeenAt, OS: r.Os, Kernel: r.Kernel, Arch: r.Arch, CPUInfo: r.CPUInfo, CPUCores: r.CPUCores, CPUUsage: r.CPUUsage, MemoryTotal: r.MemoryTotal, MemoryUsed: r.MemoryUsed, MemoryUsage: r.MemoryUsage, DiskTotal: r.DiskTotal, DiskUsed: r.DiskUsed, DiskUsage: r.DiskUsage, Uptime: r.Uptime, Hostname: r.Hostname, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
 func (b *AssetBiz) ListDBInstances(ctx context.Context, req *api.DbInstanceListRequest) (*api.PageResponse[*api.DbInstanceResponse], error) {
@@ -793,7 +815,11 @@ func (b *AssetBiz) ListTerminalSessions(req *api.TerminalSessionListRequest) (*a
 		}
 		if host, ok := hostsByID[r.HostID]; ok {
 			item.HostName = host.Name
-			item.HostAddress = net.JoinHostPort(host.IP, fmt.Sprint(host.Port))
+			if host.Port != nil {
+				item.HostAddress = net.JoinHostPort(host.IP, fmt.Sprint(*host.Port))
+			} else {
+				item.HostAddress = host.IP
+			}
 		}
 		if database, ok := databasesByID[r.DbInstanceID]; ok {
 			item.DatabaseName = database.Name

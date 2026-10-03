@@ -17,6 +17,7 @@ import (
 	"gops/internal/data/api"
 	"gops/internal/middleware"
 	"gops/internal/pkg/response"
+	"gops/internal/pkg/vncproxy"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -244,6 +245,27 @@ func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
 		default:
 		}
 	}
+}
+
+// ConnectVNCTerminal GET /api/v1/assets/terminal/vnc/connect/:id 建立 VNC WebSocket 远程桌面连接。
+func (h *AssetHandler) ConnectVNCTerminal(c *gin.Context) {
+	hostID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || hostID <= 0 {
+		response.Error(c, 400, "invalid host id")
+		return
+	}
+	connection, password, err := h.biz.StartVNC(c.Request.Context(), hostID)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	defer connection.Close()
+	ws, err := terminalUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	defer ws.Close()
+	_ = vncproxy.Bridge(connection, ws, password)
 }
 
 // ConnectDatabaseTerminal GET /api/v1/assets/terminal/database/connect/:id opens a SQL console WebSocket.

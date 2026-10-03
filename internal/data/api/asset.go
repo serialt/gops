@@ -119,9 +119,10 @@ type HostRequest struct {
 	GroupID         int64  `json:"group_id"`
 	HostType        string `json:"host_type"`
 	IP              string `json:"ip" binding:"required"`
-	Port            int64  `json:"port" binding:"min=1,max=65535"`
-	CredentialID    int64  `json:"credential_id" binding:"required"`
-	VNCCredentialID int64  `json:"vnc_credential_id"`
+	Port            *int64 `json:"port" binding:"omitempty,min=1,max=65535"`
+	CredentialID    *int64 `json:"credential_id"`
+	VNCCredentialID *int64 `json:"vnc_credential_id"`
+	VNCPort         *int64 `json:"vnc_port" binding:"omitempty,min=1,max=65535"`
 	CloudAccountID  int64  `json:"cloud_account_id"`
 	Tags            string `json:"tags"`
 	Description     string `json:"description"`
@@ -141,9 +142,10 @@ type HostResponse struct {
 	GroupID         int64     `json:"group_id"`
 	HostType        string    `json:"host_type"`
 	IP              string    `json:"ip"`
-	Port            int64     `json:"port"`
-	CredentialID    int64     `json:"credential_id"`
-	VNCCredentialID int64     `json:"vnc_credential_id"`
+	Port            *int64    `json:"port"`
+	CredentialID    *int64    `json:"credential_id"`
+	VNCCredentialID *int64    `json:"vnc_credential_id"`
+	VNCPort         *int64    `json:"vnc_port"`
 	CloudAccountID  int64     `json:"cloud_account_id"`
 	Tags            string    `json:"tags"`
 	Description     string    `json:"description"`

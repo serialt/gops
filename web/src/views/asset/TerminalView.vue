@@ -4,6 +4,7 @@ import { ElMessage, type ElTree } from 'element-plus'
 import { ArrowDown, ArrowLeft, ArrowRight, Close, CollectionTag, Coin, Delete, Document, Download, Folder, FolderOpened, Monitor, Platform, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
+import RFB from '@novnc/novnc'
 import 'xterm/css/xterm.css'
 import gopsLogoUrl from '@/assets/gops.svg'
 import { downloadSftp, getSftpTransferProgress, getTerminalAssetTree, listSftp, uploadSftp, type AssetTreeNode, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
@@ -11,8 +12,9 @@ import { useSystemConfigStore } from '@/stores/system-config'
 import { downloadAttachment } from '@/utils/download'
 
 type TreeNode = AssetTreeNode
-interface Session { key: string; kind: 'host' | 'database'; label: string; host?: Host; database?: DbInstance }
+interface Session { key: string; kind: 'ssh' | 'vnc' | 'database'; label: string; host?: Host; database?: DbInstance }
 interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout>; heartbeatTimer: ReturnType<typeof setInterval> }
+interface VNCRuntime { rfb: RFB }
 interface SftpTransferRecord {
   id: number
   name: string
@@ -30,12 +32,16 @@ const keyword = ref('')
 const treeRef = ref<InstanceType<typeof ElTree>>()
 const sessions = ref<Session[]>([])
 const activeKey = ref<string | null>(null)
+const connectionChoiceVisible = ref(false)
+const connectionChoiceHost = ref<Host | null>(null)
 const assetPaneWidth = ref(180)
 const assetPaneDragging = ref(false)
 const assetPaneStartX = ref(0)
 const assetPaneStartWidth = ref(180)
 const terminalElements = new Map<string, HTMLElement>()
+const vncElements = new Map<string, HTMLElement>()
 const runtimes = new Map<string, Runtime>()
+const vncRuntimes = new Map<string, VNCRuntime>()
 const sftpVisible = ref(false)
 const sftpOriginKey = ref<number | null>(null)
 const sftpPath = ref('/root')
@@ -71,6 +77,10 @@ const activeSession = computed(() => sessions.value.find(session => session.key 
 function setTerminalElement(key: string, element: unknown) {
   if (element instanceof HTMLElement) terminalElements.set(key, element)
   else terminalElements.delete(key)
+}
+function setVNCElement(key: string, element: unknown) {
+  if (element instanceof HTMLElement) vncElements.set(key, element)
+  else vncElements.delete(key)
 }
 function filterTree(value: string, data: TreeNode) {
   if (!value.trim()) return true
@@ -114,16 +124,40 @@ function toggleAssetPane() { assetPaneWidth.value = assetPaneWidth.value === 0 ?
 function socketURL(session: Session, terminal: Terminal) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const token = localStorage.getItem('token') || ''
-  const endpoint = session.kind === 'host'
+  const endpoint = session.kind === 'ssh'
     ? `/api/v1/assets/terminal/connect/${session.host?.id}`
     : `/api/v1/assets/terminal/database/connect/${session.database?.id}`
   return `${protocol}//${window.location.host}${endpoint}?token=${encodeURIComponent(token)}&cols=${terminal.cols}&rows=${terminal.rows}`
+}
+function vncSocketURL(host: Host) {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const token = localStorage.getItem('token') || ''
+  return `${protocol}//${window.location.host}/api/v1/assets/terminal/vnc/connect/${host.id}?token=${encodeURIComponent(token)}`
 }
 function sendResize(runtime: Runtime) {
   if (runtime.socket.readyState === WebSocket.OPEN) runtime.socket.send(JSON.stringify({ type: 'resize', cols: runtime.terminal.cols, rows: runtime.terminal.rows }))
 }
 async function initializeSession(session: Session) {
   await nextTick()
+  if (session.kind === 'vnc') {
+    const element = vncElements.get(session.key)
+    if (!element || vncRuntimes.has(session.key) || !session.host) return
+    element.replaceChildren()
+    const rfb = new RFB(element, vncSocketURL(session.host), { shared: true })
+    rfb.scaleViewport = true
+    rfb.resizeSession = true
+    rfb.focusOnClick = true
+    rfb.addEventListener('connect', () => { ElMessage.success(`${session.host?.name} VNC 已连接`); rfb.focus() })
+    rfb.addEventListener('securityfailure', (event: Event) => {
+      const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
+      ElMessage.error(reason || 'VNC 认证失败')
+    })
+    rfb.addEventListener('disconnect', (event: Event) => {
+      if (!(event as CustomEvent<{ clean?: boolean }>).detail?.clean) ElMessage.error('VNC 连接已断开')
+    })
+    vncRuntimes.set(session.key, { rfb })
+    return
+  }
   const element = terminalElements.get(session.key)
   if (!element || runtimes.has(session.key)) return
   const terminal = new Terminal({ cursorBlink: true, fontSize: 11, lineHeight: 1.2, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', theme: { background: '#1d1e20', foreground: '#d7dae0', cursor: '#f5f5f5', selectionBackground: '#42556d' } })
@@ -158,13 +192,57 @@ async function initializeSession(session: Session) {
 }
 async function openTerminal(host?: Host) {
   if (!host) return
+  if (!host.port || !host.credential_id) {
+    ElMessage.warning('当前主机未配置 SSH 端口和凭据')
+    return
+  }
   const key = `host:${host.id}`
   const existing = sessions.value.find(session => session.key === key)
   if (existing) { activateSession(existing.key); return }
-  const session: Session = { key, kind: 'host', label: host.name, host }
+  const session: Session = { key, kind: 'ssh', label: host.name, host }
   sessions.value.push(session)
   activeKey.value = session.key
   await initializeSession(session)
+}
+async function openVNCTerminal(host?: Host) {
+  if (!host) return
+  if (!host.vnc_port || !host.vnc_credential_id) {
+    ElMessage.warning('当前主机未配置 VNC 端口和凭据')
+    return
+  }
+  const key = `vnc:${host.id}`
+  const existing = sessions.value.find(session => session.key === key)
+  if (existing) { activateSession(existing.key); return }
+  const session: Session = { key, kind: 'vnc', label: `${host.name} VNC`, host }
+  sessions.value.push(session)
+  activeKey.value = session.key
+  await initializeSession(session)
+}
+function openHostConnection(host?: Host) {
+  if (!host) return
+  const hasSSH = Boolean(host.port && host.credential_id)
+  const hasVNC = Boolean(host.vnc_port && host.vnc_credential_id)
+  if (hasSSH && hasVNC) {
+    connectionChoiceHost.value = host
+    connectionChoiceVisible.value = true
+    return
+  }
+  if (hasVNC) {
+    void openVNCTerminal(host)
+    return
+  }
+  if (hasSSH) {
+    void openTerminal(host)
+    return
+  }
+  ElMessage.error('当前主机未配置 SSH 或 VNC 连接')
+}
+function chooseHostConnection(kind: 'ssh' | 'vnc') {
+  const host = connectionChoiceHost.value
+  connectionChoiceVisible.value = false
+  connectionChoiceHost.value = null
+  if (kind === 'vnc') void openVNCTerminal(host || undefined)
+  else void openTerminal(host || undefined)
 }
 async function openDatabaseTerminal(database?: DbInstance) {
   if (!database) return
@@ -178,7 +256,11 @@ async function openDatabaseTerminal(database?: DbInstance) {
 }
 function activateSession(key: string) {
   activeKey.value = key
-  void nextTick(() => { runtimes.get(key)?.fitAddon.fit(); runtimes.get(key)?.terminal.focus() })
+  void nextTick(() => {
+    runtimes.get(key)?.fitAddon.fit()
+    runtimes.get(key)?.terminal.focus()
+    vncRuntimes.get(key)?.rfb.focus()
+  })
 }
 function clearTerminal() {
   const runtime = activeKey.value === null ? undefined : runtimes.get(activeKey.value)
@@ -187,7 +269,7 @@ function clearTerminal() {
 }
 function openSftp() {
   const session = activeSession.value
-  if (session?.kind !== 'host' || !session.host) return
+  if (session?.kind !== 'ssh' || !session.host) return
   sftpOriginKey.value = session.host.id
   sftpVisible.value = true
   sftpSearchVisible.value = false
@@ -449,8 +531,15 @@ function toggleSftpSearch() {
 async function reconnectSession() {
   if (activeKey.value === null) return
   const session = sessions.value.find(item => item.key === activeKey.value)
+  if (!session) return
+  if (session.kind === 'vnc') {
+    vncRuntimes.get(session.key)?.rfb.disconnect()
+    vncRuntimes.delete(session.key)
+    await initializeSession(session)
+    return
+  }
   const runtime = runtimes.get(activeKey.value)
-  if (!session || !runtime) return
+  if (!runtime) return
   clearTimeout(runtime.connectTimer)
   clearInterval(runtime.heartbeatTimer)
   runtime.resizeObserver.disconnect()
@@ -468,6 +557,9 @@ function disposeSession(key: string) {
   runtime?.terminal.dispose()
   runtimes.delete(key)
   terminalElements.delete(key)
+  vncRuntimes.get(key)?.rfb.disconnect()
+  vncRuntimes.delete(key)
+  vncElements.delete(key)
 }
 function closeSession(key: string) {
   const index = sessions.value.findIndex(session => session.key === key)
@@ -504,7 +596,7 @@ onBeforeUnmount(() => {
           :filter-node-method="filterTree" :expand-on-click-node="true">
           <template #default="{ data, node }"><span class="tree-node"
               :class="[`is-${data.type}`, { 'asset-tree-leaf': data.type !== 'group' }]"
-              @dblclick.stop="data.type === 'host' ? openTerminal(data.host) : data.type === 'database' && openDatabaseTerminal(data.database)"><el-icon
+              @dblclick.stop="data.type === 'host' ? openHostConnection(data.host) : data.type === 'database' && openDatabaseTerminal(data.database)"><el-icon
                 v-if="data.type === 'group'" class="group-folder-icon" @click.stop="node.expanded = !node.expanded">
                 <FolderOpened v-if="node.expanded" />
                 <Folder v-else />
@@ -516,7 +608,11 @@ onBeforeUnmount(() => {
                 <Coin />
               </el-icon><span class="tree-label">{{ data.label }}</span><small v-if="data.type === 'database'"
                 class="database-type-badge">{{ databaseTypeLabel(data.database?.db_type || '') }}</small><small
-                v-else-if="data.type === 'host'" class="database-type-badge">Host</small><small
+                v-else-if="data.type === 'host' && data.host?.port && data.host?.credential_id" class="database-type-badge terminal-kind-action"
+                title="打开 SSH 终端" @click.stop="void openTerminal(data.host)">SSH</small><small
+                v-if="data.type === 'host' && data.host?.vnc_port && data.host?.vnc_credential_id"
+                class="database-type-badge terminal-kind-action is-vnc" title="打开 VNC 远程桌面"
+                @click.stop="void openVNCTerminal(data.host)">VNC</small><small
                 v-if="data.type === 'group'">({{
                   data.count }})</small><i v-else-if="data.type === 'host'"
                 :class="{ online: data.host?.status === 1 }" /><i v-else-if="data.type === 'database'"
@@ -537,14 +633,14 @@ onBeforeUnmount(() => {
             </el-icon>新建终端<span /></div>
           <button v-for="session in sessions" :key="session.key" type="button" class="session-tab"
             :class="{ active: activeKey === session.key }" @click="activateSession(session.key)"><el-icon>
-              <component :is="session.kind === 'host' ? Platform : Coin" />
+              <component :is="session.kind === 'database' ? Coin : Platform" />
             </el-icon><span>{{ session.label }}</span><i v-if="session.host"
               :class="{ online: session.host.status === 1 }" /><el-icon class="close"
               @click.stop="closeSession(session.key)">
               <Close />
             </el-icon></button>
           <div class="terminal-actions">
-            <button type="button" class="terminal-action" :disabled="activeSession?.kind !== 'host'"
+            <button type="button" class="terminal-action" :disabled="activeSession?.kind !== 'ssh'"
               aria-label="SFTP文件管理" title="SFTP文件管理" @click="openSftp"><el-icon>
                 <Folder />
               </el-icon></button>
@@ -552,7 +648,7 @@ onBeforeUnmount(() => {
               @click="void reconnectSession()"><el-icon>
                 <Refresh />
               </el-icon></button>
-            <button type="button" class="terminal-action" :disabled="activeKey === null" aria-label="清空终端" title="清空终端"
+            <button type="button" class="terminal-action" :disabled="activeKey === null || activeSession?.kind === 'vnc'" aria-label="清空终端" title="清空终端"
               @click="clearTerminal"><el-icon>
                 <Delete />
               </el-icon></button>
@@ -562,8 +658,12 @@ onBeforeUnmount(() => {
           <div v-if="!sessions.length" class="terminal-empty"><el-icon>
               <Monitor />
             </el-icon><strong>双击资产打开连接</strong><span>在左侧资产分组中选择主机或数据库</span></div>
-          <div v-for="session in sessions" v-show="activeKey === session.key" :key="session.key"
-            :ref="element => setTerminalElement(session.key, element)" class="terminal-body" />
+          <template v-for="session in sessions" :key="session.key">
+            <div v-if="session.kind === 'vnc'" v-show="activeKey === session.key"
+              :ref="element => setVNCElement(session.key, element)" class="vnc-body" />
+            <div v-else v-show="activeKey === session.key"
+              :ref="element => setTerminalElement(session.key, element)" class="terminal-body" />
+          </template>
         </div>
         <div v-if="sftpVisible" class="sftp-overlay">
           <section class="sftp-panel" :class="{ 'is-drag-active': sftpDragActive }" aria-label="SFTP 文件管理"
@@ -691,6 +791,14 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </main>
+    <el-dialog v-model="connectionChoiceVisible" class="connection-choice-dialog" width="360px"
+      :title="`选择 ${connectionChoiceHost?.name || ''} 的连接方式`" append-to-body
+      @closed="connectionChoiceHost = null">
+      <div class="connection-choice-options">
+        <el-button type="primary" plain @click="chooseHostConnection('ssh')">SSH 终端</el-button>
+        <el-button type="primary" plain @click="chooseHostConnection('vnc')">VNC 远程桌面</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -959,6 +1067,34 @@ onBeforeUnmount(() => {
   white-space: nowrap
 }
 
+.terminal-kind-action {
+  cursor: pointer
+}
+
+.terminal-kind-action:hover {
+  border-color: #55cbb5;
+  color: #dffbf5;
+  background: rgb(85 203 181 / 18%)
+}
+
+.terminal-kind-action.is-vnc {
+  border-color: rgb(117 99 246 / 45%);
+  color: #c6bfff;
+  background: rgb(117 99 246 / 14%)
+}
+
+.connection-choice-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px
+}
+
+.connection-choice-options .el-button {
+  width: 100%;
+  height: 42px;
+  margin: 0
+}
+
 .tree-label {
   min-width: 0;
   flex: 1;
@@ -1126,7 +1262,7 @@ onBeforeUnmount(() => {
 
 .terminal-body {
   position: absolute;
-  inset: 0;
+  inset: 0 0 8px;
   padding: 10px 12px;
   box-sizing: border-box;
   overflow: hidden
@@ -1134,6 +1270,17 @@ onBeforeUnmount(() => {
 
 .terminal-body :deep(.xterm) {
   height: 100%
+}
+
+.vnc-body {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #111214
+}
+
+.vnc-body :deep(canvas) {
+  outline: none
 }
 
 .terminal-empty {

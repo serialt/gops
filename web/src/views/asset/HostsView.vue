@@ -3,12 +3,13 @@ import { computed, h, onMounted, reactive, ref, render, watch, type Component } 
 import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
 interface AssetTreeNode { id: number; label: string; count: number; children: AssetTreeNode[] }
-const rows = ref<Host[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const cloudAccounts = ref<CloudAccount[]>([]); const keyword = ref(''); const statusFilter = ref<number | null>(null); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const credentialTarget = ref<'ssh' | 'vnc'>('ssh'); const testingConnection = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ name: string; group_id: number | null; host_type: string; ip: string; port: number; credential_id: number | null; vnc_credential_id: number | null; cloud_account_id: number | null; tags: string; description: string; status: number }>({ name: '', group_id: null, host_type: '', ip: '', port: 22, credential_id: null, vnc_credential_id: null, cloud_account_id: null, tags: '', description: '', status: -1 })
+const rows = ref<Host[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const groups = ref<AssetGroup[]>([]); const credentials = ref<Credential[]>([]); const cloudAccounts = ref<CloudAccount[]>([]); const keyword = ref(''); const statusFilter = ref<number | null>(null); const treeKeyword = ref(''); const selectedGroupID = ref<number | null>(null); const treePaneWidth = ref(200); const treePaneDragging = ref(false); const treePaneStartX = ref(0); const treePaneStartWidth = ref(200); const assetTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>(); const dialogVisible = ref(false); const credentialDialogVisible = ref(false); const credentialTarget = ref<'ssh' | 'vnc'>('ssh'); const testingConnection = ref(false); const editingID = ref<number | null>(null); const tagDraft = ref(''); const credentialForm = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); const form = reactive<{ name: string; group_id: number | null; host_type: string; ip: string; port: number | null; credential_id: number | null; vnc_credential_id: number | null; vnc_port: number | null; cloud_account_id: number | null; tags: string; description: string; status: number }>({ name: '', group_id: null, host_type: '', ip: '', port: null, credential_id: null, vnc_credential_id: null, vnc_port: null, cloud_account_id: null, tags: '', description: '', status: -1 })
 const auth = useAuthStore()
 const excelInput = ref<HTMLInputElement>()
 const excelBusy = ref(false)
 const selectedHosts = ref<Host[]>([])
 const tagItems = computed(() => form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
+const vncCredentials = computed(() => credentials.value.filter(credential => credential.credential_type === 'password'))
 const hostTypeLabels: Record<string, string> = { self: '自建主机', cloud: '云主机' }
 const treeData = computed<AssetTreeNode[]>(() => { const counts = new Map<number, number>(); rows.value.forEach(row => counts.set(row.group_id, (counts.get(row.group_id) || 0) + 1)); const nodes = new Map<number, AssetTreeNode>(); const roots: AssetTreeNode[] = []; groups.value.forEach(group => nodes.set(group.id, { id: group.id, label: group.name, count: counts.get(group.id) || 0, children: [] })); groups.value.forEach(group => { const node = nodes.get(group.id); const parent = nodes.get(group.parent_id); if (!node) return; if (group.parent_id && parent) parent.children.push(node); else roots.push(node) }); return roots })
 function componentIcon(icon: Component, className = 'el-icon') { const root = document.createElement('span'); root.className = className; render(h(icon), root); return root }
@@ -35,14 +36,14 @@ function startTreePaneDrag(event: PointerEvent) { if (event.button !== 0) return
 function moveTreePane(event: PointerEvent) { if (treePaneDragging.value) treePaneWidth.value = Math.max(0, Math.min(360, treePaneStartWidth.value + event.clientX - treePaneStartX.value)) }
 function stopTreePaneDrag() { if (!treePaneDragging.value) return; treePaneDragging.value = false; if (treePaneWidth.value < 90) treePaneWidth.value = 0; document.removeEventListener('pointermove', moveTreePane); document.removeEventListener('pointerup', stopTreePaneDrag) }
 function toggleTreePane() { treePaneWidth.value = treePaneWidth.value === 0 ? 200 : 0 }
-function create() { editingID.value = null; tagDraft.value = ''; Object.assign(form, { name: '', group_id: selectedGroupID.value, host_type: '', ip: '', port: 22, credential_id: null, vnc_credential_id: null, cloud_account_id: null, tags: '', description: '', status: -1 }); dialogVisible.value = true }
-function edit(row: Host) { editingID.value = row.id; tagDraft.value = ''; Object.assign(form, { ...row, group_id: row.group_id || null, credential_id: row.credential_id || null, vnc_credential_id: row.vnc_credential_id || null, cloud_account_id: row.cloud_account_id || null }); dialogVisible.value = true }
+function create() { editingID.value = null; tagDraft.value = ''; Object.assign(form, { name: '', group_id: selectedGroupID.value, host_type: '', ip: '', port: null, credential_id: null, vnc_credential_id: null, vnc_port: null, cloud_account_id: null, tags: '', description: '', status: -1 }); dialogVisible.value = true }
+function edit(row: Host) { editingID.value = row.id; tagDraft.value = ''; Object.assign(form, { ...row, group_id: row.group_id || null, port: row.port || null, credential_id: row.credential_id || null, vnc_credential_id: row.vnc_credential_id || null, vnc_port: row.vnc_port || null, cloud_account_id: row.cloud_account_id || null }); dialogVisible.value = true }
 function addTag() { const tag = tagDraft.value.trim(); if (tag && !tagItems.value.includes(tag)) form.tags = [...tagItems.value, tag].join(','); tagDraft.value = '' }
 function removeTag(tag: string) { form.tags = tagItems.value.filter(item => item !== tag).join(',') }
 function openCredentialCreate(target: 'ssh' | 'vnc') { credentialTarget.value = target; Object.assign(credentialForm, { name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); credentialDialogVisible.value = true }
 async function saveCredential() { if (!credentialForm.name.trim()) return ElMessage.warning('请填写凭证名称'); if (credentialForm.credential_type === 'password' && !credentialForm.password) return ElMessage.warning('请填写密码'); if (credentialForm.credential_type === 'key' && !credentialForm.private_key.trim()) return ElMessage.warning('请填写私钥'); const { data } = await createCredential(credentialForm); await loadFormOptions(); if (credentialTarget.value === 'vnc') form.vnc_credential_id = data.data.id; else form.credential_id = data.data.id; credentialDialogVisible.value = false; ElMessage.success('凭证创建成功') }
 async function testConnection() { if (!form.ip || !form.port || !form.credential_id) return ElMessage.warning('请填写主机地址、端口并选择凭据'); testingConnection.value = true; try { await testHostConnection({ ip: form.ip, port: form.port, credential_id: form.credential_id }); ElMessage.success('SSH 连接成功') } finally { testingConnection.value = false } }
-async function save() { if (!form.name || !form.ip || !form.host_type || !form.credential_id) return ElMessage.warning('请填写主机名称、类型、地址并选择 SSH 凭据'); const payload = { ...form, group_id: form.group_id ?? 0, credential_id: form.credential_id, vnc_credential_id: form.vnc_credential_id ?? 0, cloud_account_id: form.cloud_account_id ?? 0 }; if (editingID.value) await updateHost({ ...payload, id: editingID.value }); else await createHost(payload); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
+async function save() { if (!form.name || !form.ip || !form.host_type) return ElMessage.warning('请填写主机名称、类型和地址'); if (Boolean(form.port) !== Boolean(form.credential_id)) return ElMessage.warning('SSH 端口和 SSH 凭据需同时填写'); if (Boolean(form.vnc_port) !== Boolean(form.vnc_credential_id)) return ElMessage.warning('VNC 端口和 VNC 凭据需同时填写'); const payload = { ...form, group_id: form.group_id ?? 0, port: form.port, credential_id: form.credential_id, vnc_credential_id: form.vnc_credential_id, vnc_port: form.vnc_port, cloud_account_id: form.cloud_account_id ?? 0 }; if (editingID.value) await updateHost({ ...payload, id: editingID.value }); else await createHost(payload); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
 async function remove(row: Host) { await ElMessageBox.confirm(`确定删除主机 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteHost(row.id); ElMessage.success('删除成功'); await load() }
 async function batchRemove(selectedRows: unknown[]) {
     const selectedHosts = selectedRows as Host[]
@@ -177,13 +178,13 @@ onMounted(() => { void load(); void loadFormOptions() })
                                     :value="account.id" /></el-select></el-form-item></el-col>
                 </el-row>
                 <el-row :gutter="16">
-                    <el-col :xs="24" :sm="12"><el-form-item label="主机地址" required><el-input v-model="form.ip"
+                    <el-col :span="24"><el-form-item label="主机地址" required><el-input v-model="form.ip"
                                 placeholder="请输入 IP 地址" /></el-form-item></el-col>
-                    <el-col :xs="24" :sm="12"><el-form-item label="SSH 端口" required><el-input-number v-model="form.port"
-                                :min="1" :max="65535" controls-position="right" /></el-form-item></el-col>
                 </el-row>
                 <el-row :gutter="16">
-                    <el-col :xs="24" :sm="12"><el-form-item label="SSH 凭据" required>
+                    <el-col :xs="24" :sm="12"><el-form-item label="SSH 端口"><el-input-number v-model="form.port"
+                                :min="1" :max="65535" controls-position="right" /></el-form-item></el-col>
+                    <el-col :xs="24" :sm="12"><el-form-item label="SSH 凭据">
                             <div class="credential-picker"><el-select v-model="form.credential_id" placeholder="选择 SSH 凭据"
                                     clearable><el-option v-for="credential in credentials" :key="credential.id"
                                         :label="credential.name" :value="credential.id" /></el-select><el-button
@@ -191,9 +192,13 @@ onMounted(() => { void load(); void loadFormOptions() })
                                     class="credential-create-button" @click="openCredentialCreate('ssh')">新建凭据</el-button>
                             </div>
                         </el-form-item></el-col>
+                </el-row>
+                <el-row :gutter="16">
+                    <el-col :xs="24" :sm="12"><el-form-item label="VNC 端口"><el-input-number v-model="form.vnc_port"
+                                :min="1" :max="65535" controls-position="right" /></el-form-item></el-col>
                     <el-col :xs="24" :sm="12"><el-form-item label="VNC 凭据">
                             <div class="credential-picker"><el-select v-model="form.vnc_credential_id" placeholder="选择 VNC 凭据"
-                                    clearable><el-option v-for="credential in credentials" :key="credential.id"
+                                    clearable><el-option v-for="credential in vncCredentials" :key="credential.id"
                                         :label="credential.name" :value="credential.id" /></el-select><el-button
                                     v-permission="'POST /api/v1/assets/credentials/create'" text type="primary"
                                     class="credential-create-button" @click="openCredentialCreate('vnc')">新建凭据</el-button>
@@ -218,10 +223,10 @@ onMounted(() => { void load(); void loadFormOptions() })
             <el-form :model="credentialForm" label-width="82px" class="credential-form">
                 <el-form-item label="凭证名称" required><el-input v-model="credentialForm.name"
                         placeholder="请输入凭证名称" /></el-form-item>
-                <el-form-item label="认证方式" required><el-radio-group v-model="credentialForm.credential_type"><el-radio
+                <el-form-item v-if="credentialTarget === 'ssh'" label="认证方式" required><el-radio-group v-model="credentialForm.credential_type"><el-radio
                             value="password">密码</el-radio><el-radio
                             value="key">密钥</el-radio></el-radio-group></el-form-item>
-                <el-form-item label="用户名"><el-input v-model="credentialForm.username"
+                <el-form-item v-if="credentialTarget === 'ssh'" label="用户名"><el-input v-model="credentialForm.username"
                         placeholder="如：root" /></el-form-item>
                 <el-form-item v-if="credentialForm.credential_type === 'password'" label="密码" required><el-input
                         v-model="credentialForm.password" type="password" show-password /></el-form-item>

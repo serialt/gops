@@ -2,12 +2,16 @@ package biz
 
 import (
 	"archive/zip"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,9 +22,36 @@ import (
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+	"gorm.io/gorm"
 )
 
 const maxTerminalRecordingBytes = 1024 * 1024
+
+// StartVNC opens the TCP connection used by the VNC WebSocket proxy.
+func (b *AssetBiz) StartVNC(ctx context.Context, hostID int64) (net.Conn, string, error) {
+	host, credential, err := b.repo.GetHostAndVNCCredential(ctx, b.db, hostID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, "", fmt.Errorf("主机未配置 VNC 凭据")
+		}
+		return nil, "", fmt.Errorf("加载 VNC 配置: %w", err)
+	}
+	if host.VncPort == nil || *host.VncPort < 1 || *host.VncPort > 65535 {
+		return nil, "", fmt.Errorf("VNC 端口无效")
+	}
+	if credential.CredentialType != "password" {
+		return nil, "", fmt.Errorf("VNC 凭据仅支持密码认证")
+	}
+	password, err := cryptox.Decrypt(b.aesKey, credential.Password)
+	if err != nil {
+		return nil, "", fmt.Errorf("解密 VNC 密码: %w", err)
+	}
+	connection, err := net.DialTimeout("tcp", net.JoinHostPort(host.IP, strconv.FormatInt(*host.VncPort, 10)), 10*time.Second)
+	if err != nil {
+		return nil, "", fmt.Errorf("连接 VNC: %w", err)
+	}
+	return connection, password, nil
+}
 
 // SSHConnection is the server-side state of one interactive SSH terminal.
 type SSHConnection struct {
@@ -433,11 +464,11 @@ func (b *AssetBiz) dialHostSSH(hostID int64) (*model.Host, *ssh.Client, error) {
 	if err := b.db.First(&host, hostID).Error; err != nil {
 		return nil, nil, ErrNotFound
 	}
-	if host.CredentialID == 0 {
+	if host.CredentialID == nil {
 		return nil, nil, fmt.Errorf("主机未配置凭证")
 	}
 	var credential model.Credential
-	if err := b.db.First(&credential, host.CredentialID).Error; err != nil {
+	if err := b.db.First(&credential, *host.CredentialID).Error; err != nil {
 		return nil, nil, fmt.Errorf("加载主机凭证: %w", err)
 	}
 	client, err := b.dialSSH(&host, &credential)
@@ -479,7 +510,10 @@ func (b *AssetBiz) dialSSH(host *model.Host, credential *model.Credential) (*ssh
 	} else {
 		method = ssh.Password(password)
 	}
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host.IP, host.Port), &ssh.ClientConfig{
+	if host.Port == nil {
+		return nil, fmt.Errorf("主机未配置 SSH 端口")
+	}
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host.IP, *host.Port), &ssh.ClientConfig{
 		User: credential.Username, Auth: []ssh.AuthMethod{method}, HostKeyCallback: ssh.InsecureIgnoreHostKey(), Timeout: 10 * time.Second,
 	})
 	if err != nil {
