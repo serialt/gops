@@ -35,7 +35,6 @@ func gopsTable(g *gen.Generator) {
 	sslDNSProvider := g.GenerateModel("ssl_dns_provider")
 	auditOperationLog := g.GenerateModel("audit_operation_log")
 	auditLoginLog := g.GenerateModel("audit_login_log")
-	auditDataLog := g.GenerateModel("audit_data_log")
 	kubernetesCluster := g.GenerateModel("kubernetes_cluster")
 	kubernetesTerminalSession := g.GenerateModel("kubernetes_terminal_session")
 	kubernetesClusterInspection := g.GenerateModel("kubernetes_cluster_inspection")
@@ -81,7 +80,7 @@ func gopsTable(g *gen.Generator) {
 		taskExecution,
 		sslCertificate,
 		sslDNSProvider,
-		auditOperationLog, auditLoginLog, auditDataLog,
+		auditOperationLog, auditLoginLog,
 		kubernetesCluster,
 		kubernetesTerminalSession,
 		kubernetesClusterInspection,

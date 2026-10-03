@@ -25,17 +25,6 @@ export interface AuditLoginLog {
   created_at: string
 }
 
-export interface AuditDataLog {
-  id: number
-  username: string
-  table_name: string
-  record_id: number
-  action: string
-  old_data: string
-  new_data: string
-  created_at: string
-}
-
 export interface AuditOperationFilter {
   keyword?: string
   username?: string
@@ -66,6 +55,3 @@ export const listAuditLogins = (filter: AuditLoginFilter = {}, page = 1, limit =
 
 export const deleteAuditLogins = (ids: number[]) =>
   request.post<null>('/audit/login-logs/delete', { ids })
-
-export const listAuditData = (keyword = '', page = 1, limit = 20) =>
-  request.post<PageResponse<AuditDataLog>>('/audit/data-logs/list', { keyword, page, limit })

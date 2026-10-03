@@ -77,7 +77,6 @@ func Catalog() []Permission {
 		{Group: "审计管理", Name: "删除操作日志", Path: "/api/v1/audit/operation-logs/delete", Method: "POST"},
 		{Group: "审计管理", Name: "查看登录日志", Path: "/api/v1/audit/login-logs/list", Method: "POST"},
 		{Group: "审计管理", Name: "删除登录日志", Path: "/api/v1/audit/login-logs/delete", Method: "POST"},
-		{Group: "审计管理", Name: "查看数据日志", Path: "/api/v1/audit/data-logs/list", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看集群", Path: "/api/v1/kubernetes/clusters/list", Method: "POST"},
 		{Group: "Kubernetes", Name: "保存集群", Path: "/api/v1/kubernetes/clusters/save", Method: "POST"},
 		{Group: "Kubernetes", Name: "删除集群", Path: "/api/v1/kubernetes/clusters/delete", Method: "POST"},

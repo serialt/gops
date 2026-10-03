@@ -69,31 +69,12 @@ func (b *AuditBiz) Logins(r *api.AuditListRequest) (*api.PageResponse[*api.Audit
 	}
 	return &api.PageResponse[*api.AuditLoginLogResponse]{List: o, Total: total}, nil
 }
-func (b *AuditBiz) Data(r *api.AuditListRequest) (*api.PageResponse[*api.AuditDataLogResponse], error) {
-	q := b.db.Model(&model.AuditDataLog{}).Order("id DESC")
-	if r.Keyword != "" {
-		q = q.Where("username LIKE ? OR table_name LIKE ?", "%"+r.Keyword+"%", "%"+r.Keyword+"%")
-	}
-	a, total, e := queryPage[model.AuditDataLog](q, r.Page, r.Limit)
-	if e != nil {
-		return nil, e
-	}
-	o := make([]*api.AuditDataLogResponse, 0, len(a))
-	for _, x := range a {
-		o = append(o, &api.AuditDataLogResponse{ID: x.ID, Username: x.Username, TableName: x.TableName_, RecordID: x.RecordID, Action: x.Action, OldData: x.OldData, NewData: x.NewData, CreatedAt: x.CreatedAt})
-	}
-	return &api.PageResponse[*api.AuditDataLogResponse]{List: o, Total: total}, nil
-}
 func (b *AuditBiz) DeleteOperations(r *api.AuditDeleteRequest) error {
 	return b.db.Where("id IN ?", r.IDs).Delete(&model.AuditOperationLog{}).Error
 }
 func (b *AuditBiz) DeleteLogins(r *api.AuditDeleteRequest) error {
 	return b.db.Where("id IN ?", r.IDs).Delete(&model.AuditLoginLog{}).Error
 }
-func (b *AuditBiz) DeleteData(r *api.AuditDeleteRequest) error {
-	return b.db.Where("id IN ?", r.IDs).Delete(&model.AuditDataLog{}).Error
-}
-
 func applyAuditTimeRange(q *gorm.DB, start, end string) *gorm.DB {
 	if startTime, err := time.Parse("2006-01-02", start); err == nil {
 		q = q.Where("created_at >= ?", startTime)

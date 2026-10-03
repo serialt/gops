@@ -40,7 +40,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'kubernetes/inspections', name: 'kubernetes-inspections', component: () => import('@/views/kubernetes/ClusterInspectionView.vue'), meta: { title: '集群巡检', permission: 'POST /api/v1/kubernetes/inspections/history' } },
       { path: 'audit/operations', name: 'audit-operations', component: () => import('@/views/audit/OperationLogsView.vue'), meta: { title: '操作日志', permission: 'POST /api/v1/audit/operation-logs/list' } },
       { path: 'audit/logins', name: 'audit-logins', component: () => import('@/views/audit/LoginLogsView.vue'), meta: { title: '登录日志', permission: 'POST /api/v1/audit/login-logs/list' } },
-      { path: 'audit/data', name: 'audit-data', component: () => import('@/views/audit/AuditLogsView.vue'), meta: { title: '数据日志', audit: 'data', permission: 'POST /api/v1/audit/data-logs/list' } },
       { path: 'ssl-cert/certificates', name: 'ssl-certificates', component: () => import('@/views/ssl-cert/CertificatesView.vue'), meta: { title: '证书管理', permission: 'POST /api/v1/ssl-cert/certificates/list' } },
       { path: 'system-config', name: 'system-config', component: () => import('@/views/system/SystemConfigView.vue'), meta: { title: '系统配置', permission: 'POST /api/v1/system-config/get' } },
     ],

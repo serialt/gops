@@ -18,7 +18,6 @@ import (
 var (
 	Q                           = new(Query)
 	AssetGroup                  *assetGroup
-	AuditDataLog                *auditDataLog
 	AuditLoginLog               *auditLoginLog
 	AuditOperationLog           *auditOperationLog
 	CloudAccount                *cloudAccount
@@ -55,7 +54,6 @@ var (
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	AssetGroup = &Q.AssetGroup
-	AuditDataLog = &Q.AuditDataLog
 	AuditLoginLog = &Q.AuditLoginLog
 	AuditOperationLog = &Q.AuditOperationLog
 	CloudAccount = &Q.CloudAccount
@@ -93,7 +91,6 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
 		db:                          db,
 		AssetGroup:                  newAssetGroup(db, opts...),
-		AuditDataLog:                newAuditDataLog(db, opts...),
 		AuditLoginLog:               newAuditLoginLog(db, opts...),
 		AuditOperationLog:           newAuditOperationLog(db, opts...),
 		CloudAccount:                newCloudAccount(db, opts...),
@@ -132,7 +129,6 @@ type Query struct {
 	db *gorm.DB
 
 	AssetGroup                  assetGroup
-	AuditDataLog                auditDataLog
 	AuditLoginLog               auditLoginLog
 	AuditOperationLog           auditOperationLog
 	CloudAccount                cloudAccount
@@ -174,7 +170,6 @@ func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
 		db:                          db,
 		AssetGroup:                  q.AssetGroup.clone(db),
-		AuditDataLog:                q.AuditDataLog.clone(db),
 		AuditLoginLog:               q.AuditLoginLog.clone(db),
 		AuditOperationLog:           q.AuditOperationLog.clone(db),
 		CloudAccount:                q.CloudAccount.clone(db),
@@ -221,7 +216,6 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
 		db:                          db,
 		AssetGroup:                  q.AssetGroup.replaceDB(db),
-		AuditDataLog:                q.AuditDataLog.replaceDB(db),
 		AuditLoginLog:               q.AuditLoginLog.replaceDB(db),
 		AuditOperationLog:           q.AuditOperationLog.replaceDB(db),
 		CloudAccount:                q.CloudAccount.replaceDB(db),
@@ -258,7 +252,6 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 
 type queryCtx struct {
 	AssetGroup                  *assetGroupDo
-	AuditDataLog                *auditDataLogDo
 	AuditLoginLog               *auditLoginLogDo
 	AuditOperationLog           *auditOperationLogDo
 	CloudAccount                *cloudAccountDo
@@ -295,7 +288,6 @@ type queryCtx struct {
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
 		AssetGroup:                  q.AssetGroup.WithContext(ctx),
-		AuditDataLog:                q.AuditDataLog.WithContext(ctx),
 		AuditLoginLog:               q.AuditLoginLog.WithContext(ctx),
 		AuditOperationLog:           q.AuditOperationLog.WithContext(ctx),
 		CloudAccount:                q.CloudAccount.WithContext(ctx),

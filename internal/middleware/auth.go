@@ -21,7 +21,7 @@ func Auth(jwtManager *auth.JWTManager) gin.HandlerFunc {
 		}
 
 		claims, err := jwtManager.ParseAccess(parts[1])
-		if err != nil {
+		if err != nil || !jwtManager.IsSessionActive(claims) {
 			response.Error(c, 401, "invalid or expired token")
 			return
 		}
@@ -41,7 +41,7 @@ func WebSocketAuth(jwtManager *auth.JWTManager) gin.HandlerFunc {
 			return
 		}
 		claims, err := jwtManager.ParseAccess(token)
-		if err != nil {
+		if err != nil || !jwtManager.IsSessionActive(claims) {
 			response.Error(c, 401, "invalid or expired token")
 			return
 		}

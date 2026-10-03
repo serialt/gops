@@ -153,7 +153,7 @@ func (b *AuthBiz) availableMFAMethods(userID uint, config *api.SystemConfigRespo
 
 func (b *AuthBiz) RefreshToken(req *api.RefreshTokenRequest) (*api.LoginResponse, error) {
 	claims, err := b.jwt.ParseRefresh(req.RefreshToken)
-	if err != nil {
+	if err != nil || !b.jwt.IsSessionActive(claims) {
 		return nil, ErrInvalidCredentials
 	}
 	var user model.User

@@ -38,13 +38,3 @@ type AuditLoginLogResponse struct {
 	Message   string    `json:"message"`
 	CreatedAt time.Time `json:"created_at"`
 }
-type AuditDataLogResponse struct {
-	ID        int64     `json:"id"`
-	Username  string    `json:"username"`
-	TableName string    `json:"table_name"`
-	RecordID  int64     `json:"record_id"`
-	Action    string    `json:"action"`
-	OldData   string    `json:"old_data"`
-	NewData   string    `json:"new_data"`
-	CreatedAt time.Time `json:"created_at"`
-}
