@@ -1,5 +1,36 @@
-POSTGRES_DB=admin
-POSTGRES_USER=admin
-POSTGRES_PASSWORD=change-me
-JWT_SECRET=replace-with-a-long-random-secret
-ADMIN_PASSWORD=Admin@123456
+# SQLite 数据库文件路径；生产环境建议挂载到持久化目录。
+dsn: "gops.db"
+
+log:
+  file:
+  level: info
+
+server:
+  http_port: 9876
+  jwt_secret: "replace-with-a-long-random-secret"
+  # 必须替换为独立、随机的 32 字节 AES-256 密钥。
+  aes_key: "replace-with-a-32-byte-aes-key"
+  access_token_timeout: 15m
+  refresh_token_timeout: 168h
+
+iot:
+  enabled: true
+  # 持久化的消息 Topic 过滤器；# 表示保存全部非 $SYS 消息。
+  message_topic: "#"
+  listeners:
+    tcp:
+      enabled: true
+      address: ":1883"
+    tls:
+      enabled: false
+      address: ":8883"
+      cert_file: "certs/server.crt"
+      key_file: "certs/server.key"
+    websocket:
+      enabled: false
+      address: ":8083"
+    wss:
+      enabled: false
+      address: ":8084"
+      cert_file: "certs/server.crt"
+      key_file: "certs/server.key"

@@ -15,14 +15,14 @@ const TableNameUser = "user"
 // User mapped from table <user>
 type User struct {
 	ID            int64           `gorm:"column:id;primaryKey" json:"id"`
-	Username      string          `gorm:"column:username;not null" json:"username"`
-	PasswordHash  string          `gorm:"column:password_hash;not null" json:"password_hash"`
-	Nickname      string          `gorm:"column:nickname;not null" json:"nickname"`
-	Status        bool            `gorm:"column:status;not null;default:TRUE" json:"status"`
-	CreatedAt     time.Time       `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt     time.Time       `gorm:"column:updated_at;not null" json:"updated_at"`
-	DeletedAt     gorm.DeletedAt  `gorm:"column:deleted_at" json:"deleted_at"`
-	Email         string          `gorm:"column:email;not null;default:''" json:"email"`
+	Username      string          `gorm:"column:username;type:VARCHAR(64)" json:"username"`
+	PasswordHash  string          `gorm:"column:password_hash;type:VARCHAR(255)" json:"password_hash"`
+	Nickname      string          `gorm:"column:nickname;type:VARCHAR(64)" json:"nickname"`
+	Email         string          `gorm:"column:email;type:VARCHAR(255)" json:"email"`
+	Status        bool            `gorm:"column:status;type:BOOLEAN" json:"status"`
+	CreatedAt     time.Time       `gorm:"column:created_at;type:DATETIME" json:"created_at"`
+	UpdatedAt     time.Time       `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
+	DeletedAt     gorm.DeletedAt  `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
 	Roles         []*Role         `gorm:"many2many:user_role" json:"roles"`
 	Organizations []*Organization `gorm:"many2many:organization_user" json:"organizations"`
 }

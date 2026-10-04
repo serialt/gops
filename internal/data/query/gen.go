@@ -24,6 +24,13 @@ var (
 	Credential                  *credential
 	DbInstance                  *dbInstance
 	Host                        *host
+	IotAclRule                  *iotAclRule
+	IotClientConnection         *iotClientConnection
+	IotReceivedMessage          *iotReceivedMessage
+	IotRole                     *iotRole
+	IotTopic                    *iotTopic
+	IotUser                     *iotUser
+	IotUserRole                 *iotUserRole
 	KubernetesCluster           *kubernetesCluster
 	KubernetesClusterInspection *kubernetesClusterInspection
 	KubernetesTerminalSession   *kubernetesTerminalSession
@@ -60,6 +67,13 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Credential = &Q.Credential
 	DbInstance = &Q.DbInstance
 	Host = &Q.Host
+	IotAclRule = &Q.IotAclRule
+	IotClientConnection = &Q.IotClientConnection
+	IotReceivedMessage = &Q.IotReceivedMessage
+	IotRole = &Q.IotRole
+	IotTopic = &Q.IotTopic
+	IotUser = &Q.IotUser
+	IotUserRole = &Q.IotUserRole
 	KubernetesCluster = &Q.KubernetesCluster
 	KubernetesClusterInspection = &Q.KubernetesClusterInspection
 	KubernetesTerminalSession = &Q.KubernetesTerminalSession
@@ -97,6 +111,13 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Credential:                  newCredential(db, opts...),
 		DbInstance:                  newDbInstance(db, opts...),
 		Host:                        newHost(db, opts...),
+		IotAclRule:                  newIotAclRule(db, opts...),
+		IotClientConnection:         newIotClientConnection(db, opts...),
+		IotReceivedMessage:          newIotReceivedMessage(db, opts...),
+		IotRole:                     newIotRole(db, opts...),
+		IotTopic:                    newIotTopic(db, opts...),
+		IotUser:                     newIotUser(db, opts...),
+		IotUserRole:                 newIotUserRole(db, opts...),
 		KubernetesCluster:           newKubernetesCluster(db, opts...),
 		KubernetesClusterInspection: newKubernetesClusterInspection(db, opts...),
 		KubernetesTerminalSession:   newKubernetesTerminalSession(db, opts...),
@@ -135,6 +156,13 @@ type Query struct {
 	Credential                  credential
 	DbInstance                  dbInstance
 	Host                        host
+	IotAclRule                  iotAclRule
+	IotClientConnection         iotClientConnection
+	IotReceivedMessage          iotReceivedMessage
+	IotRole                     iotRole
+	IotTopic                    iotTopic
+	IotUser                     iotUser
+	IotUserRole                 iotUserRole
 	KubernetesCluster           kubernetesCluster
 	KubernetesClusterInspection kubernetesClusterInspection
 	KubernetesTerminalSession   kubernetesTerminalSession
@@ -176,6 +204,13 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Credential:                  q.Credential.clone(db),
 		DbInstance:                  q.DbInstance.clone(db),
 		Host:                        q.Host.clone(db),
+		IotAclRule:                  q.IotAclRule.clone(db),
+		IotClientConnection:         q.IotClientConnection.clone(db),
+		IotReceivedMessage:          q.IotReceivedMessage.clone(db),
+		IotRole:                     q.IotRole.clone(db),
+		IotTopic:                    q.IotTopic.clone(db),
+		IotUser:                     q.IotUser.clone(db),
+		IotUserRole:                 q.IotUserRole.clone(db),
 		KubernetesCluster:           q.KubernetesCluster.clone(db),
 		KubernetesClusterInspection: q.KubernetesClusterInspection.clone(db),
 		KubernetesTerminalSession:   q.KubernetesTerminalSession.clone(db),
@@ -222,6 +257,13 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Credential:                  q.Credential.replaceDB(db),
 		DbInstance:                  q.DbInstance.replaceDB(db),
 		Host:                        q.Host.replaceDB(db),
+		IotAclRule:                  q.IotAclRule.replaceDB(db),
+		IotClientConnection:         q.IotClientConnection.replaceDB(db),
+		IotReceivedMessage:          q.IotReceivedMessage.replaceDB(db),
+		IotRole:                     q.IotRole.replaceDB(db),
+		IotTopic:                    q.IotTopic.replaceDB(db),
+		IotUser:                     q.IotUser.replaceDB(db),
+		IotUserRole:                 q.IotUserRole.replaceDB(db),
 		KubernetesCluster:           q.KubernetesCluster.replaceDB(db),
 		KubernetesClusterInspection: q.KubernetesClusterInspection.replaceDB(db),
 		KubernetesTerminalSession:   q.KubernetesTerminalSession.replaceDB(db),
@@ -258,6 +300,13 @@ type queryCtx struct {
 	Credential                  *credentialDo
 	DbInstance                  *dbInstanceDo
 	Host                        *hostDo
+	IotAclRule                  *iotAclRuleDo
+	IotClientConnection         *iotClientConnectionDo
+	IotReceivedMessage          *iotReceivedMessageDo
+	IotRole                     *iotRoleDo
+	IotTopic                    *iotTopicDo
+	IotUser                     *iotUserDo
+	IotUserRole                 *iotUserRoleDo
 	KubernetesCluster           *kubernetesClusterDo
 	KubernetesClusterInspection *kubernetesClusterInspectionDo
 	KubernetesTerminalSession   *kubernetesTerminalSessionDo
@@ -294,6 +343,13 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Credential:                  q.Credential.WithContext(ctx),
 		DbInstance:                  q.DbInstance.WithContext(ctx),
 		Host:                        q.Host.WithContext(ctx),
+		IotAclRule:                  q.IotAclRule.WithContext(ctx),
+		IotClientConnection:         q.IotClientConnection.WithContext(ctx),
+		IotReceivedMessage:          q.IotReceivedMessage.WithContext(ctx),
+		IotRole:                     q.IotRole.WithContext(ctx),
+		IotTopic:                    q.IotTopic.WithContext(ctx),
+		IotUser:                     q.IotUser.WithContext(ctx),
+		IotUserRole:                 q.IotUserRole.WithContext(ctx),
 		KubernetesCluster:           q.KubernetesCluster.WithContext(ctx),
 		KubernetesClusterInspection: q.KubernetesClusterInspection.WithContext(ctx),
 		KubernetesTerminalSession:   q.KubernetesTerminalSession.WithContext(ctx),

@@ -15,4 +15,5 @@ var ProviderSet = wire.NewSet(
 	NewSSLCertBiz,
 	NewKubernetesBiz,
 	NewAuditBiz,
+	NewIOTBiz,
 )

@@ -15,20 +15,20 @@ const TableNameTaskTemplate = "task_template"
 // TaskTemplate mapped from table <task_template>
 type TaskTemplate struct {
 	ID          int64          `gorm:"column:id;primaryKey" json:"id"`
-	Name        string         `gorm:"column:name;not null" json:"name"`
-	Code        string         `gorm:"column:code;not null" json:"code"`
-	Description string         `gorm:"column:description;not null;default:''" json:"description"`
-	Content     string         `gorm:"column:content;not null;default:''" json:"content"`
-	Variables   string         `gorm:"column:variables;not null;default:''" json:"variables"`
-	Category    string         `gorm:"column:category;not null;default:'script'" json:"category"`
-	Platform    string         `gorm:"column:platform;not null;default:''" json:"platform"`
-	Timeout     int64          `gorm:"column:timeout;not null;default:300" json:"timeout"`
-	SortOrder   int64          `gorm:"column:sort_order;not null" json:"sort_order"`
-	Status      int64          `gorm:"column:status;not null;default:1" json:"status"`
-	CreatedBy   int64          `gorm:"column:created_by;not null" json:"created_by"`
-	CreatedAt   time.Time      `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	Name        string         `gorm:"column:name;type:TEXT" json:"name"`
+	Code        string         `gorm:"column:code;type:TEXT" json:"code"`
+	Description string         `gorm:"column:description;type:TEXT" json:"description"`
+	Content     string         `gorm:"column:content;type:TEXT" json:"content"`
+	Variables   string         `gorm:"column:variables;type:TEXT" json:"variables"`
+	Category    string         `gorm:"column:category;type:TEXT" json:"category"`
+	Platform    string         `gorm:"column:platform;type:TEXT" json:"platform"`
+	Timeout     int64          `gorm:"column:timeout;type:INTEGER" json:"timeout"`
+	SortOrder   int64          `gorm:"column:sort_order;type:INTEGER" json:"sort_order"`
+	Status      int64          `gorm:"column:status;type:INTEGER" json:"status"`
+	CreatedBy   int64          `gorm:"column:created_by;type:INTEGER" json:"created_by"`
+	CreatedAt   time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
 }
 
 // TableName TaskTemplate's table name

@@ -13,6 +13,7 @@ import (
 	"gops/internal/data/repo"
 	"gops/internal/data/repo/rbac"
 	"gops/internal/handler"
+	"gops/internal/iot"
 	"gops/internal/pkg/auth"
 	"gops/internal/pkg/casbinx"
 	"gops/internal/server"
@@ -63,7 +64,15 @@ func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(
 	kubernetesHandler := handler.NewKubernetesHandler(kubernetesBiz)
 	auditBiz := biz.NewAuditBiz(db)
 	auditHandler := handler.NewAuditHandler(auditBiz)
-	engine, cleanup2 := server.NewGinEngine(cfg, db, service, jwtManager, authHandler, dashboardHandler, userHandler, roleHandler, organizationHandler, assetHandler, systemConfigHandler, monitorHandler, taskHandler, sslCertHandler, kubernetesHandler, auditHandler)
+	iotRepo := repo.NewIOTRepo()
+	broker, err := iot.NewBroker(cfg, db, iotRepo)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	iotBiz := biz.NewIOTBiz(db, iotRepo, broker)
+	iotHandler := handler.NewIOTHandler(iotBiz)
+	engine, cleanup2 := server.NewGinEngine(cfg, db, service, jwtManager, authHandler, dashboardHandler, userHandler, roleHandler, organizationHandler, assetHandler, systemConfigHandler, monitorHandler, taskHandler, sslCertHandler, kubernetesHandler, auditHandler, iotHandler, broker)
 	httpServer, cleanup3, err := server.NewHTTPServer(engine, cfg)
 	if err != nil {
 		cleanup2()

@@ -1,0 +1,19 @@
+import request from '@/utils/request'
+import type { PageResponse } from '@/utils/request'
+export interface IOTRole { id:number; name:string; description:string; created_at:string; updated_at:string }
+export interface IOTUser { id:number; username:string; enabled:boolean; roles:IOTRole[]; created_at:string; updated_at:string }
+export interface IOTACLRule { id:number; role_id:number; role_name:string; operation:string; effect:string; topic_filter:string; created_at:string }
+export interface IOTTopic { id:number; topic:string; created_at:string; updated_at:string }
+export interface IOTMessage { id:number; received_at:string; client_id:string; username:string; topic:string; payload:string; qos:number; retained:boolean; duplicate:boolean }
+export interface IOTClient { id:number; client_id:string; status:string; username:string; remote_address:string; listener:string; protocol_version:number; clean_session:boolean; connected_at:string; disconnected_at?:string; disconnect_reason:string; session_expired:boolean }
+export type IOTListParams={page:number;limit:number;keyword?:string;status?:string;role_id?:number}
+export const listIOTUsers=(data:IOTListParams)=>request.post<PageResponse<IOTUser>>('/iot/users/list',data)
+export const createIOTUser=(data:any)=>request.post<IOTUser>('/iot/users/create',data);export const updateIOTUser=(data:any)=>request.post<null>('/iot/users/update',data);export const deleteIOTUser=(id:number)=>request.post<null>('/iot/users/delete',{id})
+export const listIOTRoles=(data:IOTListParams)=>request.post<PageResponse<IOTRole>>('/iot/roles/list',data)
+export const createIOTRole=(data:any)=>request.post<IOTRole>('/iot/roles/create',data);export const updateIOTRole=(data:any)=>request.post<null>('/iot/roles/update',data);export const deleteIOTRole=(id:number)=>request.post<null>('/iot/roles/delete',{id})
+export const listIOTACLRules=(data:IOTListParams)=>request.post<PageResponse<IOTACLRule>>('/iot/acl-rules/list',data)
+export const createIOTACLRule=(data:any)=>request.post<IOTACLRule>('/iot/acl-rules/create',data);export const updateIOTACLRule=(data:any)=>request.post<null>('/iot/acl-rules/update',data);export const deleteIOTACLRule=(id:number)=>request.post<null>('/iot/acl-rules/delete',{id})
+export const listIOTTopics=(data:IOTListParams)=>request.post<PageResponse<IOTTopic>>('/iot/topics/list',data)
+export const listIOTMessages=(data:IOTListParams)=>request.post<PageResponse<IOTMessage>>('/iot/messages/list',data)
+export const listIOTClients=(data:IOTListParams)=>request.post<PageResponse<IOTClient>>('/iot/clients/list',data)
+export const publishIOTMessage=(data:{topic:string;payload:string;qos:number;retain:boolean})=>request.post<null>('/iot/messages/publish',data)

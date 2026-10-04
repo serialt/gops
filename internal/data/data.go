@@ -8,7 +8,6 @@ import (
 var ProviderSet = wire.NewSet(
 	NewDB,
 	NewData,
-	NewRedis,
 )
 
 type Data struct {

@@ -17,12 +17,16 @@ type MonitorDomain struct {
 	ID                int64          `gorm:"column:id;primaryKey" json:"id"`
 	Domain            string         `gorm:"column:domain;type:VARCHAR(255)" json:"domain"`
 	Port              int64          `gorm:"column:port;type:INTEGER" json:"port"`
+	RequestClient     string         `gorm:"column:request_client;type:VARCHAR(20)" json:"request_client"`
 	Status            string         `gorm:"column:status;type:VARCHAR(20)" json:"status"`
 	ResponseTime      int64          `gorm:"column:response_time;type:INTEGER" json:"response_time"`
 	SslValid          bool           `gorm:"column:ssl_valid;type:BOOLEAN" json:"ssl_valid"`
 	SslExpiry         time.Time      `gorm:"column:ssl_expiry;type:DATETIME" json:"ssl_expiry"`
+	SslRootCa         string         `gorm:"column:ssl_root_ca;type:VARCHAR(255)" json:"ssl_root_ca"`
 	CheckInterval     int64          `gorm:"column:check_interval;type:INTEGER" json:"check_interval"`
+	CheckJitter       int64          `gorm:"column:check_jitter;type:INTEGER" json:"check_jitter"`
 	EnableSsl         bool           `gorm:"column:enable_ssl;type:BOOLEAN" json:"enable_ssl"`
+	VerifyCertificate bool           `gorm:"column:verify_certificate;type:BOOLEAN" json:"verify_certificate"`
 	EnableAlert       bool           `gorm:"column:enable_alert;type:BOOLEAN" json:"enable_alert"`
 	ResponseThreshold int64          `gorm:"column:response_threshold;type:INTEGER" json:"response_threshold"`
 	SslExpiryDays     int64          `gorm:"column:ssl_expiry_days;type:INTEGER" json:"ssl_expiry_days"`
@@ -32,10 +36,6 @@ type MonitorDomain struct {
 	CreatedAt         time.Time      `gorm:"column:created_at;type:DATETIME" json:"created_at"`
 	UpdatedAt         time.Time      `gorm:"column:updated_at;type:DATETIME" json:"updated_at"`
 	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME" json:"deleted_at"`
-	VerifyCertificate bool           `gorm:"column:verify_certificate;not null;default:TRUE" json:"verify_certificate"`
-	SslRootCa         string         `gorm:"column:ssl_root_ca;not null;default:''" json:"ssl_root_ca"`
-	RequestClient     string         `gorm:"column:request_client;not null;default:'chrome'" json:"request_client"`
-	CheckJitter       int64          `gorm:"column:check_jitter;type:INTEGER" json:"check_jitter"`
 }
 
 // TableName MonitorDomain's table name

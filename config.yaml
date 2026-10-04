@@ -10,10 +10,23 @@ server:
     # 生产环境必须替换为独立、随机的 32 字节 AES-256 密钥。
     aes_key: "0123456789abcdef0123456789abcdef"
     
-redis:
-  host: 172.12.78.53
-  port: 6379
-  password: "sugar.tang"
-  db: 5
-  pool_size: 10
-  min_idle_conn: 5
+iot:
+  enabled: true
+  message_topic: "#"
+  listeners:
+    tcp:
+      enabled: true
+      address: ":1883"
+    tls:
+      enabled: false
+      address: ":8883"
+      cert_file: "certs/server.crt"
+      key_file: "certs/server.key"
+    websocket:
+      enabled: false
+      address: ":8083"
+    wss:
+      enabled: false
+      address: ":8084"
+      cert_file: "certs/server.crt"
+      key_file: "certs/server.key"

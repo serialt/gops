@@ -40,6 +40,13 @@ func gopsTable(g *gen.Generator) {
 	kubernetesClusterInspection := g.GenerateModel("kubernetes_cluster_inspection")
 	kubernetesUserKubeConfig := g.GenerateModel("kubernetes_user_kube_config")
 	kubernetesUserRoleBinding := g.GenerateModel("kubernetes_user_role_binding")
+	iotRole := g.GenerateModel("iot_role")
+	iotUser := g.GenerateModel("iot_user")
+	iotUserRole := g.GenerateModel("iot_user_role")
+	iotACLRule := g.GenerateModel("iot_acl_rule")
+	iotTopic := g.GenerateModel("iot_topic")
+	iotReceivedMessage := g.GenerateModel("iot_received_message")
+	iotClientConnection := g.GenerateModel("iot_client_connection")
 	userRole := g.GenerateModel("user_role")
 	userMFA := g.GenerateModel("user_mfa")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
@@ -86,6 +93,13 @@ func gopsTable(g *gen.Generator) {
 		kubernetesClusterInspection,
 		kubernetesUserKubeConfig,
 		kubernetesUserRoleBinding,
+		iotRole,
+		iotUser,
+		iotUserRole,
+		iotACLRule,
+		iotTopic,
+		iotReceivedMessage,
+		iotClientConnection,
 	)
 
 }

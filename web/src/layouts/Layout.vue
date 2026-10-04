@@ -58,6 +58,15 @@ const taskMenus = computed(() => [
   { path: '/tasks/jobs', title: '任务作业', icon: DataAnalysis, permission: 'POST /api/v1/tasks/jobs/list' },
 ].filter((item) => auth.hasPermission(item.permission)))
 const kubernetesMenus = computed(() => [{ path: '/kubernetes/clusters', title: '集群管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/clusters/list' }, { path: '/kubernetes/nodes', title: '节点管理', icon: Monitor, permission: 'POST /api/v1/kubernetes/nodes/list' }, { path: '/kubernetes/namespaces', title: '命名空间', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/namespaces/list' }, { path: '/kubernetes/workloads', title: '工作负载', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/network', title: '网络管理', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/config', title: '配置管理', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/storage', title: '存储管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/access', title: '访问控制', icon: Monitor, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/inspections', title: '集群巡检', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/inspections/history' }].filter((item) => auth.hasPermission(item.permission)))
+const iotMenus = computed(() => [
+  { path: '/iot/users', title: '用户管理', icon: User, permission: 'POST /api/v1/iot/users/list' },
+  { path: '/iot/roles', title: '角色管理', icon: Key, permission: 'POST /api/v1/iot/roles/list' },
+  { path: '/iot/acl-rules', title: 'ACL 规则', icon: Setting, permission: 'POST /api/v1/iot/acl-rules/list' },
+  { path: '/iot/messages', title: '消息收发', icon: Monitor, permission: 'POST /api/v1/iot/messages/publish' },
+  { path: '/iot/topics', title: 'Topic 列表', icon: DataAnalysis, permission: 'POST /api/v1/iot/topics/list' },
+  { path: '/iot/received-messages', title: '接收消息', icon: DataAnalysis, permission: 'POST /api/v1/iot/messages/list' },
+  { path: '/iot/clients', title: '客户端记录', icon: OfficeBuilding, permission: 'POST /api/v1/iot/clients/list' },
+].filter(item => auth.hasPermission(item.permission)))
 const auditMenus = computed(() => [{ path: '/audit/operations', title: '操作日志', icon: DataAnalysis, permission: 'POST /api/v1/audit/operation-logs/list' }, { path: '/audit/logins', title: '登录日志', icon: User, permission: 'POST /api/v1/audit/login-logs/list' }].filter(item => auth.hasPermission(item.permission)))
 const sslCertMenus = computed(() => [
   { path: '/ssl-cert/certificates', title: '证书管理', icon: Key, permission: 'POST /api/v1/ssl-cert/certificates/list' },
@@ -80,6 +89,7 @@ const menuItems = computed(() => [
   ...monitorMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...taskMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...kubernetesMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
+  ...iotMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...auditMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...sslCertMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
 ])
@@ -388,6 +398,7 @@ function toggleCollapse() {
               :index="item.path"><el-icon>
                 <component :is="item.icon" />
               </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+          <el-sub-menu v-if="iotMenus.length" index="iot"><template #title><el-icon><Monitor /></el-icon><span>IOT</span></template><el-menu-item v-for="item in iotMenus" :key="item.path" :index="item.path"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
           <el-sub-menu v-if="auditMenus.length" index="audit"><template #title><el-icon>
                 <DataAnalysis />
               </el-icon><span>审计管理</span></template><el-menu-item v-for="item in auditMenus" :key="item.path"
@@ -449,6 +460,7 @@ function toggleCollapse() {
                 :index="item.path"><el-icon>
                   <component :is="item.icon" />
                 </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
+            <el-sub-menu v-if="iotMenus.length" index="iot"><template #title><el-icon><Monitor /></el-icon><span>IOT</span></template><el-menu-item v-for="item in iotMenus" :key="item.path" :index="item.path"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
             <el-sub-menu v-if="auditMenus.length" index="audit"><template #title><el-icon>
                   <DataAnalysis />
                 </el-icon><span>审计管理</span></template><el-menu-item v-for="item in auditMenus" :key="item.path"

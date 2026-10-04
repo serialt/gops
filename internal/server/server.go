@@ -9,6 +9,7 @@ import (
 	"gops/internal/config"
 	"gops/internal/data/define"
 	"gops/internal/handler"
+	iotbroker "gops/internal/iot"
 	"gops/internal/middleware"
 	"gops/internal/pkg/auth"
 	"gops/internal/pkg/casbinx"
@@ -34,6 +35,8 @@ var ProviderSet = wire.NewSet(
 	handler.NewSSLCertHandler,
 	handler.NewKubernetesHandler,
 	handler.NewAuditHandler,
+	handler.NewIOTHandler,
+	iotbroker.NewBroker,
 	NewHTTPServer,
 	NewGinEngine,
 )
@@ -69,6 +72,8 @@ func NewGinEngine(
 	sslCertHandler *handler.SSLCertHandler,
 	kubernetesHandler *handler.KubernetesHandler,
 	auditHandler *handler.AuditHandler,
+	iotHandler *handler.IOTHandler,
+	iotBroker *iotbroker.Broker,
 ) (r *gin.Engine, cleanup func()) {
 
 	if cfg.Log.Level != "debug" && cfg.Log.Level != "dev" {
@@ -89,6 +94,11 @@ func NewGinEngine(
 
 	go monitorHandler.StartScheduler(schedulerCtx)
 	go kubernetesHandler.StartStatusScheduler(schedulerCtx, 6*time.Hour)
+	go func() {
+		if err := iotBroker.Run(); err != nil {
+			fmt.Printf("IOT MQTT broker stopped: %v\n", err)
+		}
+	}()
 
 	r.Use(gin.Logger(), gin.Recovery())
 
@@ -122,9 +132,10 @@ func NewGinEngine(
 	sslCertHandler.RegisterRoutes(authorized)
 	kubernetesHandler.RegisterRoutes(authorized)
 	auditHandler.RegisterRoutes(authorized)
+	iotHandler.RegisterRoutes(authorized)
 
 	registerFrontend(r, db)
-	cleanup = cancelSchedulers
+	cleanup = func() { cancelSchedulers(); _ = iotBroker.Close() }
 	return
 }
 

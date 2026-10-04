@@ -57,13 +57,6 @@ server:
   jwt_secret: "请替换为足够长的随机字符串"
   aes_key: "请替换为 16、24 或 32 字节的 AES 密钥"
 
-redis:
-  host: "127.0.0.1"
-  port: 6379
-  password: ""
-  db: 0
-  pool_size: 10
-  min_idle_conn: 1
 ```
 
 配置项说明：
@@ -75,7 +68,8 @@ redis:
 | `server.http_port` | 后端监听端口，前端开发代理默认使用 `9876` |
 | `server.jwt_secret` | JWT 签名密钥，生产环境必须替换 |
 | `server.aes_key` | 用于加密数据库中的凭证、密码等敏感数据 |
-| `redis.*` | Redis 连接参数，供需要缓存或分布式能力的模块使用 |
+
+运行时缓存使用进程内 `go-cache`。缓存随进程重启清空，不在多个服务实例之间共享。
 
 不要将包含真实密钥的 `config.yaml` 提交到版本库。
 
