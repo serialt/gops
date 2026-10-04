@@ -30,6 +30,7 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/nodes/delete", h.DeleteNode)
 	g.POST("/kubernetes/nodes/drain", h.DrainNode)
 	g.POST("/kubernetes/namespaces/list", h.ListNamespaces)
+	g.POST("/kubernetes/namespaces/support", h.GetNamespaceSupport)
 	g.POST("/kubernetes/namespaces/update", h.UpdateNamespace)
 	g.POST("/kubernetes/workloads/list", h.ListWorkloads)
 	g.POST("/kubernetes/workloads/stats", h.WorkloadStats)
@@ -102,6 +103,21 @@ func (h *KubernetesHandler) GetIngressSupport(c *gin.Context) {
 		return
 	}
 	data, err := h.biz.IngressSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetNamespaceSupport POST /api/v1/kubernetes/namespaces/support 查询 Namespace 资源、Pod 和事件详情。
+func (h *KubernetesHandler) GetNamespaceSupport(c *gin.Context) {
+	req := new(api.KubernetesNamespaceDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid namespace query")
+		return
+	}
+	data, err := h.biz.NamespaceSupport(req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { ColDef } from 'ag-grid-community'
 import { Delete, FolderOpened, Monitor, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -8,7 +8,7 @@ import AppDataGrid from '@/components/AppDataGrid.vue'
 import KubernetesLabelDialog from '@/components/KubernetesLabelDialog.vue'
 import KubernetesYamlEditor from '@/components/KubernetesYamlEditor.vue'
 import { applyKubernetesObject, deleteKubernetesNode, deleteKubernetesObject, drainKubernetesNode, getKubernetesClusterStats, getKubernetesObject, getKubernetesResourceTemplate, listKubernetesClusters, listKubernetesNamespaces, listKubernetesNodes, listKubernetesWorkloads, updateKubernetesNamespace, updateKubernetesNode, type KubernetesCluster, type KubernetesNode, type KubernetesNamespace, type KubernetesTaint } from '@/api/kubernetes'
-const route = useRoute(); const kind = computed(() => String(route.meta.kubernetesResource || 'nodes')); const title = computed(() => kind.value === 'nodes' ? '节点管理' : kind.value === 'namespaces' ? '命名空间' : '工作负载'); const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), keyword = ref(''), rows = ref<any[]>([]), page = ref(1), pageSize = ref(20), total = ref(0)
+const route = useRoute(), router = useRouter(); const kind = computed(() => String(route.meta.kubernetesResource || 'nodes')); const title = computed(() => kind.value === 'nodes' ? '节点管理' : kind.value === 'namespaces' ? '命名空间' : '工作负载'); const clusters = ref<KubernetesCluster[]>([]), clusterID = ref(0), keyword = ref(''), rows = ref<any[]>([]), page = ref(1), pageSize = ref(20), total = ref(0)
 const statusFilter = ref(''), roleFilter = ref(''), namespaceStatus = ref(''), refreshing = ref(false)
 const cloudTTYDialog = ref(false)
 const cloudTTYCommand = `# 1. 安装并等待 Pod 运行起来
@@ -169,6 +169,7 @@ function formatMemoryCapacity(value: unknown) {
     return `${converted >= 10 || index === 0 ? converted.toFixed(0) : converted.toFixed(1)} ${units[index]}`
 }
 const indexColumn: ColDef = { headerName: '序号', valueGetter: (p: any) => p.node.rowIndex + 1, width: 70 }
+function namespaceNameRenderer(p: any) { const link = document.createElement('span'); link.className = 'namespace-detail-link'; link.textContent = String(p.value || ''); link.setAttribute('role', 'link'); link.tabIndex = 0; const open = () => router.push({ name: 'kubernetes-namespace-detail', query: { cluster_id: clusterID.value, name: p.data.name } }); link.onclick = () => { void open() }; link.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void open() } }; return link }
 const columns = computed<ColDef[]>(() => kind.value === 'nodes' ? [indexColumn, { field: 'name', headerName: '节点名称' }, { field: 'status', headerName: '状态', cellRenderer: (p: any) => { const ready = isNodeReady(p.value); const tag = document.createElement('span'); tag.className = `node-status ${ready ? 'is-ready' : 'is-abnormal'}`; tag.textContent = ready ? '正常' : p.value; return tag } }, { field: 'roles', headerName: '角色', cellRenderer: (p: any) => { const tag = document.createElement('span'); tag.className = 'node-role'; tag.textContent = p.value || 'Worker'; return tag } }, { field: 'internalIP', headerName: '内部 IP' }, { field: 'cpuCapacity', headerName: 'CPU' }, { field: 'memoryCapacity', headerName: '内存' }, { field: 'podCapacity', headerName: 'Pod 容量' }, { field: 'version', headerName: 'Kubelet 版本' }, { field: 'age', headerName: '存活时间' }, { headerName: '操作', width: 150, minWidth: 150, maxWidth: 150, pinned: 'right', sortable: false, cellRenderer: (p: any) => { const button = document.createElement('button'); button.className = 'grid-action-btn edit'; button.textContent = '编辑'; button.onclick = () => editNode(p.data); return button } }] : kind.value === 'namespaces' ? [indexColumn, { field: 'name', headerName: '命名空间', minWidth: 180 }, { field: 'status', headerName: '状态' }, { field: 'age', headerName: '运行时间' }, { field: 'created_at', headerName: '创建时间', minWidth: 160 }] : [indexColumn, { field: 'namespace', headerName: '命名空间' }, { field: 'name', headerName: '工作负载名称', minWidth: 180 }, { field: 'kind', headerName: '类型' }, { field: 'ready', headerName: '就绪副本' }, { field: 'status', headerName: '状态' }, { field: 'created_at', headerName: '创建时间', minWidth: 160 }])
 const adaptiveColumns = computed<ColDef[]>(() => {
     const source = [...columns.value]
@@ -181,6 +182,8 @@ const adaptiveColumns = computed<ColDef[]>(() => {
         source.splice(0, source.length, field('name') ? source[0] : indexColumn, field('name'), field('status'), field('roles'), field('internalIP'), { ...field('version'), headerName: 'Kubelet 版本' }, labelColumn, field('cpuCapacity'), { ...field('memoryCapacity'), valueFormatter: p => formatMemoryCapacity(p.value) }, { ...field('podCapacity'), headerName: 'Pod 数量', valueGetter: (p: any) => `${Number(p.data?.podCount || 0)} / ${Number(p.data?.podCapacity || 0)}` }, schedulableColumn, taintColumn, { ...field('age'), headerName: '运行时间' }, action)
     }
     if (kind.value === 'namespaces') {
+        const nameIndex = source.findIndex(column => column.field === 'name')
+        if (nameIndex >= 0) source[nameIndex] = { ...source[nameIndex], cellRenderer: namespaceNameRenderer }
         const statusIndex = source.findIndex(column => column.field === 'status')
         source.splice(statusIndex + 1, 0, { field: 'labels', headerName: '标签', cellRenderer: (p: any) => { const labels = p.value || {}; const wrap = document.createElement('span'); const icon = document.createElement('span'); const badge = document.createElement('span'); wrap.className = 'namespace-label-count'; icon.className = 'namespace-label-icon'; icon.textContent = '◇'; badge.className = 'namespace-label-badge'; badge.textContent = String(Object.keys(labels).length); wrap.title = '查看命名空间标签'; wrap.onclick = () => openNamespaceLabels(p.data); wrap.append(icon, badge); return wrap } })
         source.push({ headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const namespace = p.data as KubernetesNamespace, wrap = document.createElement('div'); const yamlIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/></svg>', editIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.6-10.6a2 2 0 0 0-2.8-2.8L5.4 16.2zM14.6 7l2.8 2.8M4 20h6"/></svg>', deleteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>'; wrap.className = 'namespace-action-group'; wrap.append(namespaceActionIcon('YAML 编辑', yamlIcon, () => { void openNamespaceYamlFor(namespace) }), namespaceActionIcon('编辑', editIcon, () => openNamespaceLabels(namespace)), namespaceActionIcon('删除', deleteIcon, () => { void removeNamespace(namespace) }, true)); return wrap } })
@@ -391,6 +394,22 @@ const adaptiveColumns = computed<ColDef[]>(() => {
     flex-direction: column;
     gap: 12px;
     min-height: 0
+}
+
+.page :deep(.namespace-detail-link) {
+    color: var(--primary);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.page :deep(.namespace-detail-link:hover) {
+    text-decoration: underline;
+}
+
+.page :deep(.namespace-detail-link:focus-visible) {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 2px;
 }
 
 .node-page {
