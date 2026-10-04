@@ -37,6 +37,7 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/stats/get", h.GetClusterStats)
 	g.POST("/kubernetes/events/list", h.ListEvents)
 	g.POST("/kubernetes/deployments/support", h.GetDeploymentSupport)
+	g.POST("/kubernetes/statefulsets/support", h.GetStatefulSetSupport)
 	g.POST("/kubernetes/pods/logs", h.GetPodLogs)
 	g.POST("/kubernetes/pods/exec", h.ExecPodCommand)
 	g.POST("/kubernetes/pods/files/list", h.ListPodFiles)
@@ -54,6 +55,21 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/inspections/history", h.ListInspectionHistory)
 	g.POST("/kubernetes/inspections/delete", h.DeleteInspection)
 
+}
+
+// GetStatefulSetSupport POST /api/v1/kubernetes/statefulsets/support 查询 StatefulSet 关联的 Pod、PVC 和事件。
+func (h *KubernetesHandler) GetStatefulSetSupport(c *gin.Context) {
+	req := new(api.KubernetesStatefulSetDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid statefulset query")
+		return
+	}
+	data, err := h.biz.StatefulSetSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
 }
 
 // GetDeploymentSupport POST /api/v1/kubernetes/deployments/support 查询 Deployment 关联资源、历史和监控指标。

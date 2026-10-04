@@ -1,5 +1,5 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true, guestOnly: true } },
@@ -36,6 +36,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'kubernetes/namespaces', name: 'kubernetes-namespaces', component: () => import('@/views/kubernetes/ResourceListView.vue'), meta: { title: '命名空间', kubernetesResource: 'namespaces', permission: 'POST /api/v1/kubernetes/namespaces/list' } },
       { path: 'kubernetes/workloads', name: 'kubernetes-workloads', component: () => import('@/views/kubernetes/ResourceManagerView.vue'), meta: { title: '工作负载', kubernetesGroup: 'workloads', permission: 'POST /api/v1/kubernetes/resources/list' } },
       { path: 'kubernetes/workloads/deployments/detail', name: 'kubernetes-deployment-detail', component: () => import('@/views/kubernetes/DeploymentDetailView.vue'), meta: { title: 'Deployment 详情', permission: 'POST /api/v1/kubernetes/resources/get' } },
+      { path: 'kubernetes/workloads/statefulsets/detail', name: 'kubernetes-statefulset-detail', component: () => import('@/views/kubernetes/StatefulSetDetailView.vue'), meta: { title: 'StatefulSet 详情', permission: 'POST /api/v1/kubernetes/resources/get' } },
       { path: 'kubernetes/workloads/pods/detail', name: 'kubernetes-pod-detail', component: () => import('@/views/kubernetes/PodDetailView.vue'), meta: { title: 'Pod 详情', permission: 'POST /api/v1/kubernetes/resources/get' } },
       { path: 'kubernetes/network', name: 'kubernetes-network', component: () => import('@/views/kubernetes/ResourceManagerView.vue'), meta: { title: '网络管理', kubernetesGroup: 'network', permission: 'POST /api/v1/kubernetes/resources/list' } },
       { path: 'kubernetes/config', name: 'kubernetes-config', component: () => import('@/views/kubernetes/ResourceManagerView.vue'), meta: { title: '配置管理', kubernetesGroup: 'config', permission: 'POST /api/v1/kubernetes/resources/list' } },

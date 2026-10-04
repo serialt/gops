@@ -1,5 +1,5 @@
-import request from '@/utils/request'
-import type { PageResponse } from '@/utils/request'
+import type { PageResponse } from '@/utils/request';
+import request from '@/utils/request';
 export interface KubernetesCluster { id: number; name: string; alias: string; api_endpoint: string; version: string; status: number; node_count: number; pod_count: number; region: string; provider: string; description: string; created_at: string; updated_at: string }
 export interface KubernetesClusterRequest { id?: number; name: string; alias: string; api_endpoint: string; kube_config: string; region: string; provider: string; description: string; status: number }
 export const listKubernetesClusters = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<KubernetesCluster>>('/kubernetes/clusters/list', { keyword, page, limit }); export const saveKubernetesCluster = (data: KubernetesClusterRequest) => request.post<KubernetesCluster>('/kubernetes/clusters/save', data); export const deleteKubernetesCluster = (id: number) => request.post<null>('/kubernetes/clusters/delete', { id })
@@ -23,6 +23,9 @@ export interface KubernetesReplicaSet { name: string; revision: string; replicas
 export interface KubernetesPodMetric { pod: string; cpu: string; memory: string }
 export interface KubernetesDeploymentSupport { related: KubernetesRelatedResource[]; history: KubernetesReplicaSet[]; metrics: KubernetesPodMetric[]; owner: string; uid: string; revision: string; min_ready_seconds: number; progress_deadline_seconds: number | null; description: string }
 export const getKubernetesDeploymentSupport = (cluster_id: number, namespace: string, name: string) => request.post<KubernetesDeploymentSupport>('/kubernetes/deployments/support', { cluster_id, namespace, name })
+export interface KubernetesPersistentVolumeClaim { name: string; status: string; volume_name: string; capacity: string; access_modes: string[]; storage_class_name: string; created_at: string }
+export interface KubernetesStatefulSetSupport { status: string; desired_replicas: number; current_replicas: number; ready_replicas: number; updated_replicas: number; pods: KubernetesObject[]; claims: KubernetesPersistentVolumeClaim[]; events: KubernetesEvent[]; description: string }
+export const getKubernetesStatefulSetSupport = (cluster_id: number, namespace: string, name: string) => request.post<KubernetesStatefulSetSupport>('/kubernetes/statefulsets/support', { cluster_id, namespace, name })
 export const getKubernetesPodLogs = (data: { cluster_id: number; namespace: string; pod: string; container: string; tail_lines?: number; timestamps?: boolean }) => request.post<{ logs: string }>('/kubernetes/pods/logs', data)
 export const execKubernetesPodCommand = (data: { cluster_id: number; namespace: string; pod: string; container: string; command: string }) => request.post<{ output: string; error: string }>('/kubernetes/pods/exec', data)
 export interface KubernetesPodFile { name: string; path: string; uid: string; gid: string; size: number; mode: string; modified_at: number; directory: boolean }
