@@ -18,6 +18,15 @@ export interface KubernetesClusterStats { nodeCount: number; workloadCount: numb
 export const getKubernetesClusterStats = (cluster_id: number) => request.post<KubernetesClusterStats>('/kubernetes/stats/get', { cluster_id })
 export interface KubernetesEvent { type: string; reason: string; message: string; source: string; count: number; firstTimestamp: string; lastTimestamp: string; involvedObject: { kind: string; name: string; namespace?: string } }
 export const listKubernetesEvents = (cluster_id: number, namespace = '', keyword = '', page = 1, limit = 1000) => request.post<PageResponse<KubernetesEvent>>('/kubernetes/events/list', { cluster_id, namespace, keyword, page, limit })
+export interface KubernetesNetworkDetailRequest { cluster_id: number; namespace: string; name: string }
+export interface KubernetesNetworkPolicyPeer { pod_selector?: Record<string, string>; pod_selector_text?: string; namespace_selector?: Record<string, string>; namespace_selector_text?: string; ip_block_cidr?: string; ip_block_except?: string[] }
+export interface KubernetesNetworkPolicyPort { protocol: string; port: string; end_port?: number }
+export interface KubernetesNetworkPolicyRule { peers: KubernetesNetworkPolicyPeer[]; ports: KubernetesNetworkPolicyPort[] }
+export interface KubernetesNetworkPolicySupport { name: string; namespace: string; pod_selector: Record<string, string>; pod_selector_text: string; policy_types: string[]; ingress: KubernetesNetworkPolicyRule[]; egress: KubernetesNetworkPolicyRule[]; pods: KubernetesObject[]; events: KubernetesEvent[]; labels: Record<string, string>; annotations: Record<string, string>; owner: string; uid: string; created_at: string; age: string; description: string }
+export interface KubernetesEndpointAddress { ip: string; hostname: string; node_name: string; target_kind: string; target_name: string }
+export interface KubernetesEndpointsSupport { name: string; namespace: string; addresses: KubernetesEndpointAddress[]; not_ready: KubernetesEndpointAddress[]; ports: KubernetesServicePort[]; pods: KubernetesObject[]; events: KubernetesEvent[]; labels: Record<string, string>; annotations: Record<string, string>; owner: string; uid: string; created_at: string; age: string; description: string }
+export const getKubernetesNetworkPolicySupport = (data: KubernetesNetworkDetailRequest) => request.post<KubernetesNetworkPolicySupport>('/kubernetes/networkpolicies/support', data)
+export const getKubernetesEndpointsSupport = (data: KubernetesNetworkDetailRequest) => request.post<KubernetesEndpointsSupport>('/kubernetes/endpoints/support', data)
 export interface KubernetesIngressPath { path: string; path_type: string; service_name: string; service_port: string }
 export interface KubernetesIngressRule { host: string; paths: KubernetesIngressPath[] }
 export interface KubernetesIngressTLS { hosts: string[]; secret_name: string }

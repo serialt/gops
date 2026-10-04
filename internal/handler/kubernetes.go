@@ -37,6 +37,8 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/stats/get", h.GetClusterStats)
 	g.POST("/kubernetes/events/list", h.ListEvents)
 	g.POST("/kubernetes/ingresses/support", h.GetIngressSupport)
+	g.POST("/kubernetes/networkpolicies/support", h.GetNetworkPolicySupport)
+	g.POST("/kubernetes/endpoints/support", h.GetEndpointsSupport)
 	g.POST("/kubernetes/services/support", h.GetServiceSupport)
 	g.POST("/kubernetes/deployments/support", h.GetDeploymentSupport)
 	g.POST("/kubernetes/statefulsets/support", h.GetStatefulSetSupport)
@@ -60,6 +62,36 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/inspections/history", h.ListInspectionHistory)
 	g.POST("/kubernetes/inspections/delete", h.DeleteInspection)
 
+}
+
+// GetNetworkPolicySupport POST /api/v1/kubernetes/networkpolicies/support 查询 NetworkPolicy 规则、目标 Pod 和事件。
+func (h *KubernetesHandler) GetNetworkPolicySupport(c *gin.Context) {
+	req := new(api.KubernetesNetworkDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid network policy query")
+		return
+	}
+	data, err := h.biz.NetworkPolicySupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetEndpointsSupport POST /api/v1/kubernetes/endpoints/support 查询 Endpoints 地址、端口、目标 Pod 和事件。
+func (h *KubernetesHandler) GetEndpointsSupport(c *gin.Context) {
+	req := new(api.KubernetesNetworkDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid endpoints query")
+		return
+	}
+	data, err := h.biz.EndpointsSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
 }
 
 // GetIngressSupport POST /api/v1/kubernetes/ingresses/support 查询 Ingress 规则、TLS、后端 Service 和事件。
