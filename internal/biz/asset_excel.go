@@ -12,15 +12,27 @@ import (
 	"time"
 
 	"gops/internal/data/api"
+	"gops/internal/data/define"
 
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 )
 
-var hostExcelHeaders = []string{"主机名称", "IP", "SSH端口", "VNC端口", "主机类型", "所属分组ID", "SSH凭据ID", "VNC凭据ID", "云账号ID", "标签", "备注"}
+var hostExcelHeaders = []string{"主机名称", "主机类型", "所属分组", "云账号", "主机地址", "SSH端口", "SSH凭据", "VNC端口", "VNC凭据", "标签", "备注"}
 var dbInstanceExcelHeaders = []string{"数据库名称", "数据库类型", "数据库地址", "端口", "所属分组ID", "凭据ID", "标签", "备注"}
 
+type hostExcelOptions struct {
+	groups         map[string]int64
+	credentials    map[string]int64
+	vncCredentials map[string]int64
+	cloudAccounts  map[string]int64
+}
+
 func (b *AssetBiz) ExportHosts(ctx context.Context, req *api.HostListRequest) (string, []byte, error) {
+	options, err := b.hostExcelOptions(ctx)
+	if err != nil {
+		return "", nil, err
+	}
 	book, sheet, err := newHostExcelBook()
 	if err != nil {
 		return "", nil, err
@@ -35,7 +47,7 @@ func (b *AssetBiz) ExportHosts(ctx context.Context, req *api.HostListRequest) (s
 			return "", nil, listErr
 		}
 		for _, row := range page.List {
-			values := []any{row.Name, row.IP, hostExcelNullableInt64(row.Port), hostExcelNullableInt64(row.VNCPort), row.HostType, row.GroupID, hostExcelNullableInt64(row.CredentialID), hostExcelNullableInt64(row.VNCCredentialID), row.CloudAccountID, row.Tags, row.Description}
+			values := []any{row.Name, hostTypeExcelLabel(row.HostType), hostExcelOptionLabel(options.groups, row.GroupID), hostExcelOptionLabel(options.cloudAccounts, row.CloudAccountID), row.IP, hostExcelNullableInt64(row.Port), hostExcelOptionPointerLabel(options.credentials, row.CredentialID), hostExcelNullableInt64(row.VNCPort), hostExcelOptionPointerLabel(options.vncCredentials, row.VNCCredentialID), row.Tags, row.Description}
 			cell, _ := excelize.CoordinatesToCellName(1, rowIndex)
 			if err = book.SetSheetRow(sheet, cell, &values); err != nil {
 				return "", nil, err
@@ -51,11 +63,15 @@ func (b *AssetBiz) ExportHosts(ctx context.Context, req *api.HostListRequest) (s
 }
 
 func (b *AssetBiz) HostImportTemplate() (string, []byte, error) {
-	book, _, err := newHostExcelBook()
+	book, sheet, err := newHostExcelBook()
 	if err != nil {
 		return "", nil, err
 	}
 	defer func() { _ = book.Close() }()
+	example := []any{"示例主机", "自建主机", "", "", "192.168.1.10", "", "", "", "", "生产,核心", "示例数据，导入前请删除或修改"}
+	if err = book.SetSheetRow(sheet, "A2", &example); err != nil {
+		return "", nil, err
+	}
 	return hostExcelResponse(book, "主机导入模板.xlsx")
 }
 
@@ -81,17 +97,21 @@ func (b *AssetBiz) ImportHosts(ctx context.Context, fileName string, content io.
 	for index, value := range rows[0] {
 		header[strings.TrimSpace(value)] = index
 	}
-	for _, name := range hostExcelHeaders[:7] {
+	for _, name := range hostExcelHeaders {
 		if _, ok := header[name]; !ok {
 			return nil, fmt.Errorf("缺少列：%s", name)
 		}
 	}
 	requests := make([]*api.HostRequest, 0, len(rows)-1)
+	options, err := b.hostExcelOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for index, values := range rows[1:] {
-		if hostExcelCell(values, header["主机名称"]) == "" && hostExcelCell(values, header["IP"]) == "" {
+		if hostExcelCell(values, header["主机名称"]) == "" && hostExcelCell(values, header["主机地址"]) == "" {
 			continue
 		}
-		request, parseErr := hostRequestFromExcel(values, header)
+		request, parseErr := hostRequestFromExcel(values, header, options)
 		if parseErr != nil {
 			return nil, fmt.Errorf("第 %d 行：%w", index+2, parseErr)
 		}
@@ -339,10 +359,65 @@ func newHostExcelBook() (*excelize.File, string, error) {
 		return nil, "", err
 	}
 	_ = book.SetPanes(sheet, &excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
-	for column, width := range map[string]float64{"A": 24, "B": 20, "C": 12, "D": 12, "E": 14, "F": 16, "G": 14, "H": 14, "I": 14, "J": 24, "K": 36} {
+	for column, width := range map[string]float64{"A": 24, "B": 14, "C": 22, "D": 22, "E": 22, "F": 12, "G": 22, "H": 12, "I": 22, "J": 24, "K": 36} {
 		_ = book.SetColWidth(sheet, column, column, width)
 	}
 	return book, sheet, nil
+}
+
+func (b *AssetBiz) hostExcelOptions(ctx context.Context) (*hostExcelOptions, error) {
+	groups, _, err := b.repo.ListGroups(ctx, b.db, &define.AssetGroupListCond{Page: 1, Limit: api.MaxLimit})
+	if err != nil {
+		return nil, err
+	}
+	credentials, _, err := b.repo.ListCredentials(ctx, b.db, &define.CredentialListCond{PageCond: define.PageCond{Page: 1, Limit: api.MaxLimit}})
+	if err != nil {
+		return nil, err
+	}
+	accounts, _, err := b.repo.ListCloudAccounts(ctx, b.db, &define.CloudAccountListCond{PageCond: define.PageCond{Page: 1, Limit: api.MaxLimit}})
+	if err != nil {
+		return nil, err
+	}
+	options := &hostExcelOptions{groups: map[string]int64{}, credentials: map[string]int64{}, vncCredentials: map[string]int64{}, cloudAccounts: map[string]int64{}}
+	for _, row := range groups {
+		options.groups[row.Name] = row.ID
+	}
+	for _, row := range credentials {
+		options.credentials[row.Name] = row.ID
+		if row.CredentialType == "password" {
+			options.vncCredentials[row.Name] = row.ID
+		}
+	}
+	for _, row := range accounts {
+		options.cloudAccounts[row.Name] = row.ID
+	}
+	return options, nil
+}
+
+func hostExcelOptionLabel(values map[string]int64, id int64) string {
+	if id == 0 {
+		return ""
+	}
+	for label, value := range values {
+		if value == id {
+			return label
+		}
+	}
+	return ""
+}
+
+func hostExcelOptionPointerLabel(values map[string]int64, id *int64) string {
+	if id == nil {
+		return ""
+	}
+	return hostExcelOptionLabel(values, *id)
+}
+
+func hostTypeExcelLabel(value string) string {
+	if value == "cloud" {
+		return "云主机"
+	}
+	return "自建主机"
 }
 
 func hostExcelResponse(book *excelize.File, fileName string) (string, []byte, error) {
@@ -353,10 +428,10 @@ func hostExcelResponse(book *excelize.File, fileName string) (string, []byte, er
 	return fileName, bytes.Clone(buffer.Bytes()), nil
 }
 
-func hostRequestFromExcel(row []string, header map[string]int) (*api.HostRequest, error) {
-	name, ip := hostExcelCell(row, header["主机名称"]), hostExcelCell(row, header["IP"])
+func hostRequestFromExcel(row []string, header map[string]int, options *hostExcelOptions) (*api.HostRequest, error) {
+	name, ip := hostExcelCell(row, header["主机名称"]), hostExcelCell(row, header["主机地址"])
 	if name == "" || ip == "" {
-		return nil, errors.New("主机名称和 IP 不能为空")
+		return nil, errors.New("主机名称和主机地址不能为空")
 	}
 	port := int64(0)
 	var err error
@@ -373,36 +448,53 @@ func hostRequestFromExcel(row []string, header map[string]int) (*api.HostRequest
 			return nil, errors.New("VNC端口必须是 1-65535 的整数")
 		}
 	}
-	credentialID, err := hostExcelOptionalID(row, header, "SSH凭据ID")
+	credentialID, err := hostExcelSelectedID(row, header, "SSH凭据", options.credentials)
 	if err != nil {
-		return nil, errors.New("SSH凭据ID必须是非负整数")
+		return nil, err
 	}
-	vncCredentialID, err := hostExcelOptionalID(row, header, "VNC凭据ID")
+	vncCredentialID, err := hostExcelSelectedID(row, header, "VNC凭据", options.vncCredentials)
 	if err != nil {
-		return nil, errors.New("VNC凭据ID必须是非负整数")
+		return nil, err
 	}
 	if (port > 0) != (credentialID > 0) {
-		return nil, errors.New("SSH端口和 SSH凭据ID 必须同时填写或同时留空")
+		return nil, errors.New("SSH端口和 SSH凭据必须同时填写或同时留空")
 	}
 	if (vncPort > 0) != (vncCredentialID > 0) {
-		return nil, errors.New("VNC端口和 VNC凭据ID 必须同时填写或同时留空")
+		return nil, errors.New("VNC端口和 VNC凭据必须同时填写或同时留空")
 	}
-	groupID, err := hostExcelOptionalID(row, header, "所属分组ID")
+	groupID, err := hostExcelSelectedID(row, header, "所属分组", options.groups)
 	if err != nil {
-		return nil, errors.New("所属分组ID必须是非负整数")
+		return nil, err
 	}
-	cloudAccountID, err := hostExcelOptionalID(row, header, "云账号ID")
+	cloudAccountID, err := hostExcelSelectedID(row, header, "云账号", options.cloudAccounts)
 	if err != nil {
-		return nil, errors.New("云账号ID必须是非负整数")
+		return nil, err
 	}
 	hostType := hostExcelValue(row, header, "主机类型")
-	if hostType == "" {
+	switch hostType {
+	case "自建主机":
 		hostType = "self"
+	case "云主机":
+		hostType = "cloud"
+	default:
+		return nil, errors.New("请选择有效的主机类型")
 	}
-	if hostType != "self" && hostType != "cloud" {
-		return nil, errors.New("主机类型必须是 self 或 cloud")
+	if hostType == "self" && cloudAccountID > 0 {
+		return nil, errors.New("自建主机不能选择云账号")
 	}
 	return &api.HostRequest{Name: name, IP: ip, Port: optionalHostInt64(port), VNCPort: optionalHostInt64(vncPort), HostType: hostType, GroupID: groupID, CredentialID: optionalHostInt64(credentialID), VNCCredentialID: optionalHostInt64(vncCredentialID), CloudAccountID: cloudAccountID, Tags: hostExcelValue(row, header, "标签"), Description: hostExcelValue(row, header, "备注")}, nil
+}
+
+func hostExcelSelectedID(row []string, header map[string]int, name string, options map[string]int64) (int64, error) {
+	value := hostExcelValue(row, header, name)
+	if value == "" {
+		return 0, nil
+	}
+	id, ok := options[value]
+	if !ok {
+		return 0, fmt.Errorf("%s不存在，请从下拉列表选择", name)
+	}
+	return id, nil
 }
 
 func optionalHostInt64(value int64) *int64 {
