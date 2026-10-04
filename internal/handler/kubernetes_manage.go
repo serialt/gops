@@ -52,6 +52,21 @@ func (h *KubernetesHandler) GetKubernetesStorageResourceSupport(c *gin.Context) 
 	response.OK(c, data)
 }
 
+// GetKubernetesConfigResourceSupport POST /api/v1/kubernetes/config/resources/support 查询配置类 Kubernetes 资源详情。
+func (h *KubernetesHandler) GetKubernetesConfigResourceSupport(c *gin.Context) {
+	req := new(api.KubernetesConfigResourceSupportRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid configuration resource query")
+		return
+	}
+	data, err := h.biz.ConfigResourceSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
 // GetKubernetesResourceTemplate POST /api/v1/kubernetes/resources/template 获取 Kubernetes 资源创建模板。
 func (h *KubernetesHandler) GetKubernetesResourceTemplate(c *gin.Context) {
 	r := new(api.KubernetesObjectRequest)

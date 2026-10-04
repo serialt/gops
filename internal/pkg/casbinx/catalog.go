@@ -97,6 +97,7 @@ func Catalog() []Permission {
 		{Group: "Kubernetes", Name: "查看集群统计", Path: "/api/v1/kubernetes/stats/get", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看集群事件", Path: "/api/v1/kubernetes/events/list", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看存储资源详情", Path: "/api/v1/kubernetes/storage/resources/support", Method: "POST"},
+		{Group: "Kubernetes", Name: "查看配置资源详情", Path: "/api/v1/kubernetes/config/resources/support", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看 NetworkPolicy 详情", Path: "/api/v1/kubernetes/networkpolicies/support", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看 Endpoints 详情", Path: "/api/v1/kubernetes/endpoints/support", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看 Ingress 详情", Path: "/api/v1/kubernetes/ingresses/support", Method: "POST"},
