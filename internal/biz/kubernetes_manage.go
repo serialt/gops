@@ -12,6 +12,7 @@ import (
 	"gops/internal/data/model"
 	"gops/internal/pkg/utils"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -956,16 +957,46 @@ func (b *KubernetesBiz) DeleteObject(r *api.KubernetesObjectRequest) error {
 		return err
 	}
 	resource := client.Resource(spec.gvr)
+	deleteOptions := metav1.DeleteOptions{}
+	if r.Force {
+		gracePeriod := int64(0)
+		deleteOptions.GracePeriodSeconds = &gracePeriod
+	}
 	var deleteErr error
 	if spec.namespaced {
-		deleteErr = resource.Namespace(r.Namespace).Delete(context.Background(), r.Name, metav1.DeleteOptions{})
+		deleteErr = resource.Namespace(r.Namespace).Delete(context.Background(), r.Name, deleteOptions)
 	} else {
-		deleteErr = resource.Delete(context.Background(), r.Name, metav1.DeleteOptions{})
+		deleteErr = resource.Delete(context.Background(), r.Name, deleteOptions)
 	}
 	if deleteErr == nil {
 		b.invalidateWorkloadCache(r.Resource)
 	}
-	return deleteErr
+	if deleteErr != nil || !r.Wait {
+		return deleteErr
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(300 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var getErr error
+		if spec.namespaced {
+			_, getErr = resource.Namespace(r.Namespace).Get(ctx, r.Name, metav1.GetOptions{})
+		} else {
+			_, getErr = resource.Get(ctx, r.Name, metav1.GetOptions{})
+		}
+		if apierrors.IsNotFound(getErr) {
+			return nil
+		}
+		if getErr != nil {
+			return getErr
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for resource deletion")
+		case <-ticker.C:
+		}
+	}
 }
 
 func (b *KubernetesBiz) UpdateObjectLabels(r *api.KubernetesLabelUpdateRequest) (*api.KubernetesObjectResponse, error) {

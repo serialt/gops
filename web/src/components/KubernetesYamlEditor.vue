@@ -7,7 +7,7 @@ import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
     getWorker: () => new EditorWorker(),
   }
 
-const props = withDefaults(defineProps<{ modelValue: string; minHeight?: string }>(), { minHeight: '500px' })
+const props = withDefaults(defineProps<{ modelValue: string; minHeight?: string; readonly?: boolean }>(), { minHeight: '500px', readonly: false })
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const host = ref<HTMLDivElement>()
 let editor: monaco.editor.IStandaloneCodeEditor | undefined
@@ -64,6 +64,8 @@ onMounted(() => {
     fontSize: 12,
     lineHeight: 20,
     contextmenu: true,
+    readOnly: props.readonly,
+    domReadOnly: props.readonly,
     smoothScrolling: true,
     scrollbar: { verticalScrollbarSize: 4, horizontalScrollbarSize: 4, useShadows: false },
   })
@@ -74,6 +76,8 @@ watch(() => props.modelValue, (value) => {
   if (!model || value === model.getValue()) return
   model.setValue(value)
 })
+
+watch(() => props.readonly, value => editor?.updateOptions({ readOnly: value, domReadOnly: value }))
 
 onBeforeUnmount(() => {
   contentSubscription?.dispose()

@@ -10,6 +10,8 @@ type KubernetesObjectRequest struct {
 	ServiceType string `json:"service_type"`
 	YAML        string `json:"yaml"`
 	Refresh     bool   `json:"refresh"`
+	Wait        bool   `json:"wait"`
+	Force       bool   `json:"force"`
 }
 
 type KubernetesObjectResponse struct {

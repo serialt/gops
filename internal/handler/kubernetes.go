@@ -6,6 +6,9 @@ import (
 	"gops/internal/biz"
 	"gops/internal/data/api"
 	"gops/internal/pkg/response"
+	"mime"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -33,6 +36,12 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/pods/list", h.ListPods)
 	g.POST("/kubernetes/stats/get", h.GetClusterStats)
 	g.POST("/kubernetes/events/list", h.ListEvents)
+	g.POST("/kubernetes/deployments/support", h.GetDeploymentSupport)
+	g.POST("/kubernetes/pods/logs", h.GetPodLogs)
+	g.POST("/kubernetes/pods/exec", h.ExecPodCommand)
+	g.POST("/kubernetes/pods/files/list", h.ListPodFiles)
+	g.POST("/kubernetes/pods/files/upload", h.UploadPodFile)
+	g.POST("/kubernetes/pods/files/download", h.DownloadPodFile)
 	g.POST("/kubernetes/resources/list", h.ListKubernetesObjects)
 	g.POST("/kubernetes/resources/get", h.GetKubernetesObject)
 	g.POST("/kubernetes/resources/template", h.GetKubernetesResourceTemplate)
@@ -45,6 +54,109 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/inspections/history", h.ListInspectionHistory)
 	g.POST("/kubernetes/inspections/delete", h.DeleteInspection)
 
+}
+
+// GetDeploymentSupport POST /api/v1/kubernetes/deployments/support 查询 Deployment 关联资源、历史和监控指标。
+func (h *KubernetesHandler) GetDeploymentSupport(c *gin.Context) {
+	req := new(api.KubernetesDeploymentDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid deployment query")
+		return
+	}
+	data, err := h.biz.DeploymentSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetPodLogs POST /api/v1/kubernetes/pods/logs 查询 Pod 容器日志。
+func (h *KubernetesHandler) GetPodLogs(c *gin.Context) {
+	req := new(api.KubernetesPodLogRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid pod log query")
+		return
+	}
+	data, err := h.biz.PodLogs(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// ExecPodCommand POST /api/v1/kubernetes/pods/exec 在 Pod 容器中执行命令。
+func (h *KubernetesHandler) ExecPodCommand(c *gin.Context) {
+	req := new(api.KubernetesPodExecRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid pod exec request")
+		return
+	}
+	data, err := h.biz.PodExec(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// ListPodFiles POST /api/v1/kubernetes/pods/files/list 查询 Pod 容器目录。
+func (h *KubernetesHandler) ListPodFiles(c *gin.Context) {
+	req := new(api.KubernetesPodFileRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid pod file query")
+		return
+	}
+	data, err := h.biz.PodFiles(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// UploadPodFile POST /api/v1/kubernetes/pods/files/upload 上传文件到 Pod 容器。
+func (h *KubernetesHandler) UploadPodFile(c *gin.Context) {
+	clusterID, err := strconv.ParseInt(c.PostForm("cluster_id"), 10, 64)
+	if err != nil {
+		response.Error(c, 400, "invalid cluster id")
+		return
+	}
+	req := &api.KubernetesPodFileRequest{ClusterID: clusterID, Namespace: c.PostForm("namespace"), Pod: c.PostForm("pod"), Container: c.PostForm("container"), Path: c.PostForm("path")}
+	header, err := c.FormFile("file")
+	if err != nil {
+		response.Error(c, 400, "file is required")
+		return
+	}
+	file, err := header.Open()
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	defer file.Close()
+	if err = h.biz.UploadPodFile(req, header.Filename, file); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// DownloadPodFile POST /api/v1/kubernetes/pods/files/download 下载 Pod 容器文件。
+func (h *KubernetesHandler) DownloadPodFile(c *gin.Context) {
+	req := new(api.KubernetesPodFileRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid pod file query")
+		return
+	}
+	data, err := h.biz.DownloadPodFile(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	filename := filepath.Base(req.Path)
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
+	c.Data(200, "application/octet-stream", data)
 }
 
 func (h *KubernetesHandler) StartStatusScheduler(ctx context.Context, interval time.Duration) {

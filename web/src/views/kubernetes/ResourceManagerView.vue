@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
@@ -21,7 +21,7 @@ const groups: Record<string, { label: string; resources: Option[] }> = {
   workloads: { label: '工作负载管理', resources: [['deployments', 'Deployment'], ['statefulsets', 'StatefulSet'], ['daemonsets', 'DaemonSet'], ['jobs', 'Job'], ['cronjobs', 'CronJob'], ['pods', 'Pod']].map(([key, label]) => ({ key, label, namespaced: true })) },
   namespaces: { label: '命名空间', resources: [{ key: 'namespaces', label: 'Namespace', namespaced: false }] },
 }
-const route = useRoute(), group = computed(() => groups[String(route.meta.kubernetesGroup)] || groups.network), isWorkload = computed(() => String(route.meta.kubernetesGroup) === 'workloads'), isNetwork = computed(() => String(route.meta.kubernetesGroup) === 'network'), isConfig = computed(() => String(route.meta.kubernetesGroup) === 'config'), isStorage = computed(() => String(route.meta.kubernetesGroup) === 'storage'), isAccess = computed(() => String(route.meta.kubernetesGroup) === 'access')
+const route = useRoute(), router = useRouter(), group = computed(() => groups[String(route.meta.kubernetesGroup)] || groups.network), isWorkload = computed(() => String(route.meta.kubernetesGroup) === 'workloads'), isNetwork = computed(() => String(route.meta.kubernetesGroup) === 'network'), isConfig = computed(() => String(route.meta.kubernetesGroup) === 'config'), isStorage = computed(() => String(route.meta.kubernetesGroup) === 'storage'), isAccess = computed(() => String(route.meta.kubernetesGroup) === 'access')
 const clusters = shallowRef<KubernetesCluster[]>([]), namespaces = shallowRef<KubernetesNamespace[]>([]), clusterID = ref(0), resource = ref(''), namespace = ref(''), keyword = ref(''), rows = shallowRef<KubernetesObject[]>([]), selected = shallowRef<KubernetesObject[]>([]), page = ref(1), pageSize = ref(20), total = ref(0)
 const refreshing = ref(false)
 const yamlDialog = ref(false), yaml = ref('')
@@ -83,7 +83,7 @@ async function loadStats(forceRefresh = false) { if (!clusterID.value) return; i
 async function load(forceRefresh = false) { await Promise.all([loadRows(forceRefresh), loadStats(forceRefresh)]) }
 async function refresh() { refreshing.value = true; try { await loadNamespaces(); await load(true); ElMessage.success('刷新成功') } finally { refreshing.value = false } }
 function resourceRenderer(p: any) { const row = p.data as KubernetesObject, wrap = document.createElement('div'); wrap.className = 'resource-values'; if (!row.requests?.cpu && !row.requests?.memory && !row.limits?.cpu && !row.limits?.memory) { wrap.textContent = '-'; return wrap } const add = (label: string, request?: string, limit?: string) => { const line = document.createElement('div'); line.className = 'resource-line'; line.innerHTML = `<span class="resource-label">${label}:</span><code>${request || '-'}</code><i>/</i><code>${limit || '-'}</code>`; wrap.append(line) }; add('CPU', row.requests?.cpu, row.limits?.cpu); add('Mem', row.requests?.memory, row.limits?.memory); return wrap }
-function nameRenderer(p: any) { const e = document.createElement('div'); e.className = 'workload-name-cell'; e.innerHTML = `<span><b>${p.value}</b><small>${p.data.namespace || '-'}</small></span>`; return e }
+function nameRenderer(p: any) { const detailRoute = resource.value === 'deployments' ? 'kubernetes-deployment-detail' : resource.value === 'pods' ? 'kubernetes-pod-detail' : ''; const e = document.createElement('div'); e.className = `workload-name-cell${detailRoute ? ' is-link' : ''}`; e.innerHTML = `<span><b>${p.value}</b><small>${p.data.namespace || '-'}</small></span>`; if (detailRoute) e.onclick = () => router.push({ name: detailRoute, query: { cluster_id: clusterID.value, namespace: p.data.namespace, name: p.data.name } }); return e }
 function labelRenderer(p: any) { const labels = p.value || {}, wrap = document.createElement('span'), icon = document.createElement('span'), badge = document.createElement('span'); wrap.className = 'namespace-label-count'; icon.className = 'namespace-label-icon'; icon.textContent = '◇'; badge.className = 'namespace-label-badge'; badge.textContent = String(Object.keys(labels).length); wrap.title = '查看资源标签'; wrap.onclick = () => { selectedLabelResource.value = p.data; labelDialog.value = true }; wrap.append(icon, badge); return wrap }
 function shortImage(image: string) { return image.split('/').pop() || image }
 function imageRenderer(p: any) { const images = (p.value || []) as string[], wrap = document.createElement('div'); wrap.className = 'workload-images'; if (!images.length) { wrap.textContent = '-'; return wrap } images.forEach(image => { const tag = document.createElement('span'); tag.className = 'workload-image'; tag.textContent = shortImage(image); tag.onclick = async (event) => { event.stopPropagation(); await navigator.clipboard.writeText(image); ElMessage.success('完整镜像地址已复制') }; wrap.append(tag) }); return wrap }
@@ -369,6 +369,11 @@ loadClusters().then(async () => { await loadNamespaces(); initialized = true; aw
   height: 100%;
   overflow: hidden;
   text-align: left
+}
+
+.page :deep(.workload-name-cell.is-link b) {
+  color: var(--primary);
+  cursor: pointer
 }
 
 .page :deep(.workload-name-cell span) {
