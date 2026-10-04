@@ -26,6 +26,7 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/clusters/sync", h.SyncClusters)
 	g.POST("/kubernetes/clusters/config", h.GetClusterConfig)
 	g.POST("/kubernetes/nodes/list", h.ListNodes)
+	g.POST("/kubernetes/nodes/support", h.GetNodeSupport)
 	g.POST("/kubernetes/nodes/update", h.UpdateNode)
 	g.POST("/kubernetes/nodes/delete", h.DeleteNode)
 	g.POST("/kubernetes/nodes/drain", h.DrainNode)
@@ -103,6 +104,21 @@ func (h *KubernetesHandler) GetIngressSupport(c *gin.Context) {
 		return
 	}
 	data, err := h.biz.IngressSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetNodeSupport POST /api/v1/kubernetes/nodes/support 查询 Node 详情、所在 Pods 和事件。
+func (h *KubernetesHandler) GetNodeSupport(c *gin.Context) {
+	req := new(api.KubernetesNodeDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid node query")
+		return
+	}
+	data, err := h.biz.NodeSupport(req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return

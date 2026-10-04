@@ -84,6 +84,7 @@ func Catalog() []Permission {
 		{Group: "Kubernetes", Name: "同步集群状态", Path: "/api/v1/kubernetes/clusters/sync", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看集群凭证", Path: "/api/v1/kubernetes/clusters/config", Method: "POST"},
 		{Group: "Kubernetes", Name: "查看节点", Path: "/api/v1/kubernetes/nodes/list", Method: "POST"},
+		{Group: "Kubernetes", Name: "查看 Node 详情", Path: "/api/v1/kubernetes/nodes/support", Method: "POST"},
 		{Group: "Kubernetes", Name: "编辑节点", Path: "/api/v1/kubernetes/nodes/update", Method: "POST"},
 		{Group: "Kubernetes", Name: "删除节点", Path: "/api/v1/kubernetes/nodes/delete", Method: "POST"},
 		{Group: "Kubernetes", Name: "排空节点", Path: "/api/v1/kubernetes/nodes/drain", Method: "POST"},

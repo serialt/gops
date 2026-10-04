@@ -30,6 +30,7 @@ type KubernetesNamespaceUpdateRequest struct {
 }
 type KubernetesNodeResponse struct {
 	Name             string            `json:"name"`
+	UID              string            `json:"uid"`
 	Status           string            `json:"status"`
 	Roles            string            `json:"roles"`
 	Age              string            `json:"age"`
