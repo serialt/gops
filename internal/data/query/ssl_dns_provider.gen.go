@@ -38,6 +38,7 @@ func newSslDNSProvider(db *gorm.DB, opts ...gen.DOOption) sslDNSProvider {
 	_sslDNSProvider.CreatedAt = field.NewTime(tableName, "created_at")
 	_sslDNSProvider.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_sslDNSProvider.DeletedAt = field.NewField(tableName, "deleted_at")
+	_sslDNSProvider.Phone = field.NewString(tableName, "phone")
 
 	_sslDNSProvider.fillFieldMap()
 
@@ -59,6 +60,7 @@ type sslDNSProvider struct {
 	CreatedAt  field.Time
 	UpdatedAt  field.Time
 	DeletedAt  field.Field
+	Phone      field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -86,6 +88,7 @@ func (s *sslDNSProvider) updateTableName(table string) *sslDNSProvider {
 	s.CreatedAt = field.NewTime(table, "created_at")
 	s.UpdatedAt = field.NewTime(table, "updated_at")
 	s.DeletedAt = field.NewField(table, "deleted_at")
+	s.Phone = field.NewString(table, "phone")
 
 	s.fillFieldMap()
 
@@ -114,7 +117,7 @@ func (s *sslDNSProvider) GetFieldByName(fieldName string) (field.OrderExpr, bool
 }
 
 func (s *sslDNSProvider) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 11)
+	s.fieldMap = make(map[string]field.Expr, 12)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["name"] = s.Name
 	s.fieldMap["provider"] = s.Provider
@@ -126,6 +129,7 @@ func (s *sslDNSProvider) fillFieldMap() {
 	s.fieldMap["created_at"] = s.CreatedAt
 	s.fieldMap["updated_at"] = s.UpdatedAt
 	s.fieldMap["deleted_at"] = s.DeletedAt
+	s.fieldMap["phone"] = s.Phone
 }
 
 func (s sslDNSProvider) clone(db *gorm.DB) sslDNSProvider {

@@ -10,5 +10,6 @@ var ProviderSet = wire.NewSet(
 	NewAssetRepo,
 	NewTaskRepo,
 	NewDashboardRepo,
+	NewSSLCertRepo,
 	rbac.NewRbacRepo,
 )

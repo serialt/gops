@@ -44,6 +44,15 @@ func newSslCertificate(db *gorm.DB, opts ...gen.DOOption) sslCertificate {
 	_sslCertificate.CreatedAt = field.NewTime(tableName, "created_at")
 	_sslCertificate.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_sslCertificate.DeletedAt = field.NewField(tableName, "deleted_at")
+	_sslCertificate.AcmeEmail = field.NewString(tableName, "acme_email")
+	_sslCertificate.KeyAlgorithm = field.NewString(tableName, "key_algorithm")
+	_sslCertificate.CloudAccountID = field.NewInt64(tableName, "cloud_account_id")
+	_sslCertificate.CloudCertID = field.NewString(tableName, "cloud_cert_id")
+	_sslCertificate.CertChain = field.NewString(tableName, "cert_chain")
+	_sslCertificate.NotBefore = field.NewTime(tableName, "not_before")
+	_sslCertificate.Fingerprint = field.NewString(tableName, "fingerprint")
+	_sslCertificate.DNSProviderID = field.NewInt64(tableName, "dns_provider_id")
+	_sslCertificate.LastRenewAt = field.NewTime(tableName, "last_renew_at")
 
 	_sslCertificate.fillFieldMap()
 
@@ -71,6 +80,15 @@ type sslCertificate struct {
 	CreatedAt       field.Time
 	UpdatedAt       field.Time
 	DeletedAt       field.Field
+	AcmeEmail       field.String
+	KeyAlgorithm    field.String
+	CloudAccountID  field.Int64
+	CloudCertID     field.String
+	CertChain       field.String
+	NotBefore       field.Time
+	Fingerprint     field.String
+	DNSProviderID   field.Int64
+	LastRenewAt     field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -104,6 +122,15 @@ func (s *sslCertificate) updateTableName(table string) *sslCertificate {
 	s.CreatedAt = field.NewTime(table, "created_at")
 	s.UpdatedAt = field.NewTime(table, "updated_at")
 	s.DeletedAt = field.NewField(table, "deleted_at")
+	s.AcmeEmail = field.NewString(table, "acme_email")
+	s.KeyAlgorithm = field.NewString(table, "key_algorithm")
+	s.CloudAccountID = field.NewInt64(table, "cloud_account_id")
+	s.CloudCertID = field.NewString(table, "cloud_cert_id")
+	s.CertChain = field.NewString(table, "cert_chain")
+	s.NotBefore = field.NewTime(table, "not_before")
+	s.Fingerprint = field.NewString(table, "fingerprint")
+	s.DNSProviderID = field.NewInt64(table, "dns_provider_id")
+	s.LastRenewAt = field.NewTime(table, "last_renew_at")
 
 	s.fillFieldMap()
 
@@ -132,7 +159,7 @@ func (s *sslCertificate) GetFieldByName(fieldName string) (field.OrderExpr, bool
 }
 
 func (s *sslCertificate) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 17)
+	s.fieldMap = make(map[string]field.Expr, 26)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["name"] = s.Name
 	s.fieldMap["domain"] = s.Domain
@@ -150,6 +177,15 @@ func (s *sslCertificate) fillFieldMap() {
 	s.fieldMap["created_at"] = s.CreatedAt
 	s.fieldMap["updated_at"] = s.UpdatedAt
 	s.fieldMap["deleted_at"] = s.DeletedAt
+	s.fieldMap["acme_email"] = s.AcmeEmail
+	s.fieldMap["key_algorithm"] = s.KeyAlgorithm
+	s.fieldMap["cloud_account_id"] = s.CloudAccountID
+	s.fieldMap["cloud_cert_id"] = s.CloudCertID
+	s.fieldMap["cert_chain"] = s.CertChain
+	s.fieldMap["not_before"] = s.NotBefore
+	s.fieldMap["fingerprint"] = s.Fingerprint
+	s.fieldMap["dns_provider_id"] = s.DNSProviderID
+	s.fieldMap["last_renew_at"] = s.LastRenewAt
 }
 
 func (s sslCertificate) clone(db *gorm.DB) sslCertificate {

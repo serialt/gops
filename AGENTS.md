@@ -98,5 +98,7 @@
 - 默认根组织必须由可重复安全的 Goose 数据迁移确保存在：`code` 为 `root`，初始 `name` 为“默认组织”。根组织名称允许修改，但 `code` 不可修改、根组织不可删除。
 - 所有用户必须关联默认根组织。Goose 数据迁移为历史用户补齐根组织关联；用户新增或编辑时，始终保留根组织关联，并可额外关联其他组织。
 - SQL 迁移统一放在 `docs/sql/`，须使用 SQLite 兼容语法，例如 `INTEGER PRIMARY KEY AUTOINCREMENT`、`DATETIME` 和 `ON CONFLICT`；不得使用 PostgreSQL 专有语法或 `COMMENT ON`。
+- 含 `deleted_at` 软删除字段的表如需唯一约束，唯一性必须只作用于未删除记录：使用 `CREATE UNIQUE INDEX ... ON <table>(<unique_columns>) WHERE deleted_at IS NULL`。禁止在字段或表定义中使用不含软删除条件的 `UNIQUE`，否则软删除后无法重新创建相同业务值；也禁止使用 `UNIQUE(<unique_columns>, deleted_at)`，因为 SQLite 允许唯一索引中存在多个 `NULL`，无法保证未删除记录唯一。修改既有唯一约束时必须提供 Goose 迁移，移除旧的表级/字段级唯一约束后再建立部分唯一索引。
+- 业务代码禁止调用 GORM 或 GORM Gen 的 `Unscoped()`；查询、更新和删除均必须遵循默认软删除作用域。`internal/data/query/*.gen.go` 中由 GORM Gen 自动生成但未被调用的 `Unscoped()` 方法定义不做手工修改，业务代码不得引用。新增业务数据必须始终插入新记录，不得清空历史记录的 `deleted_at`，不得复用软删除记录的 ID，也不得通过 `Save`、`FirstOrCreate`、`Assign` 或 upsert 将“新增”隐式实现为恢复。软删除历史必须保持不变；是否恢复记录应由独立、明确授权的恢复接口处理。创建前的重复校验只查询未删除记录，最终仍由带 `WHERE deleted_at IS NULL` 的部分唯一索引保证并发唯一性。
 - Goose 保留用于 SQLite 的数据修复与数据补丁；数据修复迁移必须可重复安全执行，并提供对应的 Down 操作或明确的不可逆说明。
 - 修改模型或迁移后，执行 SQLite 迁移并运行 `go test ./...`。

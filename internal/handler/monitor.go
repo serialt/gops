@@ -26,6 +26,7 @@ func (h *MonitorHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/monitor/domains/history", h.ListCheckHistory)
 	g.POST("/monitor/domains/stats", h.DomainStats)
 	g.POST("/monitor/domains/export", h.ExportDomains)
+	g.POST("/monitor/domains/template", h.DomainImportTemplate)
 	g.POST("/monitor/domains/import", h.ImportDomains)
 
 	g.POST("/monitor/channels/list", h.ListChannels)
@@ -142,6 +143,16 @@ func (h *MonitorHandler) ExportDomains(c *gin.Context) {
 		}
 		writeExcelAttachment(c, fileName, content)
 	}
+}
+
+// DomainImportTemplate POST /api/v1/monitor/domains/template 下载域名监控导入模板。
+func (h *MonitorHandler) DomainImportTemplate(c *gin.Context) {
+	fileName, content, err := h.biz.DomainImportTemplate()
+	if err != nil {
+		monitorResult(c, nil, err)
+		return
+	}
+	writeExcelAttachment(c, fileName, content)
 }
 
 // ImportDomains POST /api/v1/monitor/domains/import 导入域名监控 Excel。

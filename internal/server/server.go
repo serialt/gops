@@ -30,7 +30,6 @@ var ProviderSet = wire.NewSet(
 	handler.NewAssetHandler,
 	handler.NewSystemConfigHandler,
 	handler.NewMonitorHandler,
-	handler.NewNginxHandler,
 	handler.NewTaskHandler,
 	handler.NewSSLCertHandler,
 	handler.NewKubernetesHandler,
@@ -66,7 +65,6 @@ func NewGinEngine(
 	assetHandler *handler.AssetHandler,
 	systemConfigHandler *handler.SystemConfigHandler,
 	monitorHandler *handler.MonitorHandler,
-	nginxHandler *handler.NginxHandler,
 	taskHandler *handler.TaskHandler,
 	sslCertHandler *handler.SSLCertHandler,
 	kubernetesHandler *handler.KubernetesHandler,
@@ -120,7 +118,6 @@ func NewGinEngine(
 	assetHandler.RegisterRoutes(authorized)
 	systemConfigHandler.RegisterRoutes(authorized)
 	monitorHandler.RegisterRoutes(authorized)
-	nginxHandler.RegisterRoutes(authorized)
 	taskHandler.RegisterRoutes(authorized)
 	sslCertHandler.RegisterRoutes(authorized)
 	kubernetesHandler.RegisterRoutes(authorized)

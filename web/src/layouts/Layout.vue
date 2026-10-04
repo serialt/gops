@@ -51,9 +51,6 @@ const monitorMenus = computed(() => [
   { path: '/monitor/receivers', title: '告警接收人', icon: User, permission: 'POST /api/v1/monitor/receivers/list' },
   { path: '/monitor/logs', title: '告警日志', icon: DataAnalysis, permission: 'POST /api/v1/monitor/logs/list' },
 ].filter((item) => auth.hasPermission(item.permission)))
-const nginxMenus = computed(() => [
-  { path: '/nginx/sources', title: 'Nginx 数据源', icon: Monitor, permission: 'POST /api/v1/nginx/sources/list' },
-].filter((item) => auth.hasPermission(item.permission)))
 const taskMenus = computed(() => [
   { path: '/tasks/execute', title: '执行任务', icon: Monitor, permission: 'POST /api/v1/tasks/execute' },
   { path: '/tasks/templates', title: '模板管理', icon: FolderOpened, permission: 'POST /api/v1/tasks/templates/list' },
@@ -62,7 +59,12 @@ const taskMenus = computed(() => [
 ].filter((item) => auth.hasPermission(item.permission)))
 const kubernetesMenus = computed(() => [{ path: '/kubernetes/clusters', title: '集群管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/clusters/list' }, { path: '/kubernetes/nodes', title: '节点管理', icon: Monitor, permission: 'POST /api/v1/kubernetes/nodes/list' }, { path: '/kubernetes/namespaces', title: '命名空间', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/namespaces/list' }, { path: '/kubernetes/workloads', title: '工作负载', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/network', title: '网络管理', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/config', title: '配置管理', icon: FolderOpened, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/storage', title: '存储管理', icon: OfficeBuilding, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/access', title: '访问控制', icon: Monitor, permission: 'POST /api/v1/kubernetes/resources/list' }, { path: '/kubernetes/inspections', title: '集群巡检', icon: DataAnalysis, permission: 'POST /api/v1/kubernetes/inspections/history' }].filter((item) => auth.hasPermission(item.permission)))
 const auditMenus = computed(() => [{ path: '/audit/operations', title: '操作日志', icon: DataAnalysis, permission: 'POST /api/v1/audit/operation-logs/list' }, { path: '/audit/logins', title: '登录日志', icon: User, permission: 'POST /api/v1/audit/login-logs/list' }].filter(item => auth.hasPermission(item.permission)))
-const sslCertMenus = computed(() => [{ path: '/ssl-cert/certificates', title: '证书管理', icon: Key, permission: 'POST /api/v1/ssl-cert/certificates/list' }].filter(item => auth.hasPermission(item.permission)))
+const sslCertMenus = computed(() => [
+  { path: '/ssl-cert/certificates', title: '证书管理', icon: Key, permission: 'POST /api/v1/ssl-cert/certificates/list' },
+  { path: '/ssl-cert/dns-providers', title: 'DNS 配置', icon: Setting, permission: 'POST /api/v1/ssl-cert/dns-providers/list' },
+  { path: '/ssl-cert/deploy-configs', title: '部署配置', icon: OfficeBuilding, permission: 'POST /api/v1/ssl-cert/deploy-configs/list' },
+  { path: '/ssl-cert/tasks', title: '任务记录', icon: DataAnalysis, permission: 'POST /api/v1/ssl-cert/tasks/list' },
+].filter(item => auth.hasPermission(item.permission)))
 
 type PageTab = { path: string; title: string }
 type MenuSuggestion = { value: string; path: string }
@@ -76,7 +78,6 @@ const menuItems = computed(() => [
   ...systemMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...assetMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...monitorMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
-  ...nginxMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...taskMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...kubernetesMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...auditMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
@@ -375,12 +376,6 @@ function toggleCollapse() {
                 <component :is="item.icon" />
               </el-icon><span>{{ item.title }}</span></el-menu-item>
           </el-sub-menu>
-          <el-sub-menu v-if="nginxMenus.length" index="nginx"><template #title><el-icon>
-                <Monitor />
-              </el-icon><span>Nginx 管理</span></template><el-menu-item v-for="item in nginxMenus" :key="item.path"
-              :index="item.path"><el-icon>
-                <component :is="item.icon" />
-              </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
           <el-sub-menu v-if="taskMenus.length" index="tasks"><template #title><el-icon>
                 <Monitor />
               </el-icon><span>任务中心</span></template><el-menu-item v-for="item in taskMenus" :key="item.path"
@@ -442,12 +437,6 @@ function toggleCollapse() {
                   <component :is="item.icon" />
                 </el-icon><span>{{ item.title }}</span></el-menu-item>
             </el-sub-menu>
-            <el-sub-menu v-if="nginxMenus.length" index="nginx"><template #title><el-icon>
-                  <Monitor />
-                </el-icon><span>Nginx 管理</span></template><el-menu-item v-for="item in nginxMenus" :key="item.path"
-                :index="item.path"><el-icon>
-                  <component :is="item.icon" />
-                </el-icon><span>{{ item.title }}</span></el-menu-item></el-sub-menu>
             <el-sub-menu v-if="taskMenus.length" index="tasks"><template #title><el-icon>
                   <Monitor />
                 </el-icon><span>任务中心</span></template><el-menu-item v-for="item in taskMenus" :key="item.path"

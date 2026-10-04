@@ -25,6 +25,7 @@ export const checkMonitorDomain = (id: number) => request.post<MonitorDomain>('/
 export const listMonitorCheckHistory = (domain_id: number, page = 1, limit = 30) => request.post<PageResponse<MonitorCheckHistory>>('/monitor/domains/history', { domain_id, page, limit })
 export const monitorStats = (filters: MonitorDomainFilters = {}) => request.post<MonitorStats>('/monitor/domains/stats', filters)
 export const exportMonitorDomains = (keyword = '', ids: number[] = []) => request.post<Blob>('/monitor/domains/export', { keyword, status: '', ids }, { responseType: 'blob' })
+export const downloadMonitorDomainImportTemplate = () => request.post<Blob>('/monitor/domains/template', {}, { responseType: 'blob' })
 export const importMonitorDomains = (file: File) => { const form = new FormData(); form.append('file', file, file.name); return request.post<MonitorDomainExcelImportResult>('/monitor/domains/import', form) }
 export const listMonitorChannels = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<MonitorAlertChannel>>('/monitor/channels/list', { keyword, page, limit })
 export const saveMonitorChannel = (data: MonitorAlertChannelRequest) => request.post<MonitorAlertChannel>('/monitor/channels/save', data)

@@ -2,9 +2,9 @@
 import { nextTick, onMounted, ref, watch } from 'vue'
 import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, Filter, Upload } from '@element-plus/icons-vue'
+import { ArrowDown, Download, Filter, Upload } from '@element-plus/icons-vue'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomainOption, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorFilterOption, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
+import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, downloadMonitorDomainImportTemplate, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomainOption, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorFilterOption, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
 import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
 const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const domainFilter = ref(''); const portFilter = ref<number>(); const statusFilter = ref(''); const sslStatusFilter = ref(''); const rootCAFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const lastCheckRange = ref<[string, string] | null>(null); const filtersExpanded = ref(false); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
@@ -105,7 +105,14 @@ async function exportExcel() {
         ElMessage.success(`已导出 ${rows.value.length} 条监控配置`)
     } finally { exporting.value = false }
 }
-function chooseImport() { importInput.value?.click() }
+async function chooseImport(command: string) {
+    if (command === 'template') {
+        const response = await downloadMonitorDomainImportTemplate()
+        downloadAttachment(response.data, response.headers['content-disposition'], '域名监控导入模板.xlsx')
+        return
+    }
+    if (command === 'import') importInput.value?.click()
+}
 async function importExcel(event: Event) {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0]
@@ -174,12 +181,14 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
                 </el-button>
             </div>
             <div class="toolbar-actions"><el-dropdown
-                    v-if="auth.hasPermission('POST /api/v1/monitor/domains/export') || auth.hasPermission('POST /api/v1/monitor/domains/import')"
+                    v-if="auth.hasPermission('POST /api/v1/monitor/domains/export') || auth.hasPermission('POST /api/v1/monitor/domains/import') || auth.hasPermission('POST /api/v1/monitor/domains/template')"
                     split-button class="excel-transfer-dropdown" popper-class="excel-transfer-popper"
                     :loading="exporting || importing"
                     :disabled="!auth.hasPermission('POST /api/v1/monitor/domains/export')" @click="exportExcel"
                     @command="chooseImport">导出 Excel
                     <template #dropdown><el-dropdown-menu><el-dropdown-item
+                                v-if="auth.hasPermission('POST /api/v1/monitor/domains/template')" command="template"
+                                :icon="Download">下载 Excel 导入模板</el-dropdown-item><el-dropdown-item
                                 v-if="auth.hasPermission('POST /api/v1/monitor/domains/import')" command="import"
                                 :icon="Upload">从 Excel 导入</el-dropdown-item></el-dropdown-menu></template>
                 </el-dropdown><input ref="importInput" type="file" accept=".xlsx" hidden

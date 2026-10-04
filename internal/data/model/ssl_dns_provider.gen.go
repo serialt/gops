@@ -25,6 +25,7 @@ type SslDNSProvider struct {
 	CreatedAt  time.Time      `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt  time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	Phone      string         `gorm:"column:phone;not null;default:''" json:"phone"`
 }
 
 // TableName SslDNSProvider's table name

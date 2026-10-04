@@ -19,6 +19,51 @@ import (
 
 var monitorExcelHeaders = []string{"域名", "端口", "请求客户端", "检测间隔(秒)", "抖动(秒)", "HTTPS", "证书校验", "启用告警", "响应阈值(毫秒)", "SSL到期提醒(天)", "状态", "响应时间(毫秒)", "SSL有效", "SSL到期时间", "根CA", "最后检测", "最近错误"}
 
+func (b *MonitorBiz) DomainImportTemplate() (string, []byte, error) {
+	book := excelize.NewFile()
+	defer func() { _ = book.Close() }()
+	sheet := "域名监控导入模板"
+	if err := book.SetSheetName("Sheet1", sheet); err != nil {
+		return "", nil, err
+	}
+	headers := monitorExcelHeaders[:10]
+	headerStyle, err := book.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Color: "FFFFFF"}, Fill: excelize.Fill{Type: "pattern", Color: []string{"4F63E9"}, Pattern: 1}, Alignment: &excelize.Alignment{Vertical: "center"}})
+	if err != nil {
+		return "", nil, err
+	}
+	if err = book.SetSheetRow(sheet, "A1", &headers); err != nil {
+		return "", nil, err
+	}
+	if err = book.SetCellStyle(sheet, "A1", "J1", headerStyle); err != nil {
+		return "", nil, err
+	}
+	example := []any{"example.com", 443, "chrome", 300, 30, "是", "是", "否", 3000, 30}
+	if err = book.SetSheetRow(sheet, "A2", &example); err != nil {
+		return "", nil, err
+	}
+	requestClientValidation := excelize.NewDataValidation(false)
+	requestClientValidation.SetSqref("C2:C1000")
+	if err = requestClientValidation.SetDropList([]string{"chrome", "firefox", "edge", "safari", "curl"}); err != nil {
+		return "", nil, err
+	}
+	if err = book.AddDataValidation(sheet, requestClientValidation); err != nil {
+		return "", nil, err
+	}
+	if err = book.SetPanes(sheet, &excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"}); err != nil {
+		return "", nil, err
+	}
+	for column, width := range map[string]float64{"A": 28, "B": 10, "C": 18, "D": 15, "E": 12, "F": 10, "G": 12, "H": 12, "I": 18, "J": 18} {
+		if err = book.SetColWidth(sheet, column, column, width); err != nil {
+			return "", nil, err
+		}
+	}
+	buffer, err := book.WriteToBuffer()
+	if err != nil {
+		return "", nil, err
+	}
+	return "域名监控导入模板.xlsx", bytes.Clone(buffer.Bytes()), nil
+}
+
 func (b *MonitorBiz) ExportDomains(req *api.MonitorDomainListRequest) (string, []byte, error) {
 	pageRequest := *req
 	pageRequest.Page, pageRequest.Limit = 1, api.MaxLimit

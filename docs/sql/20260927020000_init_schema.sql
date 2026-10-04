@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS role (
   id INTEGER PRIMARY KEY AUTOINCREMENT, /* 角色ID */
-  code VARCHAR(64) NOT NULL UNIQUE, /* 角色编码 */
+  code VARCHAR(64) NOT NULL, /* 角色编码 */
   name VARCHAR(64) NOT NULL, /* 角色名称 */
   description VARCHAR(255), /* 角色说明 */
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
@@ -14,7 +14,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_role_code_active ON role(code) WHERE delet
 
 CREATE TABLE IF NOT EXISTS user (
   id INTEGER PRIMARY KEY AUTOINCREMENT, /* 用户ID */
-  username VARCHAR(64) NOT NULL UNIQUE, /* 用户名 */
+  username VARCHAR(64) NOT NULL, /* 用户名 */
   password_hash VARCHAR(255) NOT NULL, /* 密码哈希 */
   nickname VARCHAR(64) NOT NULL, /* 用户昵称 */
   email VARCHAR(255) NOT NULL DEFAULT '', /* 邮箱地址 */
@@ -210,10 +210,10 @@ CREATE TABLE IF NOT EXISTS monitor_domain (
   last_error TEXT NOT NULL DEFAULT '', /* 最近错误 */
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
-  deleted_at DATETIME, /* 删除时间 */
-  UNIQUE(domain, port)
+  deleted_at DATETIME /* 删除时间 */
 );
 CREATE INDEX IF NOT EXISTS idx_monitor_domain_next_check ON monitor_domain(next_check);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_monitor_domain_address_active ON monitor_domain(domain, port) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS monitor_check_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT, /* 检查记录ID */
@@ -273,44 +273,10 @@ CREATE TABLE IF NOT EXISTS monitor_alert_log (
 );
 CREATE INDEX IF NOT EXISTS idx_monitor_alert_log_sent_at ON monitor_alert_log(sent_at DESC);
 
-CREATE TABLE IF NOT EXISTS nginx_source (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, /* Nginx数据源ID */
-  name TEXT NOT NULL, /* 数据源名称 */
-  source_type TEXT NOT NULL DEFAULT 'host', /* 数据源类型 */
-  description TEXT NOT NULL DEFAULT '', /* 数据源说明 */
-  status INTEGER NOT NULL DEFAULT 1, /* 是否启用 */
-  host_id INTEGER NOT NULL DEFAULT 0, /* 主机ID */
-  log_path TEXT NOT NULL DEFAULT '', /* 日志文件路径 */
-  log_format TEXT NOT NULL DEFAULT 'combined', /* 日志格式 */
-  collect_interval INTEGER NOT NULL DEFAULT 60, /* 采集间隔秒数 */
-  retention_days INTEGER NOT NULL DEFAULT 30, /* 日志保留天数 */
-  last_collect_at DATETIME, /* 最近采集时间 */
-  last_collect_logs INTEGER NOT NULL DEFAULT 0, /* 最近采集条数 */
-  last_error TEXT NOT NULL DEFAULT '', /* 最近错误 */
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 创建时间 */
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
-  deleted_at DATETIME /* 删除时间 */
-);
-
-CREATE TABLE IF NOT EXISTS nginx_access_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, /* 访问日志ID */
-  source_id INTEGER NOT NULL, /* Nginx数据源ID */
-  occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 请求发生时间 */
-  remote_addr TEXT NOT NULL DEFAULT '', /* 客户端地址 */
-  method TEXT NOT NULL DEFAULT '', /* 请求方法 */
-  uri TEXT NOT NULL DEFAULT '', /* 请求地址 */
-  status INTEGER NOT NULL DEFAULT 0, /* HTTP状态码 */
-  body_bytes_sent INTEGER NOT NULL DEFAULT 0, /* 响应字节数 */
-  request_time REAL NOT NULL DEFAULT 0, /* 请求耗时 */
-  user_agent TEXT NOT NULL DEFAULT '', /* 客户端标识 */
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP /* 创建时间 */
-);
-CREATE INDEX IF NOT EXISTS idx_nginx_access_log_source_time ON nginx_access_log(source_id, occurred_at DESC);
-
 CREATE TABLE IF NOT EXISTS task_template (
   id INTEGER PRIMARY KEY AUTOINCREMENT, /* 任务模板ID */
   name TEXT NOT NULL, /* 模板名称 */
-  code TEXT NOT NULL UNIQUE, /* 模板编码 */
+  code TEXT NOT NULL, /* 模板编码 */
   description TEXT NOT NULL DEFAULT '', /* 模板说明 */
   content TEXT NOT NULL DEFAULT '', /* 模板内容 */
   variables TEXT NOT NULL DEFAULT '', /* 模板变量JSON */
@@ -324,6 +290,7 @@ CREATE TABLE IF NOT EXISTS task_template (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
   deleted_at DATETIME /* 删除时间 */
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_template_code_active ON task_template(code) WHERE deleted_at IS NULL;
 CREATE TABLE IF NOT EXISTS task_job (
   id INTEGER PRIMARY KEY AUTOINCREMENT, /* 任务ID */
   name TEXT NOT NULL, /* 任务名称 */
@@ -524,8 +491,6 @@ DROP TABLE IF EXISTS ssl_certificate;
 DROP TABLE IF EXISTS task_execution;
 DROP TABLE IF EXISTS task_job;
 DROP TABLE IF EXISTS task_template;
-DROP TABLE IF EXISTS nginx_access_log;
-DROP TABLE IF EXISTS nginx_source;
 DROP TABLE IF EXISTS monitor_alert_log;
 DROP TABLE IF EXISTS monitor_alert_receiver;
 DROP TABLE IF EXISTS monitor_alert_channel;

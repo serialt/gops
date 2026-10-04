@@ -34,13 +34,13 @@ var (
 	MonitorAlertReceiver        *monitorAlertReceiver
 	MonitorCheckHistory         *monitorCheckHistory
 	MonitorDomain               *monitorDomain
-	NginxAccessLog              *nginxAccessLog
-	NginxSource                 *nginxSource
 	Organization                *organization
 	OrganizationUser            *organizationUser
 	Role                        *role
 	SslCertificate              *sslCertificate
 	SslDNSProvider              *sslDNSProvider
+	SslDeployConfig             *sslDeployConfig
+	SslTask                     *sslTask
 	SystemConfig                *systemConfig
 	TaskExecution               *taskExecution
 	TaskJob                     *taskJob
@@ -70,13 +70,13 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	MonitorAlertReceiver = &Q.MonitorAlertReceiver
 	MonitorCheckHistory = &Q.MonitorCheckHistory
 	MonitorDomain = &Q.MonitorDomain
-	NginxAccessLog = &Q.NginxAccessLog
-	NginxSource = &Q.NginxSource
 	Organization = &Q.Organization
 	OrganizationUser = &Q.OrganizationUser
 	Role = &Q.Role
 	SslCertificate = &Q.SslCertificate
 	SslDNSProvider = &Q.SslDNSProvider
+	SslDeployConfig = &Q.SslDeployConfig
+	SslTask = &Q.SslTask
 	SystemConfig = &Q.SystemConfig
 	TaskExecution = &Q.TaskExecution
 	TaskJob = &Q.TaskJob
@@ -107,13 +107,13 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		MonitorAlertReceiver:        newMonitorAlertReceiver(db, opts...),
 		MonitorCheckHistory:         newMonitorCheckHistory(db, opts...),
 		MonitorDomain:               newMonitorDomain(db, opts...),
-		NginxAccessLog:              newNginxAccessLog(db, opts...),
-		NginxSource:                 newNginxSource(db, opts...),
 		Organization:                newOrganization(db, opts...),
 		OrganizationUser:            newOrganizationUser(db, opts...),
 		Role:                        newRole(db, opts...),
 		SslCertificate:              newSslCertificate(db, opts...),
 		SslDNSProvider:              newSslDNSProvider(db, opts...),
+		SslDeployConfig:             newSslDeployConfig(db, opts...),
+		SslTask:                     newSslTask(db, opts...),
 		SystemConfig:                newSystemConfig(db, opts...),
 		TaskExecution:               newTaskExecution(db, opts...),
 		TaskJob:                     newTaskJob(db, opts...),
@@ -145,13 +145,13 @@ type Query struct {
 	MonitorAlertReceiver        monitorAlertReceiver
 	MonitorCheckHistory         monitorCheckHistory
 	MonitorDomain               monitorDomain
-	NginxAccessLog              nginxAccessLog
-	NginxSource                 nginxSource
 	Organization                organization
 	OrganizationUser            organizationUser
 	Role                        role
 	SslCertificate              sslCertificate
 	SslDNSProvider              sslDNSProvider
+	SslDeployConfig             sslDeployConfig
+	SslTask                     sslTask
 	SystemConfig                systemConfig
 	TaskExecution               taskExecution
 	TaskJob                     taskJob
@@ -186,13 +186,13 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		MonitorAlertReceiver:        q.MonitorAlertReceiver.clone(db),
 		MonitorCheckHistory:         q.MonitorCheckHistory.clone(db),
 		MonitorDomain:               q.MonitorDomain.clone(db),
-		NginxAccessLog:              q.NginxAccessLog.clone(db),
-		NginxSource:                 q.NginxSource.clone(db),
 		Organization:                q.Organization.clone(db),
 		OrganizationUser:            q.OrganizationUser.clone(db),
 		Role:                        q.Role.clone(db),
 		SslCertificate:              q.SslCertificate.clone(db),
 		SslDNSProvider:              q.SslDNSProvider.clone(db),
+		SslDeployConfig:             q.SslDeployConfig.clone(db),
+		SslTask:                     q.SslTask.clone(db),
 		SystemConfig:                q.SystemConfig.clone(db),
 		TaskExecution:               q.TaskExecution.clone(db),
 		TaskJob:                     q.TaskJob.clone(db),
@@ -232,13 +232,13 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		MonitorAlertReceiver:        q.MonitorAlertReceiver.replaceDB(db),
 		MonitorCheckHistory:         q.MonitorCheckHistory.replaceDB(db),
 		MonitorDomain:               q.MonitorDomain.replaceDB(db),
-		NginxAccessLog:              q.NginxAccessLog.replaceDB(db),
-		NginxSource:                 q.NginxSource.replaceDB(db),
 		Organization:                q.Organization.replaceDB(db),
 		OrganizationUser:            q.OrganizationUser.replaceDB(db),
 		Role:                        q.Role.replaceDB(db),
 		SslCertificate:              q.SslCertificate.replaceDB(db),
 		SslDNSProvider:              q.SslDNSProvider.replaceDB(db),
+		SslDeployConfig:             q.SslDeployConfig.replaceDB(db),
+		SslTask:                     q.SslTask.replaceDB(db),
 		SystemConfig:                q.SystemConfig.replaceDB(db),
 		TaskExecution:               q.TaskExecution.replaceDB(db),
 		TaskJob:                     q.TaskJob.replaceDB(db),
@@ -268,13 +268,13 @@ type queryCtx struct {
 	MonitorAlertReceiver        *monitorAlertReceiverDo
 	MonitorCheckHistory         *monitorCheckHistoryDo
 	MonitorDomain               *monitorDomainDo
-	NginxAccessLog              *nginxAccessLogDo
-	NginxSource                 *nginxSourceDo
 	Organization                *organizationDo
 	OrganizationUser            *organizationUserDo
 	Role                        *roleDo
 	SslCertificate              *sslCertificateDo
 	SslDNSProvider              *sslDNSProviderDo
+	SslDeployConfig             *sslDeployConfigDo
+	SslTask                     *sslTaskDo
 	SystemConfig                *systemConfigDo
 	TaskExecution               *taskExecutionDo
 	TaskJob                     *taskJobDo
@@ -304,13 +304,13 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		MonitorAlertReceiver:        q.MonitorAlertReceiver.WithContext(ctx),
 		MonitorCheckHistory:         q.MonitorCheckHistory.WithContext(ctx),
 		MonitorDomain:               q.MonitorDomain.WithContext(ctx),
-		NginxAccessLog:              q.NginxAccessLog.WithContext(ctx),
-		NginxSource:                 q.NginxSource.WithContext(ctx),
 		Organization:                q.Organization.WithContext(ctx),
 		OrganizationUser:            q.OrganizationUser.WithContext(ctx),
 		Role:                        q.Role.WithContext(ctx),
 		SslCertificate:              q.SslCertificate.WithContext(ctx),
 		SslDNSProvider:              q.SslDNSProvider.WithContext(ctx),
+		SslDeployConfig:             q.SslDeployConfig.WithContext(ctx),
+		SslTask:                     q.SslTask.WithContext(ctx),
 		SystemConfig:                q.SystemConfig.WithContext(ctx),
 		TaskExecution:               q.TaskExecution.WithContext(ctx),
 		TaskJob:                     q.TaskJob.WithContext(ctx),

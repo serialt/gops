@@ -1,6 +1,7 @@
 package biz
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,13 @@ func TestNormalizeMonitorDomainAddress(t *testing.T) {
 				t.Fatalf("normalizeMonitorDomainAddress() = %+v, want %+v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestMonitorErrorTranslatesDuplicateDomain(t *testing.T) {
+	err := errors.New("constraint failed: UNIQUE constraint failed: monitor_domain.domain, monitor_domain.port (2067)")
+	if got := monitorError(err); got == nil || got.Error() != "该域名和端口的监控已存在，请勿重复添加" {
+		t.Fatalf("monitorError() = %v", got)
 	}
 }
 

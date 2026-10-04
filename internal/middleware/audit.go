@@ -75,7 +75,7 @@ func operationInfo(path string) (module, action, description string) {
 
 	moduleNames := map[string]string{
 		"users": "用户管理", "roles": "角色管理", "organizations": "组织管理",
-		"assets": "资产管理", "monitor": "监控管理", "nginx": "Nginx 管理",
+		"assets": "资产管理", "monitor": "监控管理",
 		"tasks": "任务中心", "kubernetes": "容器管理", "audit": "审计管理",
 		"ssl-cert": "SSL 证书", "system-config": "系统配置", "dashboard": "仪表盘",
 	}

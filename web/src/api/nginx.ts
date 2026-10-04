@@ -1,7 +1,0 @@
-import request from '@/utils/request'
-import type { PageResponse } from '@/utils/request'
-export interface NginxSource { id: number; name: string; source_type: string; description: string; status: number; host_id: number; log_path: string; log_format: string; collect_interval: number; retention_days: number; last_collect_logs: number; last_error: string; updated_at: string }
-export interface NginxSourceRequest { id?: number; name: string; source_type: string; description: string; status: number; host_id: number; log_path: string; log_format: string; collect_interval: number; retention_days: number }
-export interface NginxOverview { sources: number; active_sources: number; requests: number; error_requests: number }
-export interface NginxAccessLog { id: number; source_id: number; occurred_at: string; remote_addr: string; method: string; uri: string; status: number; body_bytes_sent: number; request_time: number; user_agent: string }
-export const listNginxSources = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<NginxSource>>('/nginx/sources/list', { keyword, page, limit }); export const saveNginxSource = (data: NginxSourceRequest) => request.post<NginxSource>('/nginx/sources/save', data); export const deleteNginxSource = (id: number) => request.post<null>('/nginx/sources/delete', { id }); export const nginxOverview = () => request.post<NginxOverview>('/nginx/overview', {}); export const listNginxLogs = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<NginxAccessLog>>('/nginx/logs/list', { keyword, page, limit })

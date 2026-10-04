@@ -164,8 +164,16 @@ func (b *MonitorBiz) CreateDomain(req *api.MonitorDomainRequest) (*api.MonitorDo
 	normalized := normalizeMonitorDomainRequest(req)
 	row := b.domainModel(normalized)
 	row.NextCheck = time.Now()
+	var existing model.MonitorDomain
+	err := b.db.Where("domain = ? AND port = ?", row.Domain, row.Port).First(&existing).Error
+	if err == nil {
+		return nil, errors.New("该域名和端口的监控已存在，请勿重复添加")
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, monitorError(err)
+	}
 	if err := b.db.Create(&row).Error; err != nil {
-		return nil, err
+		return nil, monitorError(err)
 	}
 	return monitorDomainResponse(row), nil
 }
@@ -178,7 +186,7 @@ func (b *MonitorBiz) UpdateDomain(req *api.MonitorDomainRequest) (*api.MonitorDo
 	updated := b.domainModel(normalized)
 	updated.ID, updated.CreatedAt = row.ID, row.CreatedAt
 	if err := b.db.Save(&updated).Error; err != nil {
-		return nil, err
+		return nil, monitorError(err)
 	}
 	return monitorDomainResponse(updated), nil
 }
@@ -773,6 +781,10 @@ func monitorDomainResponse(r model.MonitorDomain) *api.MonitorDomainResponse {
 func monitorError(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrNotFound
+	}
+	message := strings.ToLower(err.Error())
+	if strings.Contains(message, "unique constraint failed") && strings.Contains(message, "monitor_domain.domain") && strings.Contains(message, "monitor_domain.port") {
+		return errors.New("该域名和端口的监控已存在，请勿重复添加")
 	}
 	return err
 }

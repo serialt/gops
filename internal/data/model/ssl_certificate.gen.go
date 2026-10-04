@@ -31,6 +31,15 @@ type SslCertificate struct {
 	CreatedAt       time.Time      `gorm:"column:created_at;not null" json:"created_at"`
 	UpdatedAt       time.Time      `gorm:"column:updated_at;not null" json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	AcmeEmail       string         `gorm:"column:acme_email;not null;default:''" json:"acme_email"`
+	KeyAlgorithm    string         `gorm:"column:key_algorithm;not null;default:'rsa2048'" json:"key_algorithm"`
+	CloudAccountID  int64          `gorm:"column:cloud_account_id" json:"cloud_account_id"`
+	CloudCertID     string         `gorm:"column:cloud_cert_id;not null;default:''" json:"cloud_cert_id"`
+	CertChain       string         `gorm:"column:cert_chain;not null;default:''" json:"cert_chain"`
+	NotBefore       time.Time      `gorm:"column:not_before" json:"not_before"`
+	Fingerprint     string         `gorm:"column:fingerprint;not null;default:''" json:"fingerprint"`
+	DNSProviderID   int64          `gorm:"column:dns_provider_id" json:"dns_provider_id"`
+	LastRenewAt     time.Time      `gorm:"column:last_renew_at" json:"last_renew_at"`
 }
 
 // TableName SslCertificate's table name

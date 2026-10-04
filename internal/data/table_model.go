@@ -26,13 +26,13 @@ func gopsTable(g *gen.Generator) {
 	monitorAlertChannel := g.GenerateModel("monitor_alert_channel")
 	monitorAlertReceiver := g.GenerateModel("monitor_alert_receiver")
 	monitorAlertLog := g.GenerateModel("monitor_alert_log")
-	nginxSource := g.GenerateModel("nginx_source")
-	nginxAccessLog := g.GenerateModel("nginx_access_log")
 	taskTemplate := g.GenerateModel("task_template")
 	taskJob := g.GenerateModel("task_job")
 	taskExecution := g.GenerateModel("task_execution")
 	sslCertificate := g.GenerateModel("ssl_certificate")
 	sslDNSProvider := g.GenerateModel("ssl_dns_provider")
+	sslDeployConfig := g.GenerateModel("ssl_deploy_config")
+	sslTask := g.GenerateModel("ssl_task")
 	auditOperationLog := g.GenerateModel("audit_operation_log")
 	auditLoginLog := g.GenerateModel("audit_login_log")
 	kubernetesCluster := g.GenerateModel("kubernetes_cluster")
@@ -73,13 +73,13 @@ func gopsTable(g *gen.Generator) {
 		monitorAlertChannel,
 		monitorAlertReceiver,
 		monitorAlertLog,
-		nginxSource,
-		nginxAccessLog,
 		taskTemplate,
 		taskJob,
 		taskExecution,
 		sslCertificate,
 		sslDNSProvider,
+		sslDeployConfig,
+		sslTask,
 		auditOperationLog, auditLoginLog,
 		kubernetesCluster,
 		kubernetesTerminalSession,

@@ -154,6 +154,20 @@ async function saveNodeTaints() {
     nodeTaintSaving.value = true
     try { await updateKubernetesNode({ cluster_id: clusterID.value, name: selectedTaintNode.value.name, labels: selectedTaintNode.value.labels || {}, schedulable: selectedTaintNode.value.schedulable, taints: nodeTaintRows.value }); ElMessage.success('节点污点更新成功'); nodeTaintDialog.value = false; await load() } finally { nodeTaintSaving.value = false }
 }
+function formatMemoryCapacity(value: unknown) {
+    const source = String(value || '').trim()
+    const match = source.match(/^([\d.]+)\s*(Ki|Mi|Gi|Ti|K|M|G|T)?$/i)
+    if (!match) return source || '-'
+    const amount = Number(match[1])
+    if (!Number.isFinite(amount)) return source || '-'
+    const factors: Record<string, number> = { KI: 1024, MI: 1024 ** 2, GI: 1024 ** 3, TI: 1024 ** 4, K: 1000, M: 1000 ** 2, G: 1000 ** 3, T: 1000 ** 4 }
+    const bytes = amount * (factors[(match[2] || '').toUpperCase()] || 1)
+    if (bytes <= 0) return '0 B'
+    const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+    const converted = bytes / 1024 ** index
+    return `${converted >= 10 || index === 0 ? converted.toFixed(0) : converted.toFixed(1)} ${units[index]}`
+}
 const indexColumn: ColDef = { headerName: '序号', valueGetter: (p: any) => p.node.rowIndex + 1, width: 70 }
 const columns = computed<ColDef[]>(() => kind.value === 'nodes' ? [indexColumn, { field: 'name', headerName: '节点名称' }, { field: 'status', headerName: '状态', cellRenderer: (p: any) => { const ready = isNodeReady(p.value); const tag = document.createElement('span'); tag.className = `node-status ${ready ? 'is-ready' : 'is-abnormal'}`; tag.textContent = ready ? '正常' : p.value; return tag } }, { field: 'roles', headerName: '角色', cellRenderer: (p: any) => { const tag = document.createElement('span'); tag.className = 'node-role'; tag.textContent = p.value || 'Worker'; return tag } }, { field: 'internalIP', headerName: '内部 IP' }, { field: 'cpuCapacity', headerName: 'CPU' }, { field: 'memoryCapacity', headerName: '内存' }, { field: 'podCapacity', headerName: 'Pod 容量' }, { field: 'version', headerName: 'Kubelet 版本' }, { field: 'age', headerName: '存活时间' }, { headerName: '操作', width: 150, minWidth: 150, maxWidth: 150, pinned: 'right', sortable: false, cellRenderer: (p: any) => { const button = document.createElement('button'); button.className = 'grid-action-btn edit'; button.textContent = '编辑'; button.onclick = () => editNode(p.data); return button } }] : kind.value === 'namespaces' ? [indexColumn, { field: 'name', headerName: '命名空间', minWidth: 180 }, { field: 'status', headerName: '状态' }, { field: 'age', headerName: '运行时间' }, { field: 'created_at', headerName: '创建时间', minWidth: 160 }] : [indexColumn, { field: 'namespace', headerName: '命名空间' }, { field: 'name', headerName: '工作负载名称', minWidth: 180 }, { field: 'kind', headerName: '类型' }, { field: 'ready', headerName: '就绪副本' }, { field: 'status', headerName: '状态' }, { field: 'created_at', headerName: '创建时间', minWidth: 160 }])
 const adaptiveColumns = computed<ColDef[]>(() => {
@@ -164,7 +178,7 @@ const adaptiveColumns = computed<ColDef[]>(() => {
         const labelColumn: ColDef = { field: 'labels', headerName: '标签', cellRenderer: (p: any) => { const labels = p.value || {}; const wrap = document.createElement('span'); const icon = document.createElement('span'); const badge = document.createElement('span'); wrap.className = 'namespace-label-count'; icon.className = 'namespace-label-icon'; icon.textContent = '◇'; badge.className = 'namespace-label-badge'; badge.textContent = String(Object.keys(labels).length); wrap.title = '查看节点标签'; wrap.onclick = () => openNodeLabels(p.data); wrap.append(icon, badge); return wrap } }
         const schedulableColumn: ColDef = { field: 'schedulable', headerName: '调度', cellRenderer: (p: any) => { const tag = document.createElement('span'); tag.className = `node-status ${p.value ? 'is-ready' : 'is-abnormal'}`; tag.textContent = p.value ? '可调度' : '不可调度'; return tag } }
         const taintColumn: ColDef = { field: 'taints', headerName: '污点', cellRenderer: (p: any) => { const taints = p.value || []; const wrap = document.createElement('span'); const icon = document.createElement('span'); const badge = document.createElement('span'); wrap.className = 'namespace-label-count taint-count'; icon.className = 'namespace-label-icon'; icon.textContent = '◇'; badge.className = 'namespace-label-badge'; badge.textContent = String(taints.length); wrap.title = '查看节点污点'; wrap.onclick = () => openNodeTaints(p.data); wrap.append(icon, badge); return wrap } }
-        source.splice(0, source.length, field('name') ? source[0] : indexColumn, field('name'), field('status'), field('roles'), field('internalIP'), { ...field('version'), headerName: 'Kubelet 版本' }, labelColumn, field('cpuCapacity'), field('memoryCapacity'), { ...field('podCapacity'), headerName: 'Pod 数量', valueGetter: (p: any) => `${Number(p.data?.podCount || 0)} / ${Number(p.data?.podCapacity || 0)}` }, schedulableColumn, taintColumn, { ...field('age'), headerName: '运行时间' }, action)
+        source.splice(0, source.length, field('name') ? source[0] : indexColumn, field('name'), field('status'), field('roles'), field('internalIP'), { ...field('version'), headerName: 'Kubelet 版本' }, labelColumn, field('cpuCapacity'), { ...field('memoryCapacity'), valueFormatter: p => formatMemoryCapacity(p.value) }, { ...field('podCapacity'), headerName: 'Pod 数量', valueGetter: (p: any) => `${Number(p.data?.podCount || 0)} / ${Number(p.data?.podCapacity || 0)}` }, schedulableColumn, taintColumn, { ...field('age'), headerName: '运行时间' }, action)
     }
     if (kind.value === 'namespaces') {
         const statusIndex = source.findIndex(column => column.field === 'status')
