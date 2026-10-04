@@ -36,6 +36,7 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/pods/list", h.ListPods)
 	g.POST("/kubernetes/stats/get", h.GetClusterStats)
 	g.POST("/kubernetes/events/list", h.ListEvents)
+	g.POST("/kubernetes/services/support", h.GetServiceSupport)
 	g.POST("/kubernetes/deployments/support", h.GetDeploymentSupport)
 	g.POST("/kubernetes/statefulsets/support", h.GetStatefulSetSupport)
 	g.POST("/kubernetes/daemonsets/support", h.GetDaemonSetSupport)
@@ -58,6 +59,21 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/inspections/history", h.ListInspectionHistory)
 	g.POST("/kubernetes/inspections/delete", h.DeleteInspection)
 
+}
+
+// GetServiceSupport POST /api/v1/kubernetes/services/support 查询 Service 关联的 Pod、Endpoints、EndpointSlices 和事件。
+func (h *KubernetesHandler) GetServiceSupport(c *gin.Context) {
+	req := new(api.KubernetesServiceDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid service query")
+		return
+	}
+	data, err := h.biz.ServiceSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
 }
 
 // GetJobSupport POST /api/v1/kubernetes/jobs/support 查询 Job 关联的 Pod 和事件。
