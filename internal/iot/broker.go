@@ -121,6 +121,10 @@ func (h *brokerHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool 
 	if write {
 		operation = "publish"
 	}
+	return aclAllows(rules, operation, topic)
+}
+
+func aclAllows(rules []*model.IotAclRule, operation, topic string) bool {
 	allowed := false
 	for _, rule := range rules {
 		if rule.Operation != operation {
