@@ -44,6 +44,11 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/services/support", h.GetServiceSupport)
 	g.POST("/kubernetes/configmaps/support", h.GetConfigMapSupport)
 	g.POST("/kubernetes/secrets/support", h.GetSecretSupport)
+	g.POST("/kubernetes/serviceaccounts/support", h.GetServiceAccountSupport)
+	g.POST("/kubernetes/roles/support", h.GetRoleSupport)
+	g.POST("/kubernetes/rolebindings/support", h.GetRoleBindingSupport)
+	g.POST("/kubernetes/clusterroles/support", h.GetClusterRoleSupport)
+	g.POST("/kubernetes/clusterrolebindings/support", h.GetClusterRoleBindingSupport)
 	g.POST("/kubernetes/deployments/support", h.GetDeploymentSupport)
 	g.POST("/kubernetes/statefulsets/support", h.GetStatefulSetSupport)
 	g.POST("/kubernetes/daemonsets/support", h.GetDaemonSetSupport)
@@ -181,6 +186,81 @@ func (h *KubernetesHandler) GetSecretSupport(c *gin.Context) {
 		return
 	}
 	data, err := h.biz.SecretSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetServiceAccountSupport POST /api/v1/kubernetes/serviceaccounts/support 查询 ServiceAccount 元信息、关联资源和事件。
+func (h *KubernetesHandler) GetServiceAccountSupport(c *gin.Context) {
+	req := new(api.KubernetesServiceAccountDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid service account query")
+		return
+	}
+	data, err := h.biz.ServiceAccountSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetRoleSupport POST /api/v1/kubernetes/roles/support 查询 Role 规则、RoleBinding 和事件。
+func (h *KubernetesHandler) GetRoleSupport(c *gin.Context) {
+	req := new(api.KubernetesRoleDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid role query")
+		return
+	}
+	data, err := h.biz.RoleSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetRoleBindingSupport POST /api/v1/kubernetes/rolebindings/support 查询 RoleBinding 的 RoleRef、Subjects 和事件。
+func (h *KubernetesHandler) GetRoleBindingSupport(c *gin.Context) {
+	req := new(api.KubernetesRoleBindingDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid role binding query")
+		return
+	}
+	data, err := h.biz.RoleBindingSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetClusterRoleSupport POST /api/v1/kubernetes/clusterroles/support 查询 ClusterRole 规则、ClusterRoleBinding 和事件。
+func (h *KubernetesHandler) GetClusterRoleSupport(c *gin.Context) {
+	req := new(api.KubernetesClusterRoleDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid cluster role query")
+		return
+	}
+	data, err := h.biz.ClusterRoleSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetClusterRoleBindingSupport POST /api/v1/kubernetes/clusterrolebindings/support 查询 ClusterRoleBinding 的 RoleRef、Subjects 和事件。
+func (h *KubernetesHandler) GetClusterRoleBindingSupport(c *gin.Context) {
+	req := new(api.KubernetesClusterRoleBindingDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid cluster role binding query")
+		return
+	}
+	data, err := h.biz.ClusterRoleBindingSupport(req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return
