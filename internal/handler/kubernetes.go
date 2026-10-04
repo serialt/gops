@@ -36,6 +36,7 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/pods/list", h.ListPods)
 	g.POST("/kubernetes/stats/get", h.GetClusterStats)
 	g.POST("/kubernetes/events/list", h.ListEvents)
+	g.POST("/kubernetes/ingresses/support", h.GetIngressSupport)
 	g.POST("/kubernetes/services/support", h.GetServiceSupport)
 	g.POST("/kubernetes/deployments/support", h.GetDeploymentSupport)
 	g.POST("/kubernetes/statefulsets/support", h.GetStatefulSetSupport)
@@ -59,6 +60,21 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/inspections/history", h.ListInspectionHistory)
 	g.POST("/kubernetes/inspections/delete", h.DeleteInspection)
 
+}
+
+// GetIngressSupport POST /api/v1/kubernetes/ingresses/support 查询 Ingress 规则、TLS、后端 Service 和事件。
+func (h *KubernetesHandler) GetIngressSupport(c *gin.Context) {
+	req := new(api.KubernetesIngressDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid ingress query")
+		return
+	}
+	data, err := h.biz.IngressSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
 }
 
 // GetServiceSupport POST /api/v1/kubernetes/services/support 查询 Service 关联的 Pod、Endpoints、EndpointSlices 和事件。

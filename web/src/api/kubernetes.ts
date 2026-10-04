@@ -18,6 +18,13 @@ export interface KubernetesClusterStats { nodeCount: number; workloadCount: numb
 export const getKubernetesClusterStats = (cluster_id: number) => request.post<KubernetesClusterStats>('/kubernetes/stats/get', { cluster_id })
 export interface KubernetesEvent { type: string; reason: string; message: string; source: string; count: number; firstTimestamp: string; lastTimestamp: string; involvedObject: { kind: string; name: string; namespace?: string } }
 export const listKubernetesEvents = (cluster_id: number, namespace = '', keyword = '', page = 1, limit = 1000) => request.post<PageResponse<KubernetesEvent>>('/kubernetes/events/list', { cluster_id, namespace, keyword, page, limit })
+export interface KubernetesIngressPath { path: string; path_type: string; service_name: string; service_port: string }
+export interface KubernetesIngressRule { host: string; paths: KubernetesIngressPath[] }
+export interface KubernetesIngressTLS { hosts: string[]; secret_name: string }
+export interface KubernetesIngressBackend { service_name: string; service_port: string }
+export interface KubernetesIngressService { name: string; type: string; cluster_ip: string; ports: string }
+export interface KubernetesIngressSupport { name: string; namespace: string; ingress_class: string; hosts: string[]; addresses: string[]; rules: KubernetesIngressRule[]; tls: KubernetesIngressTLS[]; default_backend?: KubernetesIngressBackend; backends: KubernetesIngressService[]; events: KubernetesEvent[]; labels: Record<string, string>; annotations: Record<string, string>; owner: string; uid: string; resource_version: string; created_at: string; age: string; description: string }
+export const getKubernetesIngressSupport = (cluster_id: number, namespace: string, name: string) => request.post<KubernetesIngressSupport>('/kubernetes/ingresses/support', { cluster_id, namespace, name })
 export interface KubernetesRelatedResource { kind: string; name: string; status: string }
 export interface KubernetesServicePort { name: string; protocol: string; port: number; target_port: string; node_port: number }
 export interface KubernetesServiceEndpoint { name: string; created_at: string; age: string; address_type?: string; addresses: string[]; not_ready?: string[]; ports: string[]; endpoint_count: number }
