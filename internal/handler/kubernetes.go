@@ -38,6 +38,9 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/events/list", h.ListEvents)
 	g.POST("/kubernetes/deployments/support", h.GetDeploymentSupport)
 	g.POST("/kubernetes/statefulsets/support", h.GetStatefulSetSupport)
+	g.POST("/kubernetes/daemonsets/support", h.GetDaemonSetSupport)
+	g.POST("/kubernetes/jobs/support", h.GetJobSupport)
+	g.POST("/kubernetes/cronjobs/support", h.GetCronJobSupport)
 	g.POST("/kubernetes/pods/logs", h.GetPodLogs)
 	g.POST("/kubernetes/pods/exec", h.ExecPodCommand)
 	g.POST("/kubernetes/pods/files/list", h.ListPodFiles)
@@ -55,6 +58,51 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/inspections/history", h.ListInspectionHistory)
 	g.POST("/kubernetes/inspections/delete", h.DeleteInspection)
 
+}
+
+// GetJobSupport POST /api/v1/kubernetes/jobs/support 查询 Job 关联的 Pod 和事件。
+func (h *KubernetesHandler) GetJobSupport(c *gin.Context) {
+	req := new(api.KubernetesJobDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid job query")
+		return
+	}
+	data, err := h.biz.JobSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetCronJobSupport POST /api/v1/kubernetes/cronjobs/support 查询 CronJob 关联的 Job、Pod 和事件。
+func (h *KubernetesHandler) GetCronJobSupport(c *gin.Context) {
+	req := new(api.KubernetesCronJobDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid cronjob query")
+		return
+	}
+	data, err := h.biz.CronJobSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetDaemonSetSupport POST /api/v1/kubernetes/daemonsets/support 查询 DaemonSet 关联的 Pod 和事件。
+func (h *KubernetesHandler) GetDaemonSetSupport(c *gin.Context) {
+	req := new(api.KubernetesDaemonSetDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid daemonset query")
+		return
+	}
+	data, err := h.biz.DaemonSetSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
 }
 
 // GetStatefulSetSupport POST /api/v1/kubernetes/statefulsets/support 查询 StatefulSet 关联的 Pod、PVC 和事件。

@@ -8,12 +8,18 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import KubernetesYamlEditor from '@/components/KubernetesYamlEditor.vue'
-import { applyKubernetesObject, deleteKubernetesObject, execKubernetesPodCommand, getKubernetesObject, getKubernetesPodLogs, getKubernetesStatefulSetSupport, listKubernetesObjects, type KubernetesObject, type KubernetesStatefulSetSupport } from '@/api/kubernetes'
+import { applyKubernetesObject, deleteKubernetesObject, execKubernetesPodCommand, getKubernetesCronJobSupport, getKubernetesDaemonSetSupport, getKubernetesJobSupport, getKubernetesObject, getKubernetesPodLogs, getKubernetesStatefulSetSupport, listKubernetesObjects, type KubernetesObject, type KubernetesStatefulSetSupport } from '@/api/kubernetes'
 
 const route = useRoute(), router = useRouter()
 const clusterID = computed(() => Number(route.query.cluster_id || 0))
 const namespace = computed(() => String(route.query.namespace || 'default'))
 const name = computed(() => String(route.query.name || ''))
+const isDaemonSet = computed(() => route.name === 'kubernetes-daemonset-detail')
+const isJob = computed(() => route.name === 'kubernetes-job-detail')
+const isCronJob = computed(() => route.name === 'kubernetes-cronjob-detail')
+const isStatefulSet = computed(() => !isDaemonSet.value && !isJob.value && !isCronJob.value)
+const resource = computed(() => isDaemonSet.value ? 'daemonsets' : isJob.value ? 'jobs' : isCronJob.value ? 'cronjobs' : 'statefulsets')
+const kindLabel = computed(() => isDaemonSet.value ? 'DaemonSet' : isJob.value ? 'Job' : isCronJob.value ? 'CronJob' : 'StatefulSet')
 const loading = ref(false), activeTab = ref('overview'), yaml = ref(''), manifest = ref<Record<string, any>>({})
 const row = ref<KubernetesObject | null>(null), statefulSetSupport = ref<KubernetesStatefulSetSupport>({ status: 'Pending', desired_replicas: 0, current_replicas: 0, ready_replicas: 0, updated_replicas: 0, pods: [], claims: [], events: [], description: '' })
 const dialogVisible = ref(false), dialogMode = ref<'describe' | 'yaml' | 'scale' | 'delete'>('describe')
@@ -42,7 +48,8 @@ const ready = computed(() => statefulSetSupport.value.ready_replicas)
 const current = computed(() => statefulSetSupport.value.current_replicas)
 const updated = computed(() => statefulSetSupport.value.updated_replicas)
 const statefulSetStatus = computed(() => statusText(statefulSetSupport.value.status))
-const statefulSetHealthy = computed(() => statefulSetSupport.value.status === 'Running')
+const statefulSetHealthy = computed(() => ['Running', 'Completed'].includes(statefulSetSupport.value.status))
+const volumeCount = computed(() => volumes.value.length + (isStatefulSet.value ? claims.value.length + claimTemplates.value.length : 0))
 const statefulSetEvents = computed(() => events.value)
 const description = computed(() => statefulSetSupport.value.description || '暂无描述信息')
 const filteredLogs = computed(() => logs.value.split('\n').filter(line => !logFilter.value || line.toLowerCase().includes(logFilter.value.toLowerCase())).join('\n'))
@@ -53,10 +60,17 @@ async function load() {
   if (!clusterID.value || !name.value) return
   loading.value = true
   try {
+    const supportRequest = isDaemonSet.value
+      ? getKubernetesDaemonSetSupport(clusterID.value, namespace.value, name.value)
+      : isJob.value
+        ? getKubernetesJobSupport(clusterID.value, namespace.value, name.value)
+        : isCronJob.value
+          ? getKubernetesCronJobSupport(clusterID.value, namespace.value, name.value)
+          : getKubernetesStatefulSetSupport(clusterID.value, namespace.value, name.value)
     const [detail, objects, support] = await Promise.all([
-      getKubernetesObject({ cluster_id: clusterID.value, resource: 'statefulsets', namespace: namespace.value, name: name.value }),
-      listKubernetesObjects({ cluster_id: clusterID.value, resource: 'statefulsets', namespace: namespace.value, keyword: name.value, page: 1, limit: 100 }),
-      getKubernetesStatefulSetSupport(clusterID.value, namespace.value, name.value),
+      getKubernetesObject({ cluster_id: clusterID.value, resource: resource.value, namespace: namespace.value, name: name.value }),
+      listKubernetesObjects({ cluster_id: clusterID.value, resource: resource.value, namespace: namespace.value, keyword: name.value, page: 1, limit: 100 }),
+      supportRequest,
     ])
     yaml.value = detail.data.data.yaml
     manifest.value = parse(yaml.value) || {}
@@ -157,10 +171,10 @@ async function saveYaml() {
   saving.value = true
   try {
     const object = parse(editorYaml.value)
-    await applyKubernetesObject({ cluster_id: clusterID.value, resource: 'statefulsets', namespace: object?.metadata?.namespace || namespace.value, yaml: editorYaml.value })
+    await applyKubernetesObject({ cluster_id: clusterID.value, resource: resource.value, namespace: object?.metadata?.namespace || namespace.value, yaml: editorYaml.value })
     dialogVisible.value = false
-    ElMessage.success(yamlMode.value === 'clone' ? 'StatefulSet 已克隆' : 'StatefulSet 已保存')
-    if (yamlMode.value === 'clone') await router.replace({ name: 'kubernetes-statefulset-detail', query: { cluster_id: clusterID.value, namespace: object?.metadata?.namespace || namespace.value, name: object?.metadata?.name } })
+    ElMessage.success(yamlMode.value === 'clone' ? `${kindLabel.value} 已克隆` : `${kindLabel.value} 已保存`)
+    if (yamlMode.value === 'clone') await router.replace({ name: `${isJob.value ? 'kubernetes-job' : isCronJob.value ? 'kubernetes-cronjob' : isDaemonSet.value ? 'kubernetes-daemonset' : 'kubernetes-statefulset'}-detail`, query: { cluster_id: clusterID.value, namespace: object?.metadata?.namespace || namespace.value, name: object?.metadata?.name } })
     await load()
   } finally { saving.value = false }
 }
@@ -171,38 +185,38 @@ async function submitScale() {
     const object = parse(yaml.value)
     object.spec = object.spec || {}
     object.spec.replicas = scaleReplicas.value
-    await applyKubernetesObject({ cluster_id: clusterID.value, resource: 'statefulsets', namespace: namespace.value, yaml: stringify(object) })
+    await applyKubernetesObject({ cluster_id: clusterID.value, resource: resource.value, namespace: namespace.value, yaml: stringify(object) })
     dialogVisible.value = false
     ElMessage.success('扩缩容成功')
     await load()
   } finally { saving.value = false }
 }
 async function restart() {
-  await ElMessageBox.confirm(`确认重启 ${name.value}？`, '重启 StatefulSet')
+  await ElMessageBox.confirm(`确认重启 ${name.value}？`, `重启 ${kindLabel.value}`)
   const object = parse(yaml.value)
   object.spec.template.metadata = object.spec.template.metadata || {}
   object.spec.template.metadata.annotations = object.spec.template.metadata.annotations || {}
   object.spec.template.metadata.annotations['kubectl.kubernetes.io/restartedAt'] = new Date().toISOString()
-  await applyKubernetesObject({ cluster_id: clusterID.value, resource: 'statefulsets', namespace: namespace.value, yaml: stringify(object) })
+  await applyKubernetesObject({ cluster_id: clusterID.value, resource: resource.value, namespace: namespace.value, yaml: stringify(object) })
   ElMessage.success('已触发滚动重启')
   await load()
 }
 async function remove() {
   deleting.value = true
   try {
-    await deleteKubernetesObject({ cluster_id: clusterID.value, resource: 'statefulsets', namespace: namespace.value, name: name.value, wait: true })
+    await deleteKubernetesObject({ cluster_id: clusterID.value, resource: resource.value, namespace: namespace.value, name: name.value, wait: true })
     ElMessage.success('删除成功')
     await router.push('/kubernetes/workloads')
   } finally { deleting.value = false }
 }
 function openPod(pod: KubernetesObject) { void router.push({ name: 'kubernetes-pod-detail', query: { cluster_id: clusterID.value, namespace: namespace.value, name: pod.name } }) }
-function statusText(value?: string) { return ({ Running: '可用', Progressing: '更新中', Pending: '未就绪', Degraded: '部分就绪', Stopped: '已停止', Available: '可用', Ready: '可用' } as Record<string, string>)[value || ''] || value || '未知' }
+function statusText(value?: string) { return ({ Running: '运行中', Progressing: '更新中', Pending: '未就绪', Degraded: '部分就绪', Stopped: '已停止', Completed: '已完成', Failed: '失败', Scheduled: '已调度', Suspended: '已暂停', Available: '可用', Ready: '可用' } as Record<string, string>)[value || ''] || value || '未知' }
 function volumeSource(volume: Record<string, any>) {
   const type = Object.keys(volume).find(key => key !== 'name') || ''
   const source = volume[type]
   return source?.claimName || source?.name || source?.secretName || source?.path || (type ? JSON.stringify(source) : '-')
 }
-onMounted(load)
+watch([clusterID, namespace, name, resource], () => { activeTab.value = 'overview'; void load() }, { immediate: true })
 watch(activeTab, value => { if (value === 'logs' && !logs.value) void loadLogs(); if (value === 'terminal') void activateTerminal() })
 watch([logPod, logContainer], () => { if (activeTab.value === 'logs') void loadLogs() })
 watch([logTailLines, logTimestamps], () => { if (activeTab.value === 'logs') void loadLogs() })
@@ -220,19 +234,27 @@ onBeforeUnmount(() => { terminalResizeObserver?.disconnect(); xterm?.dispose() }
 
 <template>
   <section v-loading="loading" class="statefulset-detail">
-    <header class="detail-header"><div class="identity"><el-button text :icon="ArrowLeft" @click="router.back()"/><div><h1>{{ name }}</h1><p>Namespace: <b>{{ namespace }}</b></p></div></div><div class="actions"><el-button :icon="Refresh" @click="load">刷新</el-button><el-button :icon="Document" @click="openDialog('describe')">描述</el-button><el-button v-permission="'POST /api/v1/kubernetes/resources/apply'" :icon="CopyDocument" @click="clone">克隆</el-button><el-button v-permission="'POST /api/v1/kubernetes/resources/apply'" :icon="EditPen" @click="editYaml">编辑 YAML</el-button><el-button v-permission="'POST /api/v1/kubernetes/resources/apply'" :icon="SetUp" @click="scale">扩缩容</el-button><el-button v-permission="'POST /api/v1/kubernetes/resources/apply'" :icon="RefreshRight" @click="restart">重启</el-button><el-button v-permission="'POST /api/v1/kubernetes/resources/delete'" type="danger" :icon="Delete" @click="deleteConfirm=''; openDialog('delete')">删除</el-button></div></header>
+    <header class="detail-header"><div class="identity"><el-button text :icon="ArrowLeft" @click="router.back()"/><div><h1>{{ name }}</h1><p>{{ kindLabel }} · Namespace: <b>{{ namespace }}</b></p></div></div><div class="actions"><el-button :icon="Refresh" @click="load">刷新</el-button><el-button :icon="Document" @click="openDialog('describe')">描述</el-button><el-button v-permission="'POST /api/v1/kubernetes/resources/apply'" :icon="CopyDocument" @click="clone">克隆</el-button><el-button v-permission="'POST /api/v1/kubernetes/resources/apply'" :icon="EditPen" @click="editYaml">编辑 YAML</el-button><el-button v-if="isStatefulSet" v-permission="'POST /api/v1/kubernetes/resources/apply'" :icon="SetUp" @click="scale">扩缩容</el-button><el-button v-if="isStatefulSet || isDaemonSet" v-permission="'POST /api/v1/kubernetes/resources/apply'" :icon="RefreshRight" @click="restart">重启</el-button><el-button v-permission="'POST /api/v1/kubernetes/resources/delete'" type="danger" :icon="Delete" @click="deleteConfirm=''; openDialog('delete')">删除</el-button></div></header>
     <el-tabs v-model="activeTab" class="detail-tabs">
       <el-tab-pane label="概览" name="overview">
-        <div class="metric-grid"><article><span>状态</span><strong :class="statefulSetHealthy ? 'healthy' : 'unhealthy'">● {{ statefulSetStatus }}</strong></article><article><span>期望</span><strong>{{ desired }}</strong><small>副本数</small></article><article><span>就绪</span><strong>{{ ready }}/{{ desired }}</strong><small>副本数</small></article><article><span>当前</span><strong>{{ current }}</strong><small>副本数</small></article><article><span>已更新</span><strong>{{ updated }}</strong><small>副本数</small></article><article><span>创建时间</span><strong>{{ row?.age || '-' }}</strong><small>{{ row?.created_at || '-' }}</small></article></div>
+        <div v-if="isJob" class="metric-grid"><article><span>状态</span><strong :class="statefulSetHealthy ? 'healthy' : 'unhealthy'">● {{ statefulSetStatus }}</strong></article><article><span>完成</span><strong>{{ statefulSetSupport.succeeded }}/{{ statefulSetSupport.completions }}</strong><small>目标完成数</small></article><article><span>运行中</span><strong>{{ statefulSetSupport.active_replicas }}</strong><small>Pod</small></article><article><span>失败</span><strong>{{ statefulSetSupport.failed }}</strong><small>Pod</small></article><article><span>并行数</span><strong>{{ statefulSetSupport.parallelism }}</strong><small>上限</small></article><article><span>创建时间</span><strong>{{ row?.age || '-' }}</strong><small>{{ row?.created_at || '-' }}</small></article></div>
+        <div v-else-if="isCronJob" class="metric-grid"><article><span>状态</span><strong :class="statefulSetHealthy ? 'healthy' : 'unhealthy'">● {{ statefulSetStatus }}</strong></article><article><span>调度规则</span><strong>{{ statefulSetSupport.schedule || '-' }}</strong><small>标准 Cron 表达式</small></article><article><span>活动任务</span><strong>{{ statefulSetSupport.active_replicas }}</strong><small>Job</small></article><article><span>上次调度</span><strong>{{ statefulSetSupport.last_schedule || '-' }}</strong><small>最近一次</small></article><article><span>暂停</span><strong>{{ statefulSetSupport.suspended ? '是' : '否' }}</strong><small>{{ statefulSetSupport.concurrency || '-' }}</small></article><article><span>创建时间</span><strong>{{ row?.age || '-' }}</strong><small>{{ row?.created_at || '-' }}</small></article></div>
+        <div v-else class="metric-grid"><article><span>状态</span><strong :class="statefulSetHealthy ? 'healthy' : 'unhealthy'">● {{ statefulSetStatus }}</strong></article><article><span>期望</span><strong>{{ desired }}</strong><small>{{ isDaemonSet ? '目标节点 Pod' : '副本数' }}</small></article><article><span>就绪</span><strong>{{ ready }}/{{ desired }}</strong><small>{{ isDaemonSet ? '目标节点 Pod' : '副本数' }}</small></article><article><span>当前</span><strong>{{ current }}</strong><small>Pod</small></article><article><span>已更新</span><strong>{{ updated }}</strong><small>Pod</small></article><article><span>创建时间</span><strong>{{ row?.age || '-' }}</strong><small>{{ row?.created_at || '-' }}</small></article></div>
         <div class="overview-grid"><main><section class="panel"><h2>Pods ({{ pods.length }})</h2><div class="pod-table"><div class="pod-head"><b>Pods</b><b>状态</b><b>就绪</b><b>重启</b><b>节点</b><b>运行时间</b></div><div v-for="pod in pods" :key="pod.name" class="pod-row"><span><b class="pod-link" @click="openPod(pod)">{{ pod.name }}</b><small>{{ pod.pod_ip || '-' }}</small></span><span>{{ statusText(pod.status) }}</span><span>{{ pod.ready || '-' }}</span><span>{{ pod.restarts ?? 0 }}</span><span>{{ pod.node || '-' }}</span><span>{{ pod.age || '-' }}</span></div><el-empty v-if="!pods.length" description="暂无 Pod" :image-size="48"/></div></section>
-          <section class="panel"><h2>信息</h2><div class="info-grid"><span>服务名称</span><b>{{ spec.serviceName || '-' }}</b><span>Pod 管理策略</span><b>{{ spec.podManagementPolicy || 'OrderedReady' }}</b><span>更新策略</span><b>{{ spec.updateStrategy?.type || 'RollingUpdate' }}</b><span>分区</span><b>{{ spec.updateStrategy?.rollingUpdate?.partition ?? 0 }}</b><span>版本</span><b>{{ status.updateRevision || status.currentRevision || '-' }}</b><span>容器</span><b>{{ containers.length }} 个</b><span>初始化容器</span><b>{{ initContainers.length }} 个</b><span>卷模板</span><b>{{ (spec.volumeClaimTemplates || []).length }} 个</b><span>数据卷</span><b>{{ volumes.length }} 个</b></div><div class="selector"><b>Selector</b><code>{{ Object.entries(selector).map(([key,value]) => `${key}=${value}`).join(', ') || '-' }}</code></div><div class="uid-row"><span>UID</span><code>{{ metadata.uid || '-' }}</code></div></section></main>
+          <section class="panel"><h2>信息</h2><div class="info-grid">
+            <template v-if="isStatefulSet"><span>服务名称</span><b>{{ spec.serviceName || '-' }}</b><span>Pod 管理策略</span><b>{{ spec.podManagementPolicy || 'OrderedReady' }}</b><span>分区</span><b>{{ spec.updateStrategy?.rollingUpdate?.partition ?? 0 }}</b><span>当前版本</span><b>{{ status.currentRevision || '-' }}</b><span>更新版本</span><b>{{ status.updateRevision || '-' }}</b><span>卷声明模板</span><b>{{ claimTemplates.length }} 个</b></template>
+            <template v-else-if="isDaemonSet"><span>更新策略</span><b>{{ spec.updateStrategy?.type || 'RollingUpdate' }}</b><span>最大不可用</span><b>{{ spec.updateStrategy?.rollingUpdate?.maxUnavailable ?? '-' }}</b><span>最大扩容</span><b>{{ spec.updateStrategy?.rollingUpdate?.maxSurge ?? '-' }}</b><span>版本历史限制</span><b>{{ spec.revisionHistoryLimit ?? '-' }}</b><span>服务账号</span><b>{{ templateSpec.serviceAccountName || 'default' }}</b><span>主机网络</span><b>{{ templateSpec.hostNetwork ? '是' : '否' }}</b></template>
+            <template v-else-if="isJob"><span>并行数</span><b>{{ spec.parallelism ?? 1 }}</b><span>完成数</span><b>{{ spec.completions ?? 1 }}</b><span>失败重试</span><b>{{ spec.backoffLimit ?? 6 }}</b><span>重启策略</span><b>{{ templateSpec.restartPolicy || 'Never' }}</b><span>TTL 清理</span><b>{{ spec.ttlSecondsAfterFinished == null ? '-' : `${spec.ttlSecondsAfterFinished}s` }}</b></template>
+            <template v-else><span>调度规则</span><b>{{ spec.schedule || '-' }}</b><span>并发策略</span><b>{{ spec.concurrencyPolicy || 'Allow' }}</b><span>暂停调度</span><b>{{ spec.suspend ? '是' : '否' }}</b><span>保留成功历史</span><b>{{ spec.successfulJobsHistoryLimit ?? 3 }}</b><span>保留失败历史</span><b>{{ spec.failedJobsHistoryLimit ?? 1 }}</b><span>时区</span><b>{{ spec.timeZone || '-' }}</b></template>
+            <span>容器</span><b>{{ containers.length }} 个</b><span>初始化容器</span><b>{{ initContainers.length }} 个</b><span>数据卷</span><b>{{ volumes.length }} 个</b>
+          </div><div class="selector"><b>Selector</b><code>{{ Object.entries(selector).map(([key,value]) => `${key}=${value}`).join(', ') || '-' }}</code></div><div class="uid-row"><span>UID</span><code>{{ metadata.uid || '-' }}</code></div></section></main>
           <aside><section class="panel"><h2>事件 ({{ statefulSetEvents.length }})</h2><div v-for="item in statefulSetEvents.slice(0,5)" :key="`${item.reason}-${item.lastTimestamp}`" class="event"><b :class="{ warning: item.type==='Warning' }">{{ item.reason }}</b><span>{{ item.message }}</span><small>{{ item.lastTimestamp }}</small></div><p v-if="!statefulSetEvents.length" class="empty">暂无最近事件</p></section><section class="panel"><h2>标签 ({{ Object.keys(labels).length }})</h2><code v-for="(value,key) in labels" :key="key">{{ key }}={{ value }}</code><p v-if="!Object.keys(labels).length" class="empty">暂无标签</p></section><section class="panel"><h2>注解 ({{ Object.keys(annotations).length }})</h2><code v-for="(value,key) in annotations" :key="key">{{ key }}={{ value }}</code><p v-if="!Object.keys(annotations).length" class="empty">暂无注解</p></section></aside></div>
       </el-tab-pane>
       <el-tab-pane :label="`Pods (${pods.length})`" name="pods"><section class="panel pods-panel"><h2>Pods</h2><div class="pods-table"><div class="pods-table-head"><b>Name</b><b>Ready</b><b>Restart</b><b>Status</b><b>IP</b><b>Node</b><b>Created</b></div><div v-for="pod in pods" :key="pod.name" class="pods-table-row"><b class="pod-link" @click="openPod(pod)">{{ pod.name }}</b><span>{{ pod.ready || '-' }}</span><span>{{ pod.restarts ?? 0 }}</span><span>{{ pod.status }}</span><code>{{ pod.pod_ip || '-' }}</code><span>{{ pod.node || '-' }}</span><span>{{ pod.created_at || '-' }} ({{ pod.age || '-' }})</span></div></div><el-empty v-if="!pods.length" description="暂无 Pod"/></section></el-tab-pane>
       <el-tab-pane :label="`容器 (${containers.length})`" name="containers"><section class="panel container-list"><article v-for="container in containers" :key="container.name" class="container-row"><b>{{ container.name }}</b><span>{{ container.image }}</span><small>{{ container.imagePullPolicy || 'IfNotPresent' }}</small></article><el-empty v-if="!containers.length" description="暂无容器"/></section></el-tab-pane>
-      <el-tab-pane :label="`卷 (${claims.length + volumes.length + claimTemplates.length})`" name="volumes"><div class="volume-sections">
-        <section class="panel"><h2>持久卷声明 ({{ claims.length }})</h2><div class="volume-table"><div class="volume-table-head"><b>名称</b><b>状态</b><b>容量</b><b>访问模式</b><b>存储类</b><b>绑定卷</b><b>创建时间</b></div><div v-for="claim in claims" :key="claim.name" class="volume-table-row"><b>{{ claim.name }}</b><span>{{ claim.status || '-' }}</span><span>{{ claim.capacity || '-' }}</span><span>{{ claim.access_modes.join(', ') || '-' }}</span><span>{{ claim.storage_class_name || '-' }}</span><code>{{ claim.volume_name || '-' }}</code><span>{{ claim.created_at || '-' }}</span></div></div><el-empty v-if="!claims.length" description="暂无 PVC" :image-size="48"/></section>
-        <section class="panel"><h2>卷声明模板 ({{ claimTemplates.length }})</h2><div class="volume-table"><div class="claim-template" v-for="template in claimTemplates" :key="template.metadata?.name"><b>{{ template.metadata?.name || '-' }}</b><span>容量 {{ template.spec?.resources?.requests?.storage || '-' }}</span><span>访问模式 {{ (template.spec?.accessModes || []).join(', ') || '-' }}</span><span>存储类 {{ template.spec?.storageClassName || '-' }}</span></div></div><el-empty v-if="!claimTemplates.length" description="未配置卷声明模板" :image-size="48"/></section>
+      <el-tab-pane :label="`卷 (${volumeCount})`" name="volumes"><div class="volume-sections">
+        <section v-if="isStatefulSet" class="panel"><h2>持久卷声明 ({{ claims.length }})</h2><div class="volume-table"><div class="volume-table-head"><b>名称</b><b>状态</b><b>容量</b><b>访问模式</b><b>存储类</b><b>绑定卷</b><b>创建时间</b></div><div v-for="claim in claims" :key="claim.name" class="volume-table-row"><b>{{ claim.name }}</b><span>{{ claim.status || '-' }}</span><span>{{ claim.capacity || '-' }}</span><span>{{ claim.access_modes.join(', ') || '-' }}</span><span>{{ claim.storage_class_name || '-' }}</span><code>{{ claim.volume_name || '-' }}</code><span>{{ claim.created_at || '-' }}</span></div></div><el-empty v-if="!claims.length" description="暂无 PVC" :image-size="48"/></section>
+        <section v-if="isStatefulSet" class="panel"><h2>卷声明模板 ({{ claimTemplates.length }})</h2><div class="volume-table"><div class="claim-template" v-for="template in claimTemplates" :key="template.metadata?.name"><b>{{ template.metadata?.name || '-' }}</b><span>容量 {{ template.spec?.resources?.requests?.storage || '-' }}</span><span>访问模式 {{ (template.spec?.accessModes || []).join(', ') || '-' }}</span><span>存储类 {{ template.spec?.storageClassName || '-' }}</span></div></div><el-empty v-if="!claimTemplates.length" description="未配置卷声明模板" :image-size="48"/></section>
         <section class="panel"><h2>Pod 数据卷 ({{ volumes.length }})</h2><div class="volume-table"><div class="volume-table-head"><b>名称</b><b>类型</b><b>引用</b></div><div v-for="volume in volumes" :key="volume.name" class="volume-source-row"><b>{{ volume.name }}</b><span>{{ Object.keys(volume).find(key => key !== 'name') || '-' }}</span><code>{{ volumeSource(volume) }}</code></div></div><el-empty v-if="!volumes.length" description="未配置 Pod 数据卷" :image-size="48"/></section>
         <section class="panel"><h2>容器挂载 ({{ volumeMounts.length }})</h2><div class="volume-table"><div class="volume-table-head"><b>容器</b><b>卷</b><b>挂载路径</b><b>子路径</b><b>模式</b></div><div v-for="mount in volumeMounts" :key="`${mount.container}-${mount.name}-${mount.mountPath}`" class="mount-row"><b>{{ mount.container }}</b><span>{{ mount.name }}</span><code>{{ mount.mountPath }}</code><code>{{ mount.subPath || '-' }}</code><span>{{ mount.readOnly ? '只读' : '读写' }}</span></div></div><el-empty v-if="!volumeMounts.length" description="暂无容器挂载" :image-size="48"/></section>
       </div></el-tab-pane>
@@ -241,8 +263,8 @@ onBeforeUnmount(() => { terminalResizeObserver?.disconnect(); xterm?.dispose() }
       <el-tab-pane label="终端" name="terminal"><section ref="terminalPanel" class="console-panel terminal-panel"><header><div class="console-title"><b>&gt;_ Terminal</b><i/><span>↑ {{ formatTraffic(terminalUp) }}</span><span>↓ {{ formatTraffic(terminalDown) }}</span></div><div class="console-actions"><el-select v-model="terminalPod" class="console-select" filterable placeholder="选择 Pod"><el-option v-for="pod in pods" :key="pod.name" :label="pod.name" :value="pod.name"/></el-select><el-select v-model="terminalContainer" class="console-select" filterable placeholder="选择容器"><el-option v-for="container in containers" :key="container.name" :label="container.name" :value="container.name"/></el-select><el-popover placement="bottom-end" :width="220" trigger="click"><template #reference><el-button :icon="Setting" title="终端设置"/></template><div class="console-settings"><label><span>字体大小</span><el-input-number v-model="terminalFontSize" :min="10" :max="24" controls-position="right"/></label></div></el-popover><el-button title="清屏" @click="clearConsole('terminal')">≡</el-button><el-button :icon="FullScreen" title="全屏" @click="fullscreen(terminalPanel)"/></div></header><div ref="terminalHost" class="xterm-host"/><el-empty v-if="!pods.length || !containers.length" description="没有可连接的 Pod 容器" :image-size="48"/></section></el-tab-pane>
       <el-tab-pane :label="`事件 (${statefulSetEvents.length})`" name="events"><section class="panel event-list"><div v-for="item in statefulSetEvents" :key="`${item.reason}-${item.lastTimestamp}`" class="event-row"><b :class="{ warning: item.type==='Warning' }">{{ item.type }}</b><span>{{ item.reason }}</span><span>{{ item.message }}</span><span>{{ item.lastTimestamp }}</span></div><el-empty v-if="!statefulSetEvents.length" description="暂无事件"/></section></el-tab-pane>
     </el-tabs>
-    <el-dialog v-model="dialogVisible" :title="dialogMode==='describe'?'StatefulSet 描述':dialogMode==='yaml'?(yamlMode==='clone'?'克隆 StatefulSet':'编辑 StatefulSet YAML'):dialogMode==='scale'?'扩缩容 StatefulSet':'删除 StatefulSet'" width="min(800px,calc(100vw - 32px))" align-center destroy-on-close>
-      <template v-if="dialogMode==='describe'"><div class="describe-command">kubectl describe statefulset -n {{ namespace }} {{ name }}</div><pre class="describe-output">{{ description }}</pre></template>
+    <el-dialog v-model="dialogVisible" :title="dialogMode==='describe'?`${kindLabel} 描述`:dialogMode==='yaml'?(yamlMode==='clone'?`克隆 ${kindLabel}`:`编辑 ${kindLabel} YAML`):dialogMode==='scale'?`扩缩容 ${kindLabel}`:`删除 ${kindLabel}`" width="min(800px,calc(100vw - 32px))" align-center destroy-on-close>
+      <template v-if="dialogMode==='describe'"><div class="describe-command">kubectl describe {{ kindLabel.toLowerCase() }} -n {{ namespace }} {{ name }}</div><pre class="describe-output">{{ description }}</pre></template>
       <KubernetesYamlEditor v-else-if="dialogMode==='yaml'" v-model="editorYaml"/>
       <div v-else-if="dialogMode==='scale'" class="scale-form"><label>副本数</label><el-input-number v-model="scaleReplicas" :min="0" :max="1000"/></div>
       <div v-else class="delete-form"><p>删除后不可恢复，请输入 <b>{{ name }}</b> 确认。</p><el-input v-model="deleteConfirm" :placeholder="name"/></div>

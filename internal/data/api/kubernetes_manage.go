@@ -20,12 +20,39 @@ type KubernetesStatefulSetDetailRequest struct {
 	Name      string `json:"name" binding:"required"`
 }
 
+type KubernetesDaemonSetDetailRequest struct {
+	ClusterID int64  `json:"cluster_id" binding:"required"`
+	Namespace string `json:"namespace" binding:"required"`
+	Name      string `json:"name" binding:"required"`
+}
+
+type KubernetesJobDetailRequest struct {
+	ClusterID int64  `json:"cluster_id" binding:"required"`
+	Namespace string `json:"namespace" binding:"required"`
+	Name      string `json:"name" binding:"required"`
+}
+
+type KubernetesCronJobDetailRequest struct {
+	ClusterID int64  `json:"cluster_id" binding:"required"`
+	Namespace string `json:"namespace" binding:"required"`
+	Name      string `json:"name" binding:"required"`
+}
+
 type KubernetesStatefulSetSupportResponse struct {
 	Status          string                                     `json:"status"`
 	DesiredReplicas int32                                      `json:"desired_replicas"`
 	CurrentReplicas int32                                      `json:"current_replicas"`
 	ReadyReplicas   int32                                      `json:"ready_replicas"`
 	UpdatedReplicas int32                                      `json:"updated_replicas"`
+	ActiveReplicas  int32                                      `json:"active_replicas"`
+	Succeeded       int32                                      `json:"succeeded"`
+	Failed          int32                                      `json:"failed"`
+	Completions     int32                                      `json:"completions"`
+	Parallelism     int32                                      `json:"parallelism"`
+	Schedule        string                                     `json:"schedule"`
+	LastSchedule    string                                     `json:"last_schedule"`
+	Concurrency     string                                     `json:"concurrency"`
+	Suspended       bool                                       `json:"suspended"`
 	Pods            []*KubernetesObjectResponse                `json:"pods"`
 	Claims          []*KubernetesPersistentVolumeClaimResponse `json:"claims"`
 	Events          []*EventInfo                               `json:"events"`
