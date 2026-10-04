@@ -83,9 +83,9 @@ const menuItems = computed(() => [
   ...auditMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
   ...sslCertMenus.value.map(({ path, title, permission }) => ({ path, title, permission })),
 ])
-const activeTab = computed(() => route.path)
+const activeTab = computed(() => route.fullPath)
 
-watch(() => route.path, (path) => {
+watch(() => route.fullPath, (path) => {
   const title = (route.meta.title as string) || '页面'
   if (!pageTabs.value.some((tab) => tab.path === path)) pageTabs.value.push({ path, title })
 }, { immediate: true })

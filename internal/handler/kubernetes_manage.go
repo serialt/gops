@@ -1,9 +1,10 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
 	"gops/internal/data/api"
 	"gops/internal/pkg/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // ListKubernetesObjects POST /api/v1/kubernetes/resources/list 查询 Kubernetes 白名单资源。
@@ -29,6 +30,21 @@ func (h *KubernetesHandler) GetKubernetesObject(c *gin.Context) {
 		return
 	}
 	data, err := h.biz.GetObjectYAML(r)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetKubernetesStorageResourceSupport POST /api/v1/kubernetes/storage/resources/support 查询 PV、PVC 或 StorageClass 详情。
+func (h *KubernetesHandler) GetKubernetesStorageResourceSupport(c *gin.Context) {
+	req := new(api.KubernetesStorageDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid storage resource query")
+		return
+	}
+	data, err := h.biz.StorageResourceSupport(req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return

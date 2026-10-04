@@ -61,6 +61,7 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/pods/files/download", h.DownloadPodFile)
 	g.POST("/kubernetes/resources/list", h.ListKubernetesObjects)
 	g.POST("/kubernetes/resources/get", h.GetKubernetesObject)
+	g.POST("/kubernetes/storage/resources/support", h.GetKubernetesStorageResourceSupport)
 	g.POST("/kubernetes/resources/template", h.GetKubernetesResourceTemplate)
 	g.POST("/kubernetes/resources/apply", h.ApplyKubernetesObject)
 	g.POST("/kubernetes/resources/delete", h.DeleteKubernetesObject)
