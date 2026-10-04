@@ -13,18 +13,6 @@ type IOTListRequest struct {
 type IOTIDRequest struct {
 	ID int64 `json:"id" binding:"required,min=1"`
 }
-type IOTUserRequest struct {
-	ID       int64   `json:"id"`
-	Username string  `json:"username" binding:"required"`
-	Password string  `json:"password"`
-	Enabled  bool    `json:"enabled"`
-	RoleIDs  []int64 `json:"role_ids"`
-}
-type IOTRoleRequest struct {
-	ID          int64  `json:"id"`
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description"`
-}
 type IOTACLRuleRequest struct {
 	ID          int64  `json:"id"`
 	RoleID      int64  `json:"role_id" binding:"required,min=1"`
@@ -39,21 +27,6 @@ type IOTPublishRequest struct {
 	Retain  bool   `json:"retain"`
 }
 
-type IOTRoleResponse struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-type IOTUserResponse struct {
-	ID        int64              `json:"id"`
-	Username  string             `json:"username"`
-	Enabled   bool               `json:"enabled"`
-	Roles     []*IOTRoleResponse `json:"roles"`
-	CreatedAt time.Time          `json:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at"`
-}
 type IOTACLRuleResponse struct {
 	ID          int64     `json:"id"`
 	RoleID      int64     `json:"role_id"`

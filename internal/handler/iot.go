@@ -12,14 +12,6 @@ type IOTHandler struct{ biz *biz.IOTBiz }
 
 func NewIOTHandler(b *biz.IOTBiz) *IOTHandler { return &IOTHandler{biz: b} }
 func (h *IOTHandler) RegisterRoutes(g *gin.RouterGroup) {
-	g.POST("/iot/users/list", h.ListUsers)
-	g.POST("/iot/users/create", h.CreateUser)
-	g.POST("/iot/users/update", h.UpdateUser)
-	g.POST("/iot/users/delete", h.DeleteUser)
-	g.POST("/iot/roles/list", h.ListRoles)
-	g.POST("/iot/roles/create", h.CreateRole)
-	g.POST("/iot/roles/update", h.UpdateRole)
-	g.POST("/iot/roles/delete", h.DeleteRole)
 	g.POST("/iot/acl-rules/list", h.ListACLRules)
 	g.POST("/iot/acl-rules/create", h.CreateACLRule)
 	g.POST("/iot/acl-rules/update", h.UpdateACLRule)
@@ -43,94 +35,6 @@ func handleErr(c *gin.Context, err error) {
 		return
 	}
 	response.OK(c, nil)
-}
-
-// ListUsers POST /api/v1/iot/users/list 查询 IOT 用户。
-func (h *IOTHandler) ListUsers(c *gin.Context) {
-	req, ok := bind[api.IOTListRequest](c)
-	if !ok {
-		return
-	}
-	data, err := h.biz.ListUsers(c.Request.Context(), req)
-	if err != nil {
-		response.Error(c, 500, err.Error())
-		return
-	}
-	response.OK(c, data)
-}
-
-// CreateUser POST /api/v1/iot/users/create 新建 IOT 用户。
-func (h *IOTHandler) CreateUser(c *gin.Context) {
-	req, ok := bind[api.IOTUserRequest](c)
-	if !ok {
-		return
-	}
-	data, err := h.biz.CreateUser(c.Request.Context(), req)
-	if err != nil {
-		response.Error(c, 400, err.Error())
-		return
-	}
-	response.OK(c, data)
-}
-
-// UpdateUser POST /api/v1/iot/users/update 更新 IOT 用户。
-func (h *IOTHandler) UpdateUser(c *gin.Context) {
-	req, ok := bind[api.IOTUserRequest](c)
-	if ok {
-		handleErr(c, h.biz.UpdateUser(c.Request.Context(), req))
-	}
-}
-
-// DeleteUser POST /api/v1/iot/users/delete 删除 IOT 用户。
-func (h *IOTHandler) DeleteUser(c *gin.Context) {
-	req, ok := bind[api.IOTIDRequest](c)
-	if ok {
-		handleErr(c, h.biz.DeleteUser(c.Request.Context(), req))
-	}
-}
-
-// ListRoles POST /api/v1/iot/roles/list 查询 IOT 角色。
-func (h *IOTHandler) ListRoles(c *gin.Context) {
-	req, ok := bind[api.IOTListRequest](c)
-	if !ok {
-		return
-	}
-	data, err := h.biz.ListRoles(c.Request.Context(), req)
-	if err != nil {
-		response.Error(c, 500, err.Error())
-		return
-	}
-	response.OK(c, data)
-}
-
-// CreateRole POST /api/v1/iot/roles/create 新建 IOT 角色。
-func (h *IOTHandler) CreateRole(c *gin.Context) {
-	req, ok := bind[api.IOTRoleRequest](c)
-	if !ok {
-		return
-	}
-	data, err := h.biz.CreateRole(c.Request.Context(), req)
-	if err != nil {
-		response.Error(c, 400, err.Error())
-		return
-	}
-	response.OK(c, data)
-}
-
-// UpdateRole POST /api/v1/iot/roles/update 更新 IOT 角色。
-func (h *IOTHandler) UpdateRole(c *gin.Context) {
-	req, ok := bind[api.IOTRoleRequest](c)
-	if ok {
-		handleErr(c, h.biz.UpdateRole(c.Request.Context(), req))
-	}
-}
-
-// DeleteRole POST /api/v1/iot/roles/delete 删除 IOT 角色。
-func (h *IOTHandler) DeleteRole(c *gin.Context) {
-	req, ok := bind[api.IOTIDRequest](c)
-	if ok {
-		handleErr(c, h.biz.DeleteRole(c.Request.Context(), req))
-	}
 }
 
 // ListACLRules POST /api/v1/iot/acl-rules/list 查询 IOT ACL 规则。

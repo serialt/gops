@@ -18,90 +18,15 @@ type IOTRepo struct{}
 
 func NewIOTRepo() *IOTRepo { return &IOTRepo{} }
 
-func (r *IOTRepo) ListUsers(ctx context.Context, db *gorm.DB, cond *define.IOTListCond) ([]*model.IotUser, int64, error) {
-	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
-	q := query.Use(db).IotUser
-	d := q.WithContext(ctx)
-	if cond.Keyword != "" {
-		d = d.Where(q.Username.Like("%" + cond.Keyword + "%"))
-	}
-	if cond.Status == "enabled" {
-		d = d.Where(q.Enabled.Is(true))
-	} else if cond.Status == "disabled" {
-		d = d.Where(q.Enabled.Is(false))
-	}
-	return d.Order(q.ID.Desc()).FindByPage(offset, limit)
-}
-func (r *IOTRepo) GetUser(ctx context.Context, db *gorm.DB, id int64) (*model.IotUser, error) {
-	q := query.Use(db).IotUser
+func (r *IOTRepo) GetRole(ctx context.Context, db *gorm.DB, id int64) (*model.Role, error) {
+	q := query.Use(db).Role
 	return q.WithContext(ctx).Where(q.ID.Eq(id)).First()
 }
-func (r *IOTRepo) CreateUser(ctx context.Context, db *gorm.DB, row *model.IotUser) error {
-	return query.Use(db).IotUser.WithContext(ctx).Create(row)
-}
-func (r *IOTRepo) UpdateUser(ctx context.Context, db *gorm.DB, id int64, values map[string]any) error {
-	q := query.Use(db).IotUser
-	_, err := q.WithContext(ctx).Where(q.ID.Eq(id)).Updates(values)
-	return err
-}
-func (r *IOTRepo) DeleteUser(ctx context.Context, db *gorm.DB, row *model.IotUser) error {
-	_, err := query.Use(db).IotUser.WithContext(ctx).Delete(row)
-	return err
-}
-
-func (r *IOTRepo) ListRoles(ctx context.Context, db *gorm.DB, cond *define.IOTListCond) ([]*model.IotRole, int64, error) {
-	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
-	q := query.Use(db).IotRole
-	d := q.WithContext(ctx)
-	if cond.Keyword != "" {
-		value := "%" + cond.Keyword + "%"
-		d = d.Where(field.Or(q.Name.Like(value), q.Description.Like(value)))
-	}
-	return d.Order(q.ID.Desc()).FindByPage(offset, limit)
-}
-func (r *IOTRepo) GetRole(ctx context.Context, db *gorm.DB, id int64) (*model.IotRole, error) {
-	q := query.Use(db).IotRole
-	return q.WithContext(ctx).Where(q.ID.Eq(id)).First()
-}
-func (r *IOTRepo) CreateRole(ctx context.Context, db *gorm.DB, row *model.IotRole) error {
-	return query.Use(db).IotRole.WithContext(ctx).Create(row)
-}
-func (r *IOTRepo) UpdateRole(ctx context.Context, db *gorm.DB, id int64, values map[string]any) error {
-	q := query.Use(db).IotRole
-	_, err := q.WithContext(ctx).Where(q.ID.Eq(id)).Updates(values)
-	return err
-}
-func (r *IOTRepo) DeleteRole(ctx context.Context, db *gorm.DB, row *model.IotRole) error {
-	_, err := query.Use(db).IotRole.WithContext(ctx).Delete(row)
-	return err
-}
-
-func (r *IOTRepo) ReplaceUserRoles(ctx context.Context, db *gorm.DB, userID int64, roleIDs []int64) error {
-	q := query.Use(db).IotUserRole
-	if _, err := q.WithContext(ctx).Where(q.UserID.Eq(userID)).Delete(); err != nil {
-		return err
-	}
-	rows := make([]*model.IotUserRole, 0, len(roleIDs))
-	for _, id := range roleIDs {
-		rows = append(rows, &model.IotUserRole{UserID: userID, RoleID: id})
-	}
-	if len(rows) == 0 {
-		return nil
-	}
-	return q.WithContext(ctx).Create(rows...)
-}
-func (r *IOTRepo) UserRoles(ctx context.Context, db *gorm.DB, userIDs []int64) ([]*model.IotUserRole, error) {
-	if len(userIDs) == 0 {
-		return nil, nil
-	}
-	q := query.Use(db).IotUserRole
-	return q.WithContext(ctx).Where(q.UserID.In(userIDs...)).Find()
-}
-func (r *IOTRepo) RolesByIDs(ctx context.Context, db *gorm.DB, ids []int64) ([]*model.IotRole, error) {
+func (r *IOTRepo) RolesByIDs(ctx context.Context, db *gorm.DB, ids []int64) ([]*model.Role, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	q := query.Use(db).IotRole
+	q := query.Use(db).Role
 	return q.WithContext(ctx).Where(q.ID.In(ids...)).Find()
 }
 
@@ -183,13 +108,13 @@ func (r *IOTRepo) SavePublishedMessage(ctx context.Context, db *gorm.DB, topic, 
 	}
 	return q.IotTopic.WithContext(ctx).Create(&model.IotTopic{Topic: topic})
 }
-func (r *IOTRepo) FindEnabledUser(ctx context.Context, db *gorm.DB, username string) (*model.IotUser, error) {
-	q := query.Use(db).IotUser
-	return q.WithContext(ctx).Where(q.Username.Eq(username), q.Enabled.Is(true)).First()
+func (r *IOTRepo) FindEnabledUser(ctx context.Context, db *gorm.DB, username string) (*model.User, error) {
+	q := query.Use(db).User
+	return q.WithContext(ctx).Where(q.Username.Eq(username), q.Status.Is(true)).First()
 }
 func (r *IOTRepo) ACLRulesForUser(ctx context.Context, db *gorm.DB, userID int64) ([]*model.IotAclRule, error) {
 	q := query.Use(db)
-	links, err := q.IotUserRole.WithContext(ctx).Where(q.IotUserRole.UserID.Eq(userID)).Find()
+	links, err := q.UserRole.WithContext(ctx).Where(q.UserRole.UserID.Eq(userID)).Find()
 	if err != nil {
 		return nil, err
 	}

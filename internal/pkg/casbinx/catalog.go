@@ -11,14 +11,6 @@ type Permission struct {
 func Catalog() []Permission {
 	items := []Permission{
 		{Group: "仪表盘", Name: "查看仪表盘", Path: "/api/v1/dashboard/stats", Method: "POST"},
-		{Group: "IOT", Name: "查看 IOT 用户", Path: "/api/v1/iot/users/list", Method: "POST"},
-		{Group: "IOT", Name: "新增 IOT 用户", Path: "/api/v1/iot/users/create", Method: "POST"},
-		{Group: "IOT", Name: "修改 IOT 用户", Path: "/api/v1/iot/users/update", Method: "POST"},
-		{Group: "IOT", Name: "删除 IOT 用户", Path: "/api/v1/iot/users/delete", Method: "POST"},
-		{Group: "IOT", Name: "查看 IOT 角色", Path: "/api/v1/iot/roles/list", Method: "POST"},
-		{Group: "IOT", Name: "新增 IOT 角色", Path: "/api/v1/iot/roles/create", Method: "POST"},
-		{Group: "IOT", Name: "修改 IOT 角色", Path: "/api/v1/iot/roles/update", Method: "POST"},
-		{Group: "IOT", Name: "删除 IOT 角色", Path: "/api/v1/iot/roles/delete", Method: "POST"},
 		{Group: "IOT", Name: "查看 ACL 规则", Path: "/api/v1/iot/acl-rules/list", Method: "POST"},
 		{Group: "IOT", Name: "新增 ACL 规则", Path: "/api/v1/iot/acl-rules/create", Method: "POST"},
 		{Group: "IOT", Name: "修改 ACL 规则", Path: "/api/v1/iot/acl-rules/update", Method: "POST"},
