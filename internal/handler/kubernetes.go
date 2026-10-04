@@ -42,6 +42,8 @@ func (h *KubernetesHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/kubernetes/networkpolicies/support", h.GetNetworkPolicySupport)
 	g.POST("/kubernetes/endpoints/support", h.GetEndpointsSupport)
 	g.POST("/kubernetes/services/support", h.GetServiceSupport)
+	g.POST("/kubernetes/configmaps/support", h.GetConfigMapSupport)
+	g.POST("/kubernetes/secrets/support", h.GetSecretSupport)
 	g.POST("/kubernetes/deployments/support", h.GetDeploymentSupport)
 	g.POST("/kubernetes/statefulsets/support", h.GetStatefulSetSupport)
 	g.POST("/kubernetes/daemonsets/support", h.GetDaemonSetSupport)
@@ -149,6 +151,36 @@ func (h *KubernetesHandler) GetServiceSupport(c *gin.Context) {
 		return
 	}
 	data, err := h.biz.ServiceSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetConfigMapSupport POST /api/v1/kubernetes/configmaps/support 查询 ConfigMap 数据、元信息和事件。
+func (h *KubernetesHandler) GetConfigMapSupport(c *gin.Context) {
+	req := new(api.KubernetesConfigMapDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid configmap query")
+		return
+	}
+	data, err := h.biz.ConfigMapSupport(req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// GetSecretSupport POST /api/v1/kubernetes/secrets/support 查询 Secret 元信息、数据键和事件。
+func (h *KubernetesHandler) GetSecretSupport(c *gin.Context) {
+	req := new(api.KubernetesSecretDetailRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid secret query")
+		return
+	}
+	data, err := h.biz.SecretSupport(req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return
