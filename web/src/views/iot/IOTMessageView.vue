@@ -6,7 +6,7 @@ import { listIOTMessages, listIOTTopics, publishIOTMessage, type IOTMessage, typ
 
 type MessageTab = 'all' | 'received' | 'sent'
 type TopicSubscription = { topic: string; enabled: boolean; qos: number; alias: string }
-type DisplayMessage = IOTMessage & { direction: 'received' | 'sent'; localOnly?: boolean }
+type DisplayMessage = IOTMessage & { direction: 'received' | 'sent'; localOnly?: boolean; sortAt?: number }
 type SentMarker = { id: number; topic: string; payload: string; qos: number; retained: boolean; sentAt: string }
 
 const sentMarkerStorageKey = 'iot-message-sent-markers'
@@ -30,9 +30,13 @@ const messageTab = ref<MessageTab>('all')
 const displayFormat = ref<'JSON' | 'Plaintext'>('JSON')
 const payloadFormat = ref<'JSON' | 'Plaintext'>('Plaintext')
 const sidebarWidth = ref(330)
+const publisherHeight = ref(230)
+const messagePanel = ref<HTMLElement | null>(null)
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 let dragStartX = 0
 let dragStartWidth = 330
+let dragStartY = 0
+let dragStartPublisherHeight = 230
 
 const filteredMessages = computed(() => {
 	const subscribed = messages.value.filter((message) => subscriptions.value.some((subscription) => subscription.enabled && topicMatches(subscription.topic, message.topic)))
@@ -48,17 +52,16 @@ async function load() {
 	])
 	const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
 	sentMarkers.value = sentMarkers.value.filter((marker) => Date.parse(marker.sentAt) >= cutoff).slice(-200)
-	const unmatchedMarkers = new Map(sentMarkers.value.map((marker) => [marker.id, marker]))
 	const storedMessages = [...messageResponse.data.data.list].reverse().map((message): DisplayMessage => {
-		const messageTime = Date.parse(message.received_at)
+		const receivedAt = Date.parse(message.received_at)
+		if (message.client_id !== 'inline') return { ...message, direction: 'received', sortAt: receivedAt }
 		const marker = sentMarkers.value.find((item) => item.topic === message.topic
 			&& item.payload === message.payload
 			&& item.qos === message.qos
-			&& Math.abs(Date.parse(item.sentAt) - messageTime) < 60_000)
-		if (marker) unmatchedMarkers.delete(marker.id)
-		return { ...message, direction: marker || !message.client_id ? 'sent' : 'received' }
+			&& Math.abs(Date.parse(item.sentAt) - receivedAt) < 60_000)
+		return { ...message, direction: 'received', sortAt: marker ? Date.parse(marker.sentAt) + 1 : receivedAt }
 	})
-	const localMessages: DisplayMessage[] = [...unmatchedMarkers.values()].map((marker) => ({
+	const localMessages: DisplayMessage[] = sentMarkers.value.map((marker) => ({
 		id: marker.id,
 		received_at: marker.sentAt,
 		client_id: '',
@@ -70,8 +73,9 @@ async function load() {
 		duplicate: false,
 		direction: 'sent',
 		localOnly: true,
+		sortAt: Date.parse(marker.sentAt),
 	}))
-	messages.value = [...storedMessages, ...localMessages].sort((left, right) => Date.parse(left.received_at) - Date.parse(right.received_at))
+	messages.value = [...storedMessages, ...localMessages].sort((left, right) => (left.sortAt ?? Date.parse(left.received_at)) - (right.sortAt ?? Date.parse(right.received_at)))
 	topics.value = topicResponse.data.data.list
 }
 
@@ -206,6 +210,24 @@ function stopResize() {
 	window.removeEventListener('pointerup', stopResize)
 }
 
+function startPublisherResize(event: PointerEvent) {
+	dragStartY = event.clientY
+	dragStartPublisherHeight = publisherHeight.value
+	window.addEventListener('pointermove', resizePublisher)
+	window.addEventListener('pointerup', stopPublisherResize)
+}
+
+function resizePublisher(event: PointerEvent) {
+	const panelHeight = messagePanel.value?.clientHeight ?? window.innerHeight
+	const maximum = Math.max(170, panelHeight - 150)
+	publisherHeight.value = Math.max(170, Math.min(maximum, dragStartPublisherHeight + dragStartY - event.clientY))
+}
+
+function stopPublisherResize() {
+	window.removeEventListener('pointermove', resizePublisher)
+	window.removeEventListener('pointerup', stopPublisherResize)
+}
+
 onMounted(async () => {
 	try {
 		const savedSubscriptions = JSON.parse(localStorage.getItem('iot-message-subscriptions') || '[]')
@@ -242,6 +264,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
 	if (refreshTimer) clearInterval(refreshTimer)
 	stopResize()
+	stopPublisherResize()
 })
 </script>
 
@@ -264,6 +287,7 @@ onBeforeUnmount(() => {
 						:class="['subscription-item', { 'is-disabled': !subscription.enabled }]"
 						@contextmenu.prevent="openTopicContextMenu($event, subscription)"
 					>
+						<span class="subscription-status" aria-hidden="true" />
 						<div class="subscription-copy">
 							<span class="subscription-name">{{ subscription.alias || subscription.topic }}</span>
 							<small v-if="subscription.alias">{{ subscription.topic }}</small>
@@ -276,7 +300,7 @@ onBeforeUnmount(() => {
 
 			<div class="splitter" role="separator" aria-orientation="vertical" @pointerdown="startResize" />
 
-			<section class="message-panel">
+			<section ref="messagePanel" class="message-panel">
 				<div class="feed-toolbar">
 					<el-select v-model="displayFormat" class="format-select" aria-label="消息显示格式">
 						<el-option label="JSON" value="JSON" />
@@ -295,6 +319,7 @@ onBeforeUnmount(() => {
 					</div>
 					<article v-for="message in filteredMessages" :key="message.id" :class="['message-item', { 'is-sent': message.direction === 'sent' }]">
 						<div class="message-meta">
+							<span class="topic-label">Topic:</span>
 							<strong>{{ message.topic }}</strong>
 							<span>QoS {{ message.qos }}</span>
 							<span>{{ message.direction === 'received' ? '已接收' : '已发送' }}</span>
@@ -304,7 +329,9 @@ onBeforeUnmount(() => {
 					</article>
 				</section>
 
-				<section class="publisher">
+				<div class="horizontal-splitter" role="separator" aria-orientation="horizontal" @pointerdown="startPublisherResize" />
+
+				<section class="publisher" :style="{ height: `${publisherHeight}px` }">
 					<div class="publish-options">
 						<el-select v-model="payloadFormat" aria-label="消息内容格式">
 							<el-option label="Plaintext" value="Plaintext" />
@@ -467,6 +494,14 @@ onBeforeUnmount(() => {
 	border-radius: 8px;
 	color: var(--mqtt-text);
 }
+.subscription-status {
+	width: 7px;
+	height: 7px;
+	flex: none;
+	border-radius: 50%;
+	background: var(--success);
+}
+.subscription-item.is-disabled .subscription-status { background: var(--text-muted); opacity: 1; }
 .subscription-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .subscription-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subscription-copy small { overflow: hidden; color: var(--mqtt-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
@@ -570,31 +605,61 @@ onBeforeUnmount(() => {
 }
 .message-feed { min-height: 0; flex: 1; overflow: auto; padding: 18px 20px; }
 .feed-empty { padding-top: 64px; color: var(--mqtt-muted); text-align: center; font-size: 12px; }
-.message-item { padding: 12px 14px; border-bottom: 1px solid var(--mqtt-line); }
-.message-item.is-sent { width: fit-content; max-width: 85%; margin-left: auto; border: 1px solid #d8def6; border-radius: 10px; background: var(--primary-soft); }
+.message-item {
+	width: fit-content;
+	max-width: 85%;
+	margin: 0 auto 10px 0;
+	padding: 12px 14px;
+	border: 1px solid var(--mqtt-line);
+	border-radius: 10px;
+	background: var(--mqtt-input);
+}
+.message-item.is-sent { margin-right: 0; margin-left: auto; border-color: #d8def6; background: var(--primary-soft); }
 .message-meta { display: flex; align-items: center; gap: 10px; color: var(--mqtt-muted); font-size: 10px; }
+.message-meta .topic-label { margin-right: -6px; color: var(--mqtt-muted); }
 .message-meta strong { color: var(--mqtt-text); font-size: 11px; font-weight: 600; }
 .message-meta time { margin-left: auto; }
 .message-item pre { margin: 10px 0 0; color: var(--mqtt-text); font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+.horizontal-splitter {
+	position: relative;
+	height: 7px;
+	flex: none;
+	cursor: row-resize;
+	background: #e6eaf2;
+	touch-action: none;
+}
+.horizontal-splitter::after {
+	position: absolute;
+	top: 2px;
+	right: 20px;
+	left: 20px;
+	height: 3px;
+	border-radius: 2px;
+	background: #aebbd0;
+	content: '';
+}
+.horizontal-splitter:hover::after { background: var(--mqtt-accent); }
 .publisher {
 	display: flex;
-	min-height: 264px;
+	min-height: 170px;
+	flex: none;
 	flex-direction: column;
-	gap: 10px;
-	padding: 14px 20px 16px;
-	border-top: 1px solid var(--mqtt-line);
+	gap: 6px;
+	padding: 8px 20px 10px;
 	background: #f8f9fc;
 }
-.publish-options { display: flex; min-height: 44px; align-items: center; gap: 10px; }
+.publish-options { display: flex; min-height: 38px; align-items: center; gap: 8px; }
 .publish-options .el-select { width: 126px; }
 .publish-options .el-select:nth-child(2) { width: 106px; }
 .publish-options :deep(.el-checkbox) { margin-left: 2px; }
 .publish-options :deep(.el-checkbox__label) { color: var(--mqtt-muted); }
-.publish-topic :deep(.el-input__wrapper) { min-height: 52px; }
-.payload-row { display: flex; min-height: 110px; flex: 1; align-items: flex-end; gap: 10px; }
-.payload-row :deep(.el-textarea) { min-width: 0; flex: 1; }
+.publish-options :deep(.el-select__wrapper) { min-height: 38px; }
+.publish-topic :deep(.el-input__wrapper) { min-height: 40px; }
+.payload-row { display: flex; min-height: 82px; flex: 1; align-items: flex-end; gap: 8px; }
+.payload-row :deep(.el-textarea) { height: 100%; min-width: 0; flex: 1; }
 .payload-row :deep(.el-textarea__inner) {
-	min-height: 110px !important;
+	height: 100% !important;
+	min-height: 82px !important;
 	border: 1px solid #c2cddd;
 	border-radius: 14px;
 	background: var(--mqtt-input);
