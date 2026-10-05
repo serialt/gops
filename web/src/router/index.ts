@@ -66,6 +66,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'kubernetes/storage', name: 'kubernetes-storage', component: () => import('@/views/kubernetes/ResourceManagerView.vue'), meta: { title: '存储管理', kubernetesGroup: 'storage', permission: 'POST /api/v1/kubernetes/resources/list' } },
       { path: 'kubernetes/access', name: 'kubernetes-access', component: () => import('@/views/kubernetes/ResourceManagerView.vue'), meta: { title: '访问控制', kubernetesGroup: 'access', permission: 'POST /api/v1/kubernetes/resources/list' } },
       { path: 'kubernetes/inspections', name: 'kubernetes-inspections', component: () => import('@/views/kubernetes/ClusterInspectionView.vue'), meta: { title: '集群巡检', permission: 'POST /api/v1/kubernetes/inspections/history' } },
+      { path: 'iot/dashboard', name: 'iot-dashboard', component: () => import('@/views/iot/IOTDashboardView.vue'), meta: { title: 'IOT 大屏', permission: 'POST /api/v1/iot/dashboard/stats' } },
       { path: 'iot/acl-rules', name: 'iot-acl-rules', component: () => import('@/views/iot/IOTACLRulesView.vue'), meta: { title: 'ACL 规则', iotKind: 'acl', permission: 'POST /api/v1/iot/acl-rules/list' } },
       { path: 'iot/messages', name: 'iot-messages', component: () => import('@/views/iot/IOTMessageView.vue'), meta: { title: 'Debug', permission: 'POST /api/v1/iot/messages/publish' } },
       { path: 'iot/topics', name: 'iot-topics', component: () => import('@/views/iot/IOTManagementView.vue'), meta: { title: 'Topic 列表', iotKind: 'topics', permission: 'POST /api/v1/iot/topics/list' } },

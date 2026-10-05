@@ -104,9 +104,24 @@ func (h *brokerHook) ID() string { return "iot-database" }
 func (h *brokerHook) Provides(v byte) bool {
 	return v == mqtt.OnConnectAuthenticate || v == mqtt.OnACLCheck || v == mqtt.OnPublished || v == mqtt.OnSessionEstablished || v == mqtt.OnDisconnect
 }
-func (h *brokerHook) OnConnectAuthenticate(_ *mqtt.Client, pk packets.Packet) bool {
-	user, err := h.repo.FindEnabledUser(context.Background(), h.db, string(pk.Connect.Username))
-	return err == nil && bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), pk.Connect.Password) == nil
+func (h *brokerHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
+	ctx := context.Background()
+	username := string(pk.Connect.Username)
+	ip := ""
+	if cl != nil {
+		ip = remoteHost(cl.Net.Remote)
+	}
+	user, err := h.repo.FindEnabledUser(ctx, h.db, username)
+	if err != nil {
+		_ = h.repo.RecordLogin(ctx, h.db, 0, username, ip, "failed", "IOT 设备用户名或密码错误")
+		return false
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), pk.Connect.Password) != nil {
+		_ = h.repo.RecordLogin(ctx, h.db, user.ID, user.Username, ip, "failed", "IOT 设备用户名或密码错误")
+		return false
+	}
+	_ = h.repo.RecordLogin(ctx, h.db, user.ID, user.Username, ip, "success", "IOT 设备登录成功")
+	return true
 }
 func (h *brokerHook) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 	user, err := h.repo.FindEnabledUser(context.Background(), h.db, string(cl.Properties.Username))

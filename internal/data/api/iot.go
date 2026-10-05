@@ -67,3 +67,11 @@ type IOTClientResponse struct {
 	DisconnectReason string     `json:"disconnect_reason"`
 	SessionExpired   bool       `json:"session_expired"`
 }
+type IOTDashboardResponse struct {
+	TopicTotal     int64                 `json:"topic_total"`
+	MessageTotal   int64                 `json:"message_total"`
+	ClientTotal    int64                 `json:"client_total"`
+	OnlineTotal    int64                 `json:"online_total"`
+	RecentMessages []*IOTMessageResponse `json:"recent_messages"`
+	RecentClients  []*IOTClientResponse  `json:"recent_clients"`
+}

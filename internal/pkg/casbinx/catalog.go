@@ -11,6 +11,7 @@ type Permission struct {
 func Catalog() []Permission {
 	items := []Permission{
 		{Group: "仪表盘", Name: "查看仪表盘", Path: "/api/v1/dashboard/stats", Method: "POST"},
+		{Group: "IOT", Name: "查看 IOT 大屏", Path: "/api/v1/iot/dashboard/stats", Method: "POST"},
 		{Group: "IOT", Name: "查看 ACL 规则", Path: "/api/v1/iot/acl-rules/list", Method: "POST"},
 		{Group: "IOT", Name: "新增 ACL 规则", Path: "/api/v1/iot/acl-rules/create", Method: "POST"},
 		{Group: "IOT", Name: "修改 ACL 规则", Path: "/api/v1/iot/acl-rules/update", Method: "POST"},

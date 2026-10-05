@@ -88,7 +88,7 @@ onBeforeUnmount(() => window.clearTimeout(loadTimer))
     <div class="filters">
       <el-input v-model="keyword" placeholder="搜索用户名、IP 或说明" clearable />
       <el-select v-model="loginType" placeholder="全部类型" clearable><el-option label="Web" value="web" /><el-option
-          label="SSH" value="ssh" /><el-option label="API" value="api" /></el-select>
+          label="IOT 设备" value="iot" /><el-option label="SSH" value="ssh" /><el-option label="API" value="api" /></el-select>
       <el-select v-model="status" placeholder="全部状态" clearable><el-option label="成功" value="success" /><el-option
           label="失败" value="failed" /></el-select>
       <el-date-picker v-model="dateRange" type="daterange" value-format="YYYY-MM-DD" range-separator="至"
@@ -213,6 +213,12 @@ onBeforeUnmount(() => window.clearTimeout(loadTimer))
   border-color: #cce8c2;
   background: #f0f9eb;
   color: #54b72c
+}
+
+:deep(.audit-tag.type-iot) {
+  border-color: #b9e5dc;
+  background: #edf9f6;
+  color: #159f84
 }
 
 :deep(.audit-tag.failed) {

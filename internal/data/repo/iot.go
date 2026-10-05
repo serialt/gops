@@ -16,7 +16,45 @@ import (
 
 type IOTRepo struct{}
 
+type IOTDashboardData struct {
+	TopicTotal     int64
+	MessageTotal   int64
+	ClientTotal    int64
+	OnlineTotal    int64
+	RecentMessages []*model.IotReceivedMessage
+	RecentClients  []*model.IotClientConnection
+}
+
 func NewIOTRepo() *IOTRepo { return &IOTRepo{} }
+
+func (r *IOTRepo) Dashboard(ctx context.Context, db *gorm.DB) (*IOTDashboardData, error) {
+	q := query.Use(db)
+	topicTotal, err := q.IotTopic.WithContext(ctx).Count()
+	if err != nil {
+		return nil, err
+	}
+	messageTotal, err := q.IotReceivedMessage.WithContext(ctx).Count()
+	if err != nil {
+		return nil, err
+	}
+	clientTotal, err := q.IotClientConnection.WithContext(ctx).Count()
+	if err != nil {
+		return nil, err
+	}
+	onlineTotal, err := q.IotClientConnection.WithContext(ctx).Where(q.IotClientConnection.Status.Eq("connected")).Count()
+	if err != nil {
+		return nil, err
+	}
+	messages, err := q.IotReceivedMessage.WithContext(ctx).Order(q.IotReceivedMessage.ID.Desc()).Limit(200).Find()
+	if err != nil {
+		return nil, err
+	}
+	clients, err := q.IotClientConnection.WithContext(ctx).Order(q.IotClientConnection.ID.Desc()).Limit(8).Find()
+	if err != nil {
+		return nil, err
+	}
+	return &IOTDashboardData{TopicTotal: topicTotal, MessageTotal: messageTotal, ClientTotal: clientTotal, OnlineTotal: onlineTotal, RecentMessages: messages, RecentClients: clients}, nil
+}
 
 func (r *IOTRepo) GetRole(ctx context.Context, db *gorm.DB, id int64) (*model.Role, error) {
 	q := query.Use(db).Role
@@ -111,6 +149,11 @@ func (r *IOTRepo) SavePublishedMessage(ctx context.Context, db *gorm.DB, topic, 
 func (r *IOTRepo) FindEnabledUser(ctx context.Context, db *gorm.DB, username string) (*model.User, error) {
 	q := query.Use(db).User
 	return q.WithContext(ctx).Where(q.Username.Eq(username), q.Status.Is(true)).First()
+}
+func (r *IOTRepo) RecordLogin(ctx context.Context, db *gorm.DB, userID int64, username, ip, status, message string) error {
+	return query.Use(db).AuditLoginLog.WithContext(ctx).Create(&model.AuditLoginLog{
+		UserID: userID, Username: username, LoginType: "iot", Status: status, IP: ip, Message: message, CreatedAt: time.Now(),
+	})
 }
 func (r *IOTRepo) ACLRulesForUser(ctx context.Context, db *gorm.DB, userID int64) ([]*model.IotAclRule, error) {
 	q := query.Use(db)

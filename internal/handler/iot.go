@@ -12,6 +12,7 @@ type IOTHandler struct{ biz *biz.IOTBiz }
 
 func NewIOTHandler(b *biz.IOTBiz) *IOTHandler { return &IOTHandler{biz: b} }
 func (h *IOTHandler) RegisterRoutes(g *gin.RouterGroup) {
+	g.POST("/iot/dashboard/stats", h.Dashboard)
 	g.POST("/iot/acl-rules/list", h.ListACLRules)
 	g.POST("/iot/acl-rules/create", h.CreateACLRule)
 	g.POST("/iot/acl-rules/update", h.UpdateACLRule)
@@ -20,6 +21,16 @@ func (h *IOTHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/iot/messages/list", h.ListMessages)
 	g.POST("/iot/clients/list", h.ListClients)
 	g.POST("/iot/messages/publish", h.Publish)
+}
+
+// Dashboard POST /api/v1/iot/dashboard/stats 查询 IOT 大屏聚合数据。
+func (h *IOTHandler) Dashboard(c *gin.Context) {
+	data, err := h.biz.Dashboard(c.Request.Context())
+	if err != nil {
+		response.Error(c, 500, err.Error())
+		return
+	}
+	response.OK(c, data)
 }
 func bind[T any](c *gin.Context) (*T, bool) {
 	req := new(T)

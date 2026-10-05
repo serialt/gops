@@ -28,6 +28,27 @@ func iotCond(req *api.IOTListRequest) *define.IOTListCond {
 	return &define.IOTListCond{PageCond: define.PageCond{Page: int(req.Page), Limit: int(req.Limit)}, Keyword: strings.TrimSpace(req.Keyword), Status: req.Status, RoleID: req.RoleID}
 }
 
+func (b *IOTBiz) Dashboard(ctx context.Context) (*api.IOTDashboardResponse, error) {
+	data, err := b.repo.Dashboard(ctx, b.db)
+	if err != nil {
+		return nil, err
+	}
+	messages := make([]*api.IOTMessageResponse, 0, len(data.RecentMessages))
+	for _, row := range data.RecentMessages {
+		messages = append(messages, &api.IOTMessageResponse{ID: row.ID, ReceivedAt: row.ReceivedAt, ClientID: row.ClientID, Username: row.Username, Topic: row.Topic, Payload: row.Payload, QoS: row.Qos, Retained: row.Retained, Duplicate: row.Duplicate})
+	}
+	clients := make([]*api.IOTClientResponse, 0, len(data.RecentClients))
+	for _, row := range data.RecentClients {
+		var disconnected *time.Time
+		if !row.DisconnectedAt.IsZero() {
+			value := row.DisconnectedAt
+			disconnected = &value
+		}
+		clients = append(clients, &api.IOTClientResponse{ID: row.ID, ClientID: row.ClientID, Status: row.Status, Username: row.Username, RemoteAddress: row.RemoteAddress, Listener: row.Listener, ProtocolVersion: row.ProtocolVersion, CleanSession: row.CleanSession, ConnectedAt: row.ConnectedAt, DisconnectedAt: disconnected, DisconnectReason: row.DisconnectReason, SessionExpired: row.SessionExpired})
+	}
+	return &api.IOTDashboardResponse{TopicTotal: data.TopicTotal, MessageTotal: data.MessageTotal, ClientTotal: data.ClientTotal, OnlineTotal: data.OnlineTotal, RecentMessages: messages, RecentClients: clients}, nil
+}
+
 func (b *IOTBiz) ListACLRules(ctx context.Context, req *api.IOTListRequest) (*api.PageResponse[*api.IOTACLRuleResponse], error) {
 	rows, total, err := b.repo.ListACLRules(ctx, b.db, iotCond(req))
 	if err != nil {
