@@ -2,12 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Check, CircleClose, Close, Edit, Plus, Promotion } from '@element-plus/icons-vue'
-import { listIOTMessages, listIOTTopics, publishIOTMessage, type IOTMessage, type IOTTopic } from '@/api/iot'
+import { getIOTBrokerOptions, listIOTMessages, listIOTTopics, publishIOTMessage, type IOTBrokerOption, type IOTMessage, type IOTTopic } from '@/api/iot'
 
 type MessageTab = 'all' | 'received' | 'sent'
 type TopicSubscription = { topic: string; enabled: boolean; qos: number; alias: string }
 type DisplayMessage = IOTMessage & { direction: 'received' | 'sent'; localOnly?: boolean; sortAt?: number }
-type SentMarker = { id: number; topic: string; payload: string; qos: number; retained: boolean; sentAt: string }
+type SentMarker = { id: number; broker: string; topic: string; payload: string; qos: number; retained: boolean; sentAt: string }
 
 const sentMarkerStorageKey = 'iot-message-sent-markers'
 
@@ -15,6 +15,8 @@ const topic = ref('')
 const payload = ref('')
 const qos = ref(0)
 const retain = ref(false)
+const broker = ref('internal')
+const brokerOptions = ref<IOTBrokerOption[]>([])
 const sending = ref(false)
 const messages = ref<DisplayMessage[]>([])
 const sentMarkers = ref<SentMarker[]>([])
@@ -46,19 +48,25 @@ const filteredMessages = computed(() => {
 })
 
 async function load() {
-	const [messageResponse, topicResponse] = await Promise.all([
+	const [messageResponse, topicResponse, brokerResponse] = await Promise.all([
 		listIOTMessages({ page: 1, limit: 100 }),
 		listIOTTopics({ page: 1, limit: 1000 }),
+		getIOTBrokerOptions(),
 	])
+	brokerOptions.value = brokerResponse.data.data
+	const selectedBroker = brokerOptions.value.find((item) => item.key === broker.value && item.connected)
+	if (!selectedBroker) broker.value = brokerOptions.value.find((item) => item.connected)?.key || ''
 	const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
 	sentMarkers.value = sentMarkers.value.filter((marker) => Date.parse(marker.sentAt) >= cutoff).slice(-200)
 	const storedMessages = [...messageResponse.data.data.list].reverse().map((message): DisplayMessage => {
 		const receivedAt = Date.parse(message.received_at)
-		if (message.client_id !== 'inline') return { ...message, direction: 'received', sortAt: receivedAt }
-		const marker = sentMarkers.value.find((item) => item.topic === message.topic
+		const marker = sentMarkers.value.find((item) => (message.client_id === 'inline' && item.broker === 'internal'
+			|| message.client_id === `external:${item.broker}`)
+			&& item.topic === message.topic
 			&& item.payload === message.payload
 			&& item.qos === message.qos
 			&& Math.abs(Date.parse(item.sentAt) - receivedAt) < 60_000)
+		if (!marker) return { ...message, direction: 'received', sortAt: receivedAt }
 		return { ...message, direction: 'received', sortAt: marker ? Date.parse(marker.sentAt) + 1 : receivedAt }
 	})
 	const localMessages: DisplayMessage[] = sentMarkers.value.map((marker) => ({
@@ -185,8 +193,8 @@ async function publish() {
 	}
 	sending.value = true
 	try {
-		await publishIOTMessage({ topic: topicName, payload: payload.value, qos: qos.value, retain: retain.value })
-		sentMarkers.value.push({ id: -Date.now(), topic: topicName, payload: payload.value, qos: qos.value, retained: retain.value, sentAt: new Date().toISOString() })
+		await publishIOTMessage({ broker: broker.value, topic: topicName, payload: payload.value, qos: qos.value, retain: retain.value })
+		sentMarkers.value.push({ id: -Date.now(), broker: broker.value, topic: topicName, payload: payload.value, qos: qos.value, retained: retain.value, sentAt: new Date().toISOString() })
 		ElMessage.success('消息已发送')
 		await load()
 	} finally {
@@ -245,12 +253,12 @@ onMounted(async () => {
 		}
 		const savedSentMarkers = JSON.parse(localStorage.getItem(sentMarkerStorageKey) || '[]')
 		if (Array.isArray(savedSentMarkers)) {
-			sentMarkers.value = savedSentMarkers.filter((item): item is SentMarker => item
+			sentMarkers.value = savedSentMarkers.filter((item) => item
 				&& typeof item.id === 'number'
 				&& typeof item.topic === 'string'
 				&& typeof item.payload === 'string'
 				&& typeof item.qos === 'number'
-				&& typeof item.sentAt === 'string')
+				&& typeof item.sentAt === 'string').map((item) => ({ ...item, broker: typeof item.broker === 'string' ? item.broker : 'internal' }))
 		}
 	} catch {
 		subscriptions.value = []
@@ -333,6 +341,17 @@ onBeforeUnmount(() => {
 
 				<section class="publisher" :style="{ height: `${publisherHeight}px` }">
 					<div class="publish-options">
+						<el-select v-model="broker" class="broker-select" aria-label="MQTT Broker" placeholder="选择 Broker">
+							<el-option
+								v-for="item in brokerOptions"
+								:key="item.key"
+								:label="item.name"
+								:value="item.key"
+								:disabled="!item.connected"
+							>
+								<span :title="item.url || item.name">{{ item.name }}{{ item.connected ? '' : '（未连接）' }}</span>
+							</el-option>
+						</el-select>
 						<el-select v-model="payloadFormat" aria-label="消息内容格式">
 							<el-option label="Plaintext" value="Plaintext" />
 							<el-option label="JSON" value="JSON" />
@@ -359,6 +378,7 @@ onBeforeUnmount(() => {
 							circle
 							:icon="Promotion"
 							:loading="sending"
+							:disabled="!broker"
 							aria-label="发送消息"
 							title="发送消息"
 							@click="publish"
@@ -649,8 +669,9 @@ onBeforeUnmount(() => {
 	background: #f8f9fc;
 }
 .publish-options { display: flex; min-height: 38px; align-items: center; gap: 8px; }
-.publish-options .el-select { width: 126px; }
-.publish-options .el-select:nth-child(2) { width: 106px; }
+.publish-options .el-select { width: 118px; }
+.publish-options .broker-select { width: 156px; }
+.publish-options .el-select:nth-child(3) { width: 94px; }
 .publish-options :deep(.el-checkbox) { margin-left: 2px; }
 .publish-options :deep(.el-checkbox__label) { color: var(--mqtt-muted); }
 .publish-options :deep(.el-select__wrapper) { min-height: 38px; }
@@ -682,7 +703,8 @@ onBeforeUnmount(() => {
 	.message-feed { padding: 12px; }
 	.publisher { padding: 12px; }
 	.publish-options { gap: 6px; }
-	.publish-options .el-select { width: 112px; }
-	.publish-options .el-select:nth-child(2) { width: 94px; }
+	.publish-options .el-select { width: 104px; }
+	.publish-options .broker-select { width: 136px; }
+	.publish-options .el-select:nth-child(3) { width: 88px; }
 }
 </style>

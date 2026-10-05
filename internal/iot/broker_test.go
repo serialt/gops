@@ -29,6 +29,27 @@ func TestNewListenersRequiresTLSFiles(t *testing.T) {
 	}
 }
 
+func TestNormalizeExternalBrokerURL(t *testing.T) {
+	tests := map[string]string{
+		"tcp://broker.example:1883":       "tcp://broker.example:1883",
+		"tls://broker.example:8883":       "ssl://broker.example:8883",
+		"websocket://broker.example/mqtt": "ws://broker.example/mqtt",
+		"wss://broker.example/mqtt":       "wss://broker.example/mqtt",
+	}
+	for input, expected := range tests {
+		actual, err := normalizeExternalBrokerURL(input)
+		if err != nil {
+			t.Fatalf("normalizeExternalBrokerURL(%q): %v", input, err)
+		}
+		if actual != expected {
+			t.Fatalf("normalizeExternalBrokerURL(%q) = %q, want %q", input, actual, expected)
+		}
+	}
+	if _, err := normalizeExternalBrokerURL("http://broker.example"); err == nil {
+		t.Fatal("expected unsupported broker protocol error")
+	}
+}
+
 func TestACLRulesDenyOverridesAllow(t *testing.T) {
 	allow := &model.IotAclRule{Operation: "publish", Effect: "allow", TopicFilter: "devices/#"}
 	deny := &model.IotAclRule{Operation: "publish", Effect: "deny", TopicFilter: "devices/private/#"}

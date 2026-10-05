@@ -100,6 +100,44 @@ func (r *IOTRepo) DeleteACLRule(ctx context.Context, db *gorm.DB, row *model.Iot
 	return err
 }
 
+func (r *IOTRepo) ListExternalBrokers(ctx context.Context, db *gorm.DB, cond *define.IOTBrokerListCond) ([]*model.IotExternalBroker, int64, error) {
+	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
+	q := query.Use(db).IotExternalBroker
+	d := q.WithContext(ctx)
+	if cond.Keyword != "" {
+		value := "%" + cond.Keyword + "%"
+		d = d.Where(field.Or(q.Name.Like(value), q.URL.Like(value), q.ClientID.Like(value), q.Username.Like(value)))
+	}
+	if cond.Enabled != nil {
+		enabled := int64(0)
+		if *cond.Enabled {
+			enabled = 1
+		}
+		d = d.Where(q.Enabled.Eq(enabled))
+	}
+	return d.Order(q.ID.Desc()).FindByPage(offset, limit)
+}
+func (r *IOTRepo) EnabledExternalBrokers(ctx context.Context, db *gorm.DB) ([]*model.IotExternalBroker, error) {
+	q := query.Use(db).IotExternalBroker
+	return q.WithContext(ctx).Where(q.Enabled.Eq(1)).Order(q.ID.Asc()).Find()
+}
+func (r *IOTRepo) GetExternalBroker(ctx context.Context, db *gorm.DB, id int64) (*model.IotExternalBroker, error) {
+	q := query.Use(db).IotExternalBroker
+	return q.WithContext(ctx).Where(q.ID.Eq(id)).First()
+}
+func (r *IOTRepo) CreateExternalBroker(ctx context.Context, db *gorm.DB, row *model.IotExternalBroker) error {
+	return query.Use(db).IotExternalBroker.WithContext(ctx).Create(row)
+}
+func (r *IOTRepo) UpdateExternalBroker(ctx context.Context, db *gorm.DB, id int64, values map[string]any) error {
+	q := query.Use(db).IotExternalBroker
+	_, err := q.WithContext(ctx).Where(q.ID.Eq(id)).Updates(values)
+	return err
+}
+func (r *IOTRepo) DeleteExternalBroker(ctx context.Context, db *gorm.DB, row *model.IotExternalBroker) error {
+	_, err := query.Use(db).IotExternalBroker.WithContext(ctx).Delete(row)
+	return err
+}
+
 func (r *IOTRepo) ListTopics(ctx context.Context, db *gorm.DB, cond *define.IOTListCond) ([]*model.IotTopic, int64, error) {
 	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).IotTopic

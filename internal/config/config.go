@@ -15,9 +15,21 @@ type Config struct {
 }
 
 type IOT struct {
-	Enabled      bool         `json:"enabled" yaml:"enabled"`
-	Listeners    IOTListeners `json:"listeners" yaml:"listeners"`
-	MessageTopic string       `json:"message_topic" yaml:"message_topic"`
+	Enabled         bool                `json:"enabled" yaml:"enabled"`
+	Listeners       IOTListeners        `json:"listeners" yaml:"listeners"`
+	MessageTopic    string              `json:"message_topic" yaml:"message_topic"`
+	ExternalBrokers []IOTExternalBroker `json:"external_brokers" yaml:"external_brokers"`
+}
+
+type IOTExternalBroker struct {
+	Name               string `json:"name" yaml:"name"`
+	Enabled            bool   `json:"enabled" yaml:"enabled"`
+	URL                string `json:"url" yaml:"url"`
+	ClientID           string `json:"client_id" yaml:"client_id"`
+	Username           string `json:"username" yaml:"username"`
+	Password           string `json:"password" yaml:"password"`
+	TopicFilter        string `json:"topic_filter" yaml:"topic_filter"`
+	InsecureSkipVerify bool   `json:"insecure_skip_verify" yaml:"insecure_skip_verify"`
 }
 
 type IOTListeners struct {
@@ -74,6 +86,15 @@ func NewConfig(cfgPath string) (cfg *Config) {
 	applyIOTListenerDefaults(&cfg.IOT.Listeners.WSS, false, ":8084")
 	if cfg.IOT.MessageTopic == "" {
 		cfg.IOT.MessageTopic = "#"
+	}
+	for index := range cfg.IOT.ExternalBrokers {
+		broker := &cfg.IOT.ExternalBrokers[index]
+		if broker.ClientID == "" {
+			broker.ClientID = "gops-" + broker.Name
+		}
+		if broker.TopicFilter == "" {
+			broker.TopicFilter = "#"
+		}
 	}
 	return
 }

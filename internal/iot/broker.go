@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"gops/internal/config"
@@ -20,8 +21,10 @@ import (
 )
 
 type Broker struct {
-	server  *mqtt.Server
-	enabled bool
+	server          *mqtt.Server
+	enabled         bool
+	mutex           sync.RWMutex
+	externalClients map[string]*externalBrokerClient
 }
 
 func NewBroker(cfg *config.Config, db *gorm.DB, repository *repo.IOTRepo) (*Broker, error) {
@@ -44,7 +47,27 @@ func NewBroker(cfg *config.Config, db *gorm.DB, repository *repo.IOTRepo) (*Brok
 			}
 		}
 	}
-	return &Broker{server: server, enabled: cfg.IOT.Enabled}, nil
+	externalClients, err := newExternalBrokerClients(cfg.IOT.ExternalBrokers, db, repository)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := repository.EnabledExternalBrokers(context.Background(), db)
+	if err != nil {
+		return nil, fmt.Errorf("load external MQTT brokers: %w", err)
+	}
+	for _, row := range rows {
+		password, decryptErr := decryptBrokerPassword(cfg.Server.AESKey, row.Password)
+		if decryptErr != nil {
+			return nil, fmt.Errorf("decrypt external MQTT broker %s password: %w", row.Name, decryptErr)
+		}
+		item := config.IOTExternalBroker{Name: row.Name, Enabled: true, URL: row.URL, ClientID: row.ClientID, Username: row.Username, Password: password, TopicFilter: row.TopicFilter, InsecureSkipVerify: row.InsecureSkipVerify == 1}
+		client, createErr := newExternalBrokerClient(item, db, repository)
+		if createErr != nil {
+			return nil, createErr
+		}
+		externalClients[item.Name] = client
+	}
+	return &Broker{server: server, enabled: cfg.IOT.Enabled, externalClients: externalClients}, nil
 }
 
 func newListeners(cfg config.IOTListeners) ([]listeners.Listener, error) {
@@ -83,14 +106,22 @@ func loadTLSConfig(cfg config.IOTListener) (*tls.Config, error) {
 	return &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{certificate}}, nil
 }
 func (b *Broker) Run() error {
+	b.connectExternalBrokers()
 	if !b.enabled {
 		return nil
 	}
 	return b.server.Serve()
 }
-func (b *Broker) Close() error { return b.server.Close() }
+func (b *Broker) Close() error {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	for _, external := range b.externalClients {
+		external.client.Disconnect(250)
+	}
+	return b.server.Close()
+}
 func (b *Broker) Publish(topic string, payload []byte, retain bool, qos byte) error {
-	return b.server.Publish(topic, payload, retain, qos)
+	return b.PublishTo("internal", topic, payload, retain, qos)
 }
 
 type brokerHook struct {

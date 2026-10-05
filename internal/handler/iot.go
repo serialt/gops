@@ -20,7 +20,56 @@ func (h *IOTHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/iot/topics/list", h.ListTopics)
 	g.POST("/iot/messages/list", h.ListMessages)
 	g.POST("/iot/clients/list", h.ListClients)
+	g.POST("/iot/brokers/options", h.BrokerOptions)
+	g.POST("/iot/brokers/list", h.ListExternalBrokers)
+	g.POST("/iot/brokers/create", h.CreateExternalBroker)
+	g.POST("/iot/brokers/update", h.UpdateExternalBroker)
+	g.POST("/iot/brokers/delete", h.DeleteExternalBroker)
 	g.POST("/iot/messages/publish", h.Publish)
+	g.POST("/iot/messages/receive", h.ReceiveHTTP)
+}
+
+// BrokerOptions POST /api/v1/iot/brokers/options 查询可用的 MQTT Broker。
+func (h *IOTHandler) BrokerOptions(c *gin.Context) {
+	response.OK(c, h.biz.BrokerOptions())
+}
+
+// ListExternalBrokers POST /api/v1/iot/brokers/list 查询外部 MQTT Broker。
+func (h *IOTHandler) ListExternalBrokers(c *gin.Context) {
+	req, ok := bind[api.IOTExternalBrokerListRequest](c)
+	if !ok {
+		return
+	}
+	data, err := h.biz.ListExternalBrokers(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 500, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// CreateExternalBroker POST /api/v1/iot/brokers/create 新建外部 MQTT Broker。
+func (h *IOTHandler) CreateExternalBroker(c *gin.Context) {
+	req, ok := bind[api.IOTExternalBrokerRequest](c)
+	if ok {
+		handleErr(c, h.biz.CreateExternalBroker(c.Request.Context(), req))
+	}
+}
+
+// UpdateExternalBroker POST /api/v1/iot/brokers/update 更新外部 MQTT Broker。
+func (h *IOTHandler) UpdateExternalBroker(c *gin.Context) {
+	req, ok := bind[api.IOTExternalBrokerRequest](c)
+	if ok {
+		handleErr(c, h.biz.UpdateExternalBroker(c.Request.Context(), req))
+	}
+}
+
+// DeleteExternalBroker POST /api/v1/iot/brokers/delete 删除外部 MQTT Broker。
+func (h *IOTHandler) DeleteExternalBroker(c *gin.Context) {
+	req, ok := bind[api.IOTIDRequest](c)
+	if ok {
+		handleErr(c, h.biz.DeleteExternalBroker(c.Request.Context(), req))
+	}
 }
 
 // Dashboard POST /api/v1/iot/dashboard/stats 查询 IOT 大屏聚合数据。
@@ -139,5 +188,13 @@ func (h *IOTHandler) Publish(c *gin.Context) {
 	req, ok := bind[api.IOTPublishRequest](c)
 	if ok {
 		handleErr(c, h.biz.Publish(c.Request.Context(), req))
+	}
+}
+
+// ReceiveHTTP POST /api/v1/iot/messages/receive 通过 HTTP 接收外部 IOT 消息。
+func (h *IOTHandler) ReceiveHTTP(c *gin.Context) {
+	req, ok := bind[api.IOTHTTPReceiveRequest](c)
+	if ok {
+		handleErr(c, h.biz.ReceiveHTTP(c.Request.Context(), req))
 	}
 }

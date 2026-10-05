@@ -17,6 +17,8 @@ iot:
   enabled: true
   # 持久化的消息 Topic 过滤器；# 表示保存全部非 $SYS 消息。
   message_topic: "#"
+  # HTTP 消息可通过登录后的 POST /api/v1/iot/messages/receive 接入，并写入同一消息列表。
+  # 外部 Broker 请在 IOT -> Broker 管理页面添加；支持 tcp、tls、websocket 和 wss。
   listeners:
     tcp:
       enabled: true

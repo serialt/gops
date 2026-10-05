@@ -21,10 +21,63 @@ type IOTACLRuleRequest struct {
 	TopicFilter string `json:"topic_filter" binding:"required"`
 }
 type IOTPublishRequest struct {
+	Broker  string `json:"broker"`
 	Topic   string `json:"topic" binding:"required"`
 	Payload string `json:"payload"`
 	QoS     int64  `json:"qos" binding:"min=0,max=2"`
 	Retain  bool   `json:"retain"`
+}
+
+type IOTHTTPReceiveRequest struct {
+	Source   string `json:"source" binding:"required"`
+	ClientID string `json:"client_id"`
+	Topic    string `json:"topic" binding:"required"`
+	Payload  string `json:"payload"`
+	QoS      int64  `json:"qos" binding:"min=0,max=2"`
+	Retain   bool   `json:"retain"`
+}
+
+type IOTExternalBrokerListRequest struct {
+	Page    int64  `json:"page" binding:"required,min=1"`
+	Limit   int64  `json:"limit" binding:"required,min=1,max=1000"`
+	Keyword string `json:"keyword"`
+	Enabled *bool  `json:"enabled"`
+}
+
+type IOTExternalBrokerRequest struct {
+	ID                 int64  `json:"id"`
+	Name               string `json:"name" binding:"required"`
+	URL                string `json:"url" binding:"required"`
+	ClientID           string `json:"client_id" binding:"required"`
+	Username           string `json:"username"`
+	Password           string `json:"password"`
+	TopicFilter        string `json:"topic_filter" binding:"required"`
+	Enabled            bool   `json:"enabled"`
+	InsecureSkipVerify bool   `json:"insecure_skip_verify"`
+}
+
+type IOTExternalBrokerResponse struct {
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	URL                string    `json:"url"`
+	ClientID           string    `json:"client_id"`
+	Username           string    `json:"username"`
+	TopicFilter        string    `json:"topic_filter"`
+	Enabled            bool      `json:"enabled"`
+	Connected          bool      `json:"connected"`
+	HasPassword        bool      `json:"has_password"`
+	InsecureSkipVerify bool      `json:"insecure_skip_verify"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+type IOTBrokerOptionResponse struct {
+	Key       string `json:"key"`
+	Name      string `json:"name"`
+	URL       string `json:"url"`
+	Type      string `json:"type"`
+	Connected bool   `json:"connected"`
+	Internal  bool   `json:"internal"`
 }
 
 type IOTACLRuleResponse struct {

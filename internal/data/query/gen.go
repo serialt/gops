@@ -26,6 +26,7 @@ var (
 	Host                        *host
 	IotAclRule                  *iotAclRule
 	IotClientConnection         *iotClientConnection
+	IotExternalBroker           *iotExternalBroker
 	IotReceivedMessage          *iotReceivedMessage
 	IotTopic                    *iotTopic
 	KubernetesCluster           *kubernetesCluster
@@ -66,6 +67,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Host = &Q.Host
 	IotAclRule = &Q.IotAclRule
 	IotClientConnection = &Q.IotClientConnection
+	IotExternalBroker = &Q.IotExternalBroker
 	IotReceivedMessage = &Q.IotReceivedMessage
 	IotTopic = &Q.IotTopic
 	KubernetesCluster = &Q.KubernetesCluster
@@ -107,6 +109,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Host:                        newHost(db, opts...),
 		IotAclRule:                  newIotAclRule(db, opts...),
 		IotClientConnection:         newIotClientConnection(db, opts...),
+		IotExternalBroker:           newIotExternalBroker(db, opts...),
 		IotReceivedMessage:          newIotReceivedMessage(db, opts...),
 		IotTopic:                    newIotTopic(db, opts...),
 		KubernetesCluster:           newKubernetesCluster(db, opts...),
@@ -149,6 +152,7 @@ type Query struct {
 	Host                        host
 	IotAclRule                  iotAclRule
 	IotClientConnection         iotClientConnection
+	IotExternalBroker           iotExternalBroker
 	IotReceivedMessage          iotReceivedMessage
 	IotTopic                    iotTopic
 	KubernetesCluster           kubernetesCluster
@@ -194,6 +198,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Host:                        q.Host.clone(db),
 		IotAclRule:                  q.IotAclRule.clone(db),
 		IotClientConnection:         q.IotClientConnection.clone(db),
+		IotExternalBroker:           q.IotExternalBroker.clone(db),
 		IotReceivedMessage:          q.IotReceivedMessage.clone(db),
 		IotTopic:                    q.IotTopic.clone(db),
 		KubernetesCluster:           q.KubernetesCluster.clone(db),
@@ -244,6 +249,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Host:                        q.Host.replaceDB(db),
 		IotAclRule:                  q.IotAclRule.replaceDB(db),
 		IotClientConnection:         q.IotClientConnection.replaceDB(db),
+		IotExternalBroker:           q.IotExternalBroker.replaceDB(db),
 		IotReceivedMessage:          q.IotReceivedMessage.replaceDB(db),
 		IotTopic:                    q.IotTopic.replaceDB(db),
 		KubernetesCluster:           q.KubernetesCluster.replaceDB(db),
@@ -284,6 +290,7 @@ type queryCtx struct {
 	Host                        *hostDo
 	IotAclRule                  *iotAclRuleDo
 	IotClientConnection         *iotClientConnectionDo
+	IotExternalBroker           *iotExternalBrokerDo
 	IotReceivedMessage          *iotReceivedMessageDo
 	IotTopic                    *iotTopicDo
 	KubernetesCluster           *kubernetesClusterDo
@@ -324,6 +331,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Host:                        q.Host.WithContext(ctx),
 		IotAclRule:                  q.IotAclRule.WithContext(ctx),
 		IotClientConnection:         q.IotClientConnection.WithContext(ctx),
+		IotExternalBroker:           q.IotExternalBroker.WithContext(ctx),
 		IotReceivedMessage:          q.IotReceivedMessage.WithContext(ctx),
 		IotTopic:                    q.IotTopic.WithContext(ctx),
 		KubernetesCluster:           q.KubernetesCluster.WithContext(ctx),

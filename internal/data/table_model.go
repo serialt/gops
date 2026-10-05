@@ -44,6 +44,7 @@ func gopsTable(g *gen.Generator) {
 	iotTopic := g.GenerateModel("iot_topic")
 	iotReceivedMessage := g.GenerateModel("iot_received_message")
 	iotClientConnection := g.GenerateModel("iot_client_connection")
+	iotExternalBroker := g.GenerateModel("iot_external_broker")
 	userRole := g.GenerateModel("user_role")
 	userMFA := g.GenerateModel("user_mfa")
 	user := g.GenerateModel("user", gen.FieldRelate(field.HasMany, "Roles", role,
@@ -94,6 +95,7 @@ func gopsTable(g *gen.Generator) {
 		iotTopic,
 		iotReceivedMessage,
 		iotClientConnection,
+		iotExternalBroker,
 	)
 
 }

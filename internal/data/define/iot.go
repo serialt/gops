@@ -6,3 +6,9 @@ type IOTListCond struct {
 	Status  string
 	RoleID  int64
 }
+
+type IOTBrokerListCond struct {
+	PageCond
+	Keyword string
+	Enabled *bool
+}
