@@ -11,7 +11,6 @@ type Config struct {
 	Log    Log    `json:"log" yaml:"log"`
 	Server Server `json:"server" yaml:"server"`
 	IOT    IOT    `json:"iot" yaml:"iot"`
-	Env    string `json:"-" yaml:"-"`
 }
 
 type IOT struct {

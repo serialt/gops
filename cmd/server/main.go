@@ -14,7 +14,6 @@ import (
 	"gops/docs"
 	"gops/internal/config"
 	"gops/internal/data"
-	"gops/internal/data/define"
 	"gops/internal/pkg/casbinx"
 	"gops/internal/server"
 
@@ -33,8 +32,6 @@ var (
 	GenModel    bool
 	GenTable    bool
 	UserCommand string
-	DBPath      string
-	DevMode     bool
 	GenTableDir = "sql"
 	Args        []string
 )
@@ -46,8 +43,6 @@ func init() {
 	flag.StringVar(&ConfigFile, "c", "config.yaml", "Config file")
 	flag.StringVar(&UserCommand, "u", "", "user command: list, create, reset")
 	flag.BoolVar(&GenTable, "t", false, "goose cmd")
-	flag.StringVar(&DBPath, "db", "", "sqlite db path")
-	flag.BoolVar(&DevMode, "dev", false, "enable dev env")
 	flag.Parse()
 	Args = flag.Args()
 }
@@ -85,10 +80,6 @@ func seedDatabase(cfg *config.Config) error {
 
 func main() {
 	cfg := config.NewConfig(ConfigFile)
-	if DevMode {
-		cfg.Env = define.EnvDev
-	}
-
 	if appVersion {
 		fmt.Printf("AppVersion: %v\nGo Version: %v\nBuild Time: %v\nGit Commit: %v\n\n",
 			APPVersion,

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"gops/internal/config"
-	"gops/internal/data/define"
 	"gops/internal/handler"
 	iotbroker "gops/internal/iot"
 	"gops/internal/middleware"
@@ -85,12 +84,12 @@ func NewGinEngine(
 	whitelistMap := lo.KeyBy(whitelist, func(item string) string { return item })
 	middleware.RegisterMiddleware(r, cfg, whitelistMap)
 
-	if cfg.Env == define.EnvDev {
-		if err := Seed(db, casbinService); err != nil {
-			cancelSchedulers()
-			panic(err)
-		}
-	}
+	// if cfg.Env == define.EnvDev {
+	// 	if err := Seed(db, casbinService); err != nil {
+	// 		cancelSchedulers()
+	// 		panic(err)
+	// 	}
+	// }
 
 	go monitorHandler.StartScheduler(schedulerCtx)
 	go kubernetesHandler.StartStatusScheduler(schedulerCtx, 6*time.Hour)
