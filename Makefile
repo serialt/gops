@@ -89,7 +89,9 @@ build: clean frontend wire
 
 release: clean frontend
 	@set -eu; \
+		package_dir=""; \
 		cleanup() { \
+			if [ -n "$$package_dir" ]; then rm -rf "$$package_dir"; fi; \
 			rm -rf $(EMBED_DIR); \
 			mkdir -p $(EMBED_DIR); \
 			cp $(WEB_FALLBACK) $(EMBED_DIR)/index.html; \
@@ -104,11 +106,20 @@ release: clean frontend
 			arch=$${platform#*/}; \
 			ext=""; \
 			if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
-			output="$(DIST_DIR)/$(APP_NAME)-$$os-$$arch$$ext"; \
-			echo "Building $$output"; \
+			package_name="$(APP_NAME)-$$os-$$arch"; \
+			package_dir="$(DIST_DIR)/$$package_name"; \
+			archive="$(DIST_DIR)/$$package_name.tar.gz"; \
+			rm -rf "$$package_dir"; \
+			mkdir -p "$$package_dir"; \
+			output="$$package_dir/$(APP_NAME)$$ext"; \
+			echo "Building $$archive"; \
 			CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "$(LDFLAGS)" -o "$$output" $(CMD_PATH); \
+			cp config.yaml.example "$$package_dir/config.yaml.example"; \
+			tar -czf "$$archive" -C "$$package_dir" .; \
+			rm -rf "$$package_dir"; \
+			package_dir=""; \
 		done
-	@ls -lh $(DIST_DIR)/$(APP_NAME)-*
+	@ls -lh $(DIST_DIR)/$(APP_NAME)-*.tar.gz
 
 image:
 	docker build --tag $(IMAGE) .
