@@ -46,7 +46,7 @@ all: build
 
 deps:
 	go mod download
-	pnpm --dir $(WEB_DIR) install --frozen-lockfile
+	pnpm --dir $(WEB_DIR) install 
 
 frontend:
 	pnpm --dir $(WEB_DIR) build
