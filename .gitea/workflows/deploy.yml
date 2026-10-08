@@ -30,31 +30,31 @@ jobs:
           test "${#GOPS_AES_KEY}" -eq 32
 
       - name: Build image in container runtime
-        run: docker-compose build --pull gops
+        run: docker compose build --pull gops
 
       - name: Start service
-        run: docker-compose up -d --remove-orphans gops
+        run: docker compose up -d --remove-orphans gops
 
       - name: Wait for health check
         shell: sh
         run: |
-          container_id="$(docker-compose ps -q gops)"
+          container_id="$(docker compose ps -q gops)"
           test -n "$container_id"
           for attempt in $(seq 1 36); do
             status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
             if [ "$status" = "healthy" ]; then
-              docker-compose ps
+              docker compose ps
               exit 0
             fi
             if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
-              docker-compose logs --no-color gops
+              docker compose logs --no-color gops
               exit 1
             fi
             sleep 5
           done
-          docker-compose logs --no-color gops
+          docker compose logs --no-color gops
           exit 1
 
       - name: Show logs on failure
         if: failure()
-        run: docker-compose logs --no-color --tail=200 gops
+        run: docker compose logs --no-color --tail=200 gops
