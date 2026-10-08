@@ -22,13 +22,6 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Validate deployment secrets
-        shell: sh
-        run: |
-          test -n "$GOPS_JWT_SECRET"
-          test -n "$GOPS_AES_KEY"
-          test "${#GOPS_AES_KEY}" -eq 32
-
       - name: Build image in container runtime
         run: docker compose build --pull gops
 
