@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 
 	"gops/docs"
 	"gops/internal/config"
@@ -49,6 +52,37 @@ func init() {
 	Args = flag.Args()
 }
 
+func sqliteDatabaseMissing(dsn string) bool {
+	dsn = strings.TrimSpace(dsn)
+	if dsn == "" {
+		return false
+	}
+	if dsn == ":memory:" || strings.Contains(dsn, "mode=memory") {
+		return false
+	}
+	path := strings.SplitN(dsn, "?", 2)[0]
+	path = strings.TrimPrefix(path, "file:")
+	path = strings.TrimPrefix(path, "//")
+	_, err := os.Stat(path)
+	return errors.Is(err, os.ErrNotExist)
+}
+
+func seedDatabase(cfg *config.Config) error {
+	db, cleanup, err := data.NewDB(cfg, slog.Default())
+	if err != nil {
+		return fmt.Errorf("open migrated database: %w", err)
+	}
+	defer cleanup()
+	casbinService, err := casbinx.NewService(db)
+	if err != nil {
+		return fmt.Errorf("initialize Casbin: %w", err)
+	}
+	if err := server.Seed(db, casbinService); err != nil {
+		return fmt.Errorf("seed database: %w", err)
+	}
+	return nil
+}
+
 func main() {
 	cfg := config.NewConfig(ConfigFile)
 	if DevMode {
@@ -77,20 +111,20 @@ func main() {
 			log.Fatalf("failed to migrate database: %v", err)
 		}
 		if Args[0] == "up" {
-			db, cleanup, err := data.NewDB(cfg, slog.Default())
-			if err != nil {
-				log.Fatalf("failed to open migrated database: %v", err)
-			}
-			defer cleanup()
-			casbinService, err := casbinx.NewService(db)
-			if err != nil {
-				log.Fatalf("failed to initialize Casbin: %v", err)
-			}
-			if err := server.Seed(db, casbinService); err != nil {
-				log.Fatalf("failed to seed database: %v", err)
+			if err := seedDatabase(cfg); err != nil {
+				log.Fatalf("failed to initialize database: %v", err)
 			}
 		}
 		return
+	}
+	if sqliteDatabaseMissing(cfg.Dsn) {
+		slog.Info("SQLite database does not exist; applying migrations", "dsn", cfg.Dsn)
+		if err := data.GenTable(cfg, docs.Migrations, []string{"up"}, GenTableDir); err != nil {
+			log.Fatalf("failed to migrate database: %v", err)
+		}
+		if err := seedDatabase(cfg); err != nil {
+			log.Fatalf("failed to initialize database: %v", err)
+		}
 	}
 	loggger := sugar.New(
 		sugar.WithShort(true),
