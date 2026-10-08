@@ -28,7 +28,7 @@ onMounted(load)
 </script>
 <template>
   <section class="page"><header><h2>任务作业</h2><p>查看执行任务和文件分发的运行记录。</p></header><div class="toolbar"><el-input v-model="keyword" clearable placeholder="搜索任务名称" /><el-select v-model="taskType" clearable placeholder="选择任务类型"><el-option label="执行任务" value="manual" /><el-option label="文件分发" value="file" /></el-select><el-select v-model="status" clearable placeholder="选择状态"><el-option label="执行中" value="running" /><el-option label="成功" value="success" /><el-option label="失败" value="failed" /></el-select></div><AppDataGrid v-loading="loading" class="grid" :row-data="rows" :column-defs="columns" pagination server-pagination :total="total" :current-page="page" :page-size="pageSize" @page-change="value => { page = value; void load() }" @page-size-change="value => { pageSize = value; page = 1; void load() }" />
-    <el-dialog :model-value="Boolean(detail)" title="任务详情" width="820px" class="task-detail-dialog" @update:model-value="value => { if (!value) detail = null }">
+    <el-dialog :model-value="Boolean(detail)" title="任务详情" width="820px" class="task-detail-dialog" @update:model-value="(value: boolean) => { if (!value) detail = null }">
       <div v-if="detail" class="detail-content">
         <div class="detail-summary">
           <div><span>任务名称</span><strong>{{ detail.name }}</strong></div>

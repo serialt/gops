@@ -26,5 +26,16 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        onwarn(warning, warn) {
+          const isVueUsePureAnnotation = warning.code === 'INVALID_ANNOTATION'
+            && warning.id?.includes('@vueuse/core/dist/index.js')
+            && warning.message.includes('#__PURE__')
+          if (isVueUsePureAnnotation) return
+          warn(warning)
+        },
+      },
+    },
   }
 })

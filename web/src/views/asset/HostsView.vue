@@ -56,7 +56,10 @@ async function batchRemove(selectedRows: unknown[]) {
 async function batchCollect(selectedRows: unknown[]) {
     const selected = selectedRows as Host[]
     const hosts = selected.filter(hasSSHConnection)
-    if (!hosts.length) return ElMessage.warning('选中的主机均未配置 SSH，无法采集')
+    if (!hosts.length) {
+        ElMessage.warning('选中的主机均未配置 SSH，无法采集')
+        return
+    }
     await Promise.all(hosts.map(host => collectHostInfo(host.id)))
     const skipped = selected.length - hosts.length
     ElMessage.success(`已完成 ${hosts.length} 台主机的信息采集${skipped ? `，跳过 ${skipped} 台未配置 SSH 的主机` : ''}`)

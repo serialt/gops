@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { ElMessage, type UploadFile, type UploadFiles, type UploadUserFile } from 'element-plus'
+import { ElMessage, type UploadFile, type UploadFiles, type UploadRawFile, type UploadUserFile } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { listHosts, type Host } from '@/api/asset'
 import { distributeTaskFiles, type TaskHostResult } from '@/api/task'
@@ -19,7 +19,7 @@ async function loadHosts() {
 function filesChanged(_file: UploadFile, files: UploadFiles) { fileList.value = files }
 function formatSize(size = 0) { if (size < 1024) return `${size} B`; if (size < 1048576) return `${(size / 1024).toFixed(1)} KB`; return `${(size / 1048576).toFixed(1)} MB` }
 async function distribute() {
-  const files = fileList.value.map(item => item.raw).filter((item): item is File => Boolean(item))
+  const files = fileList.value.map(item => item.raw).filter((item): item is UploadRawFile => item !== undefined)
   if (!files.length) return ElMessage.warning('请选择要分发的文件')
   if (!hostIDs.value.length) return ElMessage.warning('请选择目标主机')
   if (!targetPath.value.trim()) return ElMessage.warning('请输入目标路径')
