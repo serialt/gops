@@ -9,8 +9,8 @@ server:
   http_port: 9876
   jwt_secret: "replace-with-a-long-random-secret"
   # 必须替换为独立、随机的 32 字节 AES-256 密钥。
-  aes_key: "replace-with-a-32-byte-aes-key"
-  access_token_timeout: 15m
+  aes_key: "0123456789abcdef0123456789abcdef"
+  access_token_timeout: 30m
   refresh_token_timeout: 168h
 
 iot:
