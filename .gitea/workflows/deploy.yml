@@ -47,14 +47,14 @@ jobs:
               exit 0
             fi
             if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
-              docker compose logs --no-color gops
+              docker compose logs  gops
               exit 1
             fi
             sleep 5
           done
-          docker compose logs --no-color gops
+          docker compose logs  gops
           exit 1
 
       - name: Show logs on failure
         if: failure()
-        run: docker compose logs --no-color --tail=200 gops
+        run: docker compose logs  --tail=200 gops
