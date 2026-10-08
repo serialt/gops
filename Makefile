@@ -20,9 +20,17 @@ LDFLAGS := -s -w \
 
 PLATFORMS := linux/amd64 darwin/arm64
 
+IMAGE ?= gin-vue:$(VERSION)
+IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
+BUILDX_BUILDER ?=
+BUILDX := docker buildx build
+ifneq ($(strip $(BUILDX_BUILDER)),)
+BUILDX += --builder $(BUILDX_BUILDER)
+endif
+
 .DEFAULT_GOAL := help
 
-.PHONY: help all deps frontend frontend-check backend build release run test check wire migrate-up migrate-down migrate-status migration-create generate clean
+.PHONY: help all deps frontend frontend-check backend build release image image-multiarch run test check wire migrate-up migrate-down migrate-status migration-create generate clean
 
 help:
 	@echo "Gops build targets:"
@@ -31,6 +39,8 @@ help:
 	@echo "  make backend                Build backend with the current embedded resources"
 	@echo "  make build                  Build frontend and one self-contained backend binary"
 	@echo "  make release                Build self-contained binaries for all platforms"
+	@echo "  make image                  Build a container image for the current architecture"
+	@echo "  make image-multiarch        Build and push a linux/amd64,linux/arm64 image"
 	@echo "  make run                    Run the backend in development mode"
 	@echo "  make test                   Run backend tests"
 	@echo "  make check                  Run backend tests and frontend type checking"
@@ -99,6 +109,16 @@ release: clean frontend
 			CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "$(LDFLAGS)" -o "$$output" $(CMD_PATH); \
 		done
 	@ls -lh $(DIST_DIR)/$(APP_NAME)-*
+
+image:
+	docker build --tag $(IMAGE) .
+
+# A multi-platform image cannot be loaded into Docker's classic local image
+# store. Publish the manifest and architecture-specific images to the registry.
+# Example: make image-multiarch IMAGE=registry.example.com/team/gops:v1.0.0
+image-multiarch:
+	@test -n "$(IMAGE)" || (echo "IMAGE is required"; exit 1)
+	$(BUILDX) --platform $(IMAGE_PLATFORMS) --tag $(IMAGE) --push .
 
 run:
 	go run $(CMD_PATH)

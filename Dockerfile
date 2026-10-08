@@ -16,7 +16,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositorie
     && install -d -o app -g app /app/data
 USER app
 WORKDIR /app/data
-COPY --from=backend-builder /out/server /usr/local/bin/gops
+COPY --from=backend-builder /src/dist/gops /usr/local/bin/gops
 COPY --chown=app:app docker/entrypoint.sh /usr/local/bin/gops-entrypoint
 EXPOSE 9876
 ENTRYPOINT ["/usr/local/bin/gops-entrypoint"]
