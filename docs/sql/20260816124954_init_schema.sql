@@ -272,6 +272,16 @@ CREATE TABLE "user" (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, /* 更新时间 */
   deleted_at DATETIME /* 删除时间 */
 );
+CREATE TABLE casbin_rule (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, /* Casbin规则ID */
+  ptype TEXT NOT NULL DEFAULT '', /* 策略类型 */
+  v0 TEXT NOT NULL DEFAULT '', /* 策略字段0 */
+  v1 TEXT NOT NULL DEFAULT '', /* 策略字段1 */
+  v2 TEXT NOT NULL DEFAULT '', /* 策略字段2 */
+  v3 TEXT NOT NULL DEFAULT '', /* 策略字段3 */
+  v4 TEXT NOT NULL DEFAULT '', /* 策略字段4 */
+  v5 TEXT NOT NULL DEFAULT '' /* 策略字段5 */
+);
 CREATE TABLE "monitor_domain" (
   id INTEGER PRIMARY KEY AUTOINCREMENT, /* 域名监控ID */
   domain VARCHAR(255) NOT NULL, /* 域名 */
@@ -405,6 +415,7 @@ CREATE INDEX idx_ssl_task_status ON ssl_task(status);
 CREATE UNIQUE INDEX idx_role_code_active ON role(code) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX idx_user_username_active ON user(username) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX idx_user_email_active ON user(email) WHERE deleted_at IS NULL AND email <> '';
+CREATE UNIQUE INDEX idx_casbin_rule ON casbin_rule(ptype, v0, v1, v2, v3, v4, v5);
 CREATE INDEX idx_monitor_domain_next_check ON monitor_domain(next_check);
 CREATE UNIQUE INDEX idx_monitor_domain_address_active ON monitor_domain(domain, port) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX idx_task_template_code_active ON task_template(code) WHERE deleted_at IS NULL;
@@ -426,8 +437,54 @@ WHERE NOT EXISTS (SELECT 1 FROM organization WHERE code = 'root' AND deleted_at 
 INSERT INTO system_config(config_key, config_value) VALUES ('system_name', 'Gops') ON CONFLICT(config_key) DO NOTHING;
 INSERT INTO system_config(config_key, config_value) VALUES ('system_description', '') ON CONFLICT(config_key) DO NOTHING;
 
+-- 初始化超级管理员，初始密码为 password；首次登录后应立即修改。
+INSERT INTO role(code, name, description)
+SELECT 'admin', '超级管理员', '拥有全部后台接口权限'
+WHERE NOT EXISTS (SELECT 1 FROM role WHERE code = 'admin' AND deleted_at IS NULL);
+
+INSERT INTO user(username, password_hash, nickname, email, status)
+SELECT 'admin', '$2a$10$itQzLKzPEE0KGCYXAiKol.rOt0GjhsQkm6mX42SOk09Hhye5DjM5u', '管理员', '', TRUE
+WHERE NOT EXISTS (SELECT 1 FROM user WHERE username = 'admin' AND deleted_at IS NULL);
+
+INSERT INTO user_role(user_id, role_id)
+SELECT users.id, roles.id
+FROM user AS users
+JOIN role AS roles ON roles.code = 'admin' AND roles.deleted_at IS NULL
+WHERE users.username = 'admin' AND users.deleted_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM user_role AS relation
+    WHERE relation.user_id = users.id AND relation.role_id = roles.id
+  );
+
+INSERT INTO organization_user(organization_id, user_id)
+SELECT organizations.id, users.id
+FROM organization AS organizations
+JOIN user AS users ON users.username = 'admin' AND users.deleted_at IS NULL
+WHERE organizations.code = 'root' AND organizations.deleted_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM organization_user AS relation
+    WHERE relation.organization_id = organizations.id AND relation.user_id = users.id
+  );
+
+INSERT INTO casbin_rule(ptype, v0, v1, v2, v3, v4, v5)
+SELECT 'g', CAST(users.id AS TEXT), 'admin', '', '', '', ''
+FROM user AS users
+WHERE users.username = 'admin' AND users.deleted_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM casbin_rule
+    WHERE ptype = 'g' AND v0 = CAST(users.id AS TEXT) AND v1 = 'admin'
+  );
+
+INSERT INTO casbin_rule(ptype, v0, v1, v2, v3, v4, v5)
+SELECT 'p', 'admin', '/api/v1/*', '.*', '', '', ''
+WHERE NOT EXISTS (
+  SELECT 1 FROM casbin_rule
+  WHERE ptype = 'p' AND v0 = 'admin' AND v1 = '/api/v1/*' AND v2 = '.*'
+);
+
 -- +goose Down
 PRAGMA foreign_keys = OFF;
+DROP TABLE IF EXISTS "casbin_rule";
 DROP TABLE IF EXISTS "iot_external_broker";
 DROP TABLE IF EXISTS "iot_acl_rule";
 DROP TABLE IF EXISTS "iot_client_connection";

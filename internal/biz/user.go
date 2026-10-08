@@ -1,6 +1,7 @@
 package biz
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -22,6 +23,77 @@ type UserBiz struct {
 
 func NewUserBiz(db *gorm.DB, casbinService *casbinx.Service, repo *rbac.RbacRepo) *UserBiz {
 	return &UserBiz{db: db, casbin: casbinService, repo: repo}
+}
+
+func (b *UserBiz) ListForCLI(ctx context.Context) ([]*api.UserResponse, error) {
+	users, err := b.repo.ListUsers(ctx, b.db)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*api.UserResponse, 0, len(users))
+	for _, user := range users {
+		result = append(result, toUserResponse(*user))
+	}
+	return result, nil
+}
+
+func (b *UserBiz) CreateForCLI(ctx context.Context, username, password, nickname string) (*api.UserResponse, error) {
+	username = strings.TrimSpace(username)
+	if username == "" || password == "" {
+		return nil, errors.New("username and password are required")
+	}
+	if nickname = strings.TrimSpace(nickname); nickname == "" {
+		nickname = username
+	}
+	if _, err := b.repo.GetUserByUsername(ctx, b.db, username); err == nil {
+		return nil, errors.New("username already exists")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+	user := &model.User{Username: username, PasswordHash: hash, Nickname: nickname, Status: true}
+	err = b.db.Transaction(func(tx *gorm.DB) error {
+		root, err := b.repo.GetOrganizationByCode(ctx, tx, "root")
+		if err != nil {
+			return err
+		}
+		adminRole, err := b.repo.GetRoleByCode(ctx, tx, "admin")
+		if err != nil {
+			return err
+		}
+		if err := b.repo.CreateUser(ctx, tx, user); err != nil {
+			return err
+		}
+		if err := b.repo.AppendUserOrganization(ctx, tx, user, root); err != nil {
+			return err
+		}
+		return b.repo.AppendUserRole(ctx, tx, user, adminRole)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := b.casbin.SetUserRoles(uint(user.ID), []string{"admin"}); err != nil {
+		return nil, err
+	}
+	return toUserResponse(*user), nil
+}
+
+func (b *UserBiz) ResetPasswordForCLI(ctx context.Context, username, password string) error {
+	if strings.TrimSpace(username) == "" || password == "" {
+		return errors.New("username and password are required")
+	}
+	user, err := b.repo.GetUserByUsername(ctx, b.db, strings.TrimSpace(username))
+	if err != nil {
+		return err
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	return b.repo.UpdateUserPassword(ctx, b.db, user.ID, hash)
 }
 
 func (b *UserBiz) List(req *api.UserListRequest) (*api.PageResponse[*api.UserResponse], error) {

@@ -12,6 +12,7 @@ import (
 	"gops/internal/config"
 	"gops/internal/data"
 	"gops/internal/data/define"
+	"gops/internal/pkg/casbinx"
 	"gops/internal/server"
 
 	"github.com/serialt/sugar/v3"
@@ -28,7 +29,7 @@ var (
 	CheckCfg    bool
 	GenModel    bool
 	GenTable    bool
-	ResetPass   string
+	UserCommand string
 	DBPath      string
 	DevMode     bool
 	GenTableDir = "sql"
@@ -40,7 +41,7 @@ func init() {
 	flag.BoolVar(&CheckCfg, "k", true, "check cfg")
 	flag.BoolVar(&GenModel, "g", false, "gorm gen model")
 	flag.StringVar(&ConfigFile, "c", "config.yaml", "Config file")
-	flag.StringVar(&ResetPass, "u", "", "reset user pass")
+	flag.StringVar(&UserCommand, "u", "", "user command: list, create, reset")
 	flag.BoolVar(&GenTable, "t", false, "goose cmd")
 	flag.StringVar(&DBPath, "db", "", "sqlite db path")
 	flag.BoolVar(&DevMode, "dev", false, "enable dev env")
@@ -72,7 +73,23 @@ func main() {
 			flag.Usage()
 			return
 		}
-		data.GenTable(cfg, docs.Migrations, Args, GenTableDir)
+		if err := data.GenTable(cfg, docs.Migrations, Args, GenTableDir); err != nil {
+			log.Fatalf("failed to migrate database: %v", err)
+		}
+		if Args[0] == "up" {
+			db, cleanup, err := data.NewDB(cfg, slog.Default())
+			if err != nil {
+				log.Fatalf("failed to open migrated database: %v", err)
+			}
+			defer cleanup()
+			casbinService, err := casbinx.NewService(db)
+			if err != nil {
+				log.Fatalf("failed to initialize Casbin: %v", err)
+			}
+			if err := server.Seed(db, casbinService); err != nil {
+				log.Fatalf("failed to seed database: %v", err)
+			}
+		}
 		return
 	}
 	loggger := sugar.New(
@@ -81,13 +98,11 @@ func main() {
 	)
 	slog.SetDefault(loggger)
 
-	if ResetPass != "" {
-		if len(Args) != 1 {
-			slog.Info("password is empty")
-			return
+	if UserCommand != "" {
+		if err := server.ManageUsers(context.Background(), UserCommand, Args, cfg); err != nil {
+			log.Fatalf("user command failed: %v", err)
 		}
-		server.ResetUserPassword(context.Background(), ResetPass, Args[0], cfg)
-
+		return
 	}
 
 	server, cleanup, err := InitializeServer(cfg, loggger)

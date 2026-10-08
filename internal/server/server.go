@@ -86,7 +86,7 @@ func NewGinEngine(
 	middleware.RegisterMiddleware(r, cfg, whitelistMap)
 
 	if cfg.Env == define.EnvDev {
-		if err := seed(db, casbinService); err != nil {
+		if err := Seed(db, casbinService); err != nil {
 			cancelSchedulers()
 			panic(err)
 		}

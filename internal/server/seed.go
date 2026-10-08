@@ -2,13 +2,16 @@ package server
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 
+	"gops/internal/biz"
 	"gops/internal/config"
 	"gops/internal/data"
 	"gops/internal/data/model"
-	"gops/internal/data/query"
+	"gops/internal/data/repo/rbac"
 	"gops/internal/pkg/auth"
 	"gops/internal/pkg/casbinx"
 
@@ -19,7 +22,8 @@ var (
 	DEFAULT_PASSWORD = "password"
 )
 
-func seed(db *gorm.DB, casbinService *casbinx.Service) error {
+// Seed 初始化内置管理员、管理员角色及其完整接口权限。
+func Seed(db *gorm.DB, casbinService *casbinx.Service) error {
 	var admin model.User
 	result := db.Where("username = ?", "admin").First(&admin)
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -59,37 +63,68 @@ func seed(db *gorm.DB, casbinService *casbinx.Service) error {
 	return nil
 }
 
-func ResetUserPassword(ctx context.Context, username string, pass string, cfg *config.Config) {
-	if username == "" {
-		slog.Info("用户名为空")
-		return
-	}
-
+// ManageUsers 执行命令行用户列表、创建和密码重置操作。
+func ManageUsers(ctx context.Context, action string, args []string, cfg *config.Config) error {
 	db, cleanup, err := data.NewDB(cfg, slog.Default())
 	if err != nil {
-		slog.Info("connect db failed", "err", err)
-		return
+		return fmt.Errorf("connect database: %w", err)
 	}
 	defer cleanup()
-	mm := query.Use(db).User
-	_, err = mm.WithContext(ctx).Where(mm.Username.Eq(username)).Find()
-	if err != nil && err != gorm.ErrRecordNotFound {
-		slog.Info("unknown err", "err", err)
-		return
-	}
-	if err == gorm.ErrRecordNotFound {
-		slog.Info("user not exists, reset failed")
-		return
-	}
-	hash, err := auth.HashPassword(pass)
+	casbinService, err := casbinx.NewService(db)
 	if err != nil {
-		slog.Info("gen hash password failed", "err", err)
+		return fmt.Errorf("initialize Casbin: %w", err)
 	}
-	_, err = mm.WithContext(ctx).Where(mm.Username.Eq(username)).UpdateSimple(mm.PasswordHash.Value(hash))
-	if err != nil {
-		slog.Info("reset user password failed", "err", err)
-		return
-	} else {
-		slog.Info("reset user password succeed!!!")
+	userBiz := biz.NewUserBiz(db, casbinService, rbac.NewRbacRepo())
+
+	switch action {
+	case "list":
+		if len(args) != 0 {
+			return errors.New("usage: -u list")
+		}
+		users, err := userBiz.ListForCLI(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%-6s %-24s %-24s %-8s\n", "ID", "USERNAME", "NICKNAME", "STATUS")
+		for _, user := range users {
+			status := "disabled"
+			if user.Status {
+				status = "enabled"
+			}
+			fmt.Printf("%-6d %-24s %-24s %-8s\n", user.ID, user.Username, user.Nickname, status)
+		}
+		return nil
+	case "create":
+		if len(args) < 2 || len(args) > 3 {
+			return errors.New("usage: -u create <username> <password> [nickname]")
+		}
+		nickname := args[0]
+		if len(args) == 3 {
+			nickname = args[2]
+		}
+		user, err := userBiz.CreateForCLI(ctx, args[0], args[1], nickname)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("created administrator %s (ID %d)\n", user.Username, user.ID)
+		return nil
+	case "reset":
+		if len(args) != 2 {
+			return errors.New("usage: -u reset <username> <new-password>")
+		}
+		if err := userBiz.ResetPasswordForCLI(ctx, args[0], args[1]); err != nil {
+			return err
+		}
+		fmt.Printf("reset password for user %s\n", args[0])
+		return nil
+	default:
+		if len(args) == 1 {
+			if err := userBiz.ResetPasswordForCLI(ctx, action, args[0]); err != nil {
+				return err
+			}
+			fmt.Printf("reset password for user %s\n", action)
+			return nil
+		}
+		return errors.New("unknown user action; use list, create, or reset")
 	}
 }

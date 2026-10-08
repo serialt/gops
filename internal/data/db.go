@@ -81,17 +81,15 @@ func GenModel(cfg *config.Config) {
 	g.Execute()
 }
 
-func GenTable(cfg *config.Config, migrations embed.FS, gooseArgs []string, dir string) {
+func GenTable(cfg *config.Config, migrations embed.FS, gooseArgs []string, dir string) error {
 	goose.SetBaseFS(migrations)
 	command := gooseArgs[0]
 	if err := goose.SetDialect("sqlite3"); err != nil {
-		slog.Error("goose: failed to set SQLite dialect", "err", err)
-		return
+		return fmt.Errorf("goose: failed to set SQLite dialect: %w", err)
 	}
 	gooseDB, err := sql.Open("sqlite", cfg.Dsn)
 	if err != nil {
-		slog.Error("goose: failed to open DB", "err", err)
-		return
+		return fmt.Errorf("goose: failed to open DB: %w", err)
 	}
 	defer func() {
 		if err := gooseDB.Close(); err != nil {
@@ -111,8 +109,7 @@ func GenTable(cfg *config.Config, migrations embed.FS, gooseArgs []string, dir s
 	}
 
 	if err := goose.RunContext(context.Background(), command, gooseDB, dir, arguments...); err != nil {
-		slog.Error("goose: failed to run", "cmd", command, "err", err)
-		return
+		return fmt.Errorf("goose: failed to run %s: %w", command, err)
 	}
-
+	return nil
 }

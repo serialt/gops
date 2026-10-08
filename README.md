@@ -134,7 +134,16 @@ go run ./cmd/server -t status
 # 基于当前 SQLite 表结构重新生成 model 和 query
 go run ./cmd/server -g
 
-# 重置指定用户密码；命令执行后服务会继续启动
+# 列出用户
+go run ./cmd/server -u list
+
+# 创建管理员（自动关联 admin 角色和默认根组织；昵称可省略）
+go run ./cmd/server -u create operator 'StrongPassword' '运维用户'
+
+# 重置指定用户密码
+go run ./cmd/server -u reset admin 'NewPassword'
+
+# 兼容旧版重置密码写法
 go run ./cmd/server -u admin 'NewPassword'
 ```
 
