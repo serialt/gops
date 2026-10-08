@@ -18,7 +18,7 @@ LDFLAGS := -s -w \
 	-X 'main.BuildTime=$(BUILD_TIME)' \
 	-X 'main.GitCommit=$(GIT_COMMIT)'
 
-PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
+PLATFORMS := linux/amd64 darwin/arm64
 
 .DEFAULT_GOAL := help
 

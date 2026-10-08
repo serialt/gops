@@ -5,6 +5,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositorie
 RUN apk add --no-cache ca-certificates git npm pnpm make && pnpm config set registry https://registry.npmmirror.com
 
 COPY . .
+RUN go install github.com/google/wire/cmd/wire@latest
 RUN make deps && make build
 
 FROM alpine:3.24
