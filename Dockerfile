@@ -1,24 +1,20 @@
-FROM node:22-alpine AS frontend-builder
-WORKDIR /src/web
-RUN corepack enable
-COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
-COPY web/ ./
-RUN pnpm build
-
-FROM golang:1.27-alpine AS backend-builder
+FROM golang:1.27.1-alpine AS backend-builder
 WORKDIR /src
-RUN apk add --no-cache ca-certificates git
-COPY go.mod go.sum ./
-RUN go mod download
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && apk update
+RUN apk add --no-cache ca-certificates git npm pnpm && pnpm config set registry https://registry.npmmirror.com
+
 COPY . .
-COPY --from=frontend-builder /src/web/dist/ ./internal/webui/dist/
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+RUN make deps && make build
 
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates tzdata && adduser -D -u 10001 app
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories \
+    && apk update \
+    && apk add --no-cache ca-certificates tzdata wget curl\
+    && adduser -D -u 10001 app \
+    && install -d -o app -g app /app/data
 USER app
-WORKDIR /app
-COPY --from=backend-builder /out/server /app/server
+WORKDIR /app/data
+COPY --from=backend-builder /out/server /usr/local/bin/gops
+COPY --chown=app:app docker/entrypoint.sh /usr/local/bin/gops-entrypoint
 EXPOSE 9876
-ENTRYPOINT ["/app/server"]
+ENTRYPOINT ["/usr/local/bin/gops-entrypoint"]

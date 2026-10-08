@@ -1,28 +1,31 @@
 services:
-  backend:
+  gops:
     build:
-      context: ./backend
+      context: .
+      dockerfile: Dockerfile
+    image: ${GOPS_IMAGE:-gin-vue:local}
+    container_name: ${GOPS_CONTAINER_NAME:-gops}
     restart: unless-stopped
     environment:
-      APP_ADDR: ":8080"
-      DB_DSN: "/data/gops.db"
-      JWT_SECRET: ${JWT_SECRET:-replace-with-a-long-random-secret}
-      JWT_EXPIRE_HOURS: "24"
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@123456}
-      CORS_ORIGINS: "http://localhost:8088,http://localhost:5173"
+      TZ: ${TZ:-Asia/Shanghai}
+      GOPS_HTTP_PORT: "9876"
+      GOPS_DB_DSN: /app/data/gops.db
+      GOPS_LOG_LEVEL: ${GOPS_LOG_LEVEL:-info}
+      GOPS_JWT_SECRET: ${GOPS_JWT_SECRET:-replace-with-a-long-random-secret}
+      GOPS_AES_KEY: ${GOPS_AES_KEY:-0123456789abcdef0123456789abcdef}
+      GOPS_ACCESS_TOKEN_TIMEOUT: ${GOPS_ACCESS_TOKEN_TIMEOUT:-15m}
+      GOPS_REFRESH_TOKEN_TIMEOUT: ${GOPS_REFRESH_TOKEN_TIMEOUT:-168h}
+      GOPS_IOT_ENABLED: ${GOPS_IOT_ENABLED:-false}
     volumes:
-      - sqlite_data:/data
+      - sqlite_data:/app/data
     ports:
-      - "8080:8080"
-
-  frontend:
-    build:
-      context: ./frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    ports:
-      - "8088:80"
+      - "${GOPS_HTTP_PORT:-9876}:9876"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "--post-data=", "http://127.0.0.1:9876/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
 
 volumes:
   sqlite_data:

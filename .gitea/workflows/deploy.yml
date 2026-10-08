@@ -1,0 +1,60 @@
+name: Build and deploy container
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: gin-vue-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GOPS_IMAGE: gin-vue:${{ gitea.sha }}
+      GOPS_JWT_SECRET: ${{ secrets.GOPS_JWT_SECRET }}
+      GOPS_AES_KEY: ${{ secrets.GOPS_AES_KEY }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Validate deployment secrets
+        shell: sh
+        run: |
+          test -n "$GOPS_JWT_SECRET"
+          test -n "$GOPS_AES_KEY"
+          test "${#GOPS_AES_KEY}" -eq 32
+
+      - name: Build image in container runtime
+        run: docker-compose build --pull gops
+
+      - name: Start service
+        run: docker-compose up -d --remove-orphans gops
+
+      - name: Wait for health check
+        shell: sh
+        run: |
+          container_id="$(docker-compose ps -q gops)"
+          test -n "$container_id"
+          for attempt in $(seq 1 36); do
+            status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+            if [ "$status" = "healthy" ]; then
+              docker-compose ps
+              exit 0
+            fi
+            if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+              docker-compose logs --no-color gops
+              exit 1
+            fi
+            sleep 5
+          done
+          docker-compose logs --no-color gops
+          exit 1
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker-compose logs --no-color --tail=200 gops
