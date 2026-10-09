@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 30
     env:
       GOPS_IMAGE_REPOSITORY: registry.cn-hangzhou.aliyuncs.com/serialt/gops
+      GOPS_BASE_IMAGE_REPOSITORY: registry.cn-hangzhou.aliyuncs.com/serialt/gops-base
       GOPS_JWT_SECRET: ${{ secrets.GOPS_JWT_SECRET }}
       GOPS_AES_KEY: ${{ secrets.GOPS_AES_KEY }}
     steps:
@@ -32,12 +33,30 @@ jobs:
           safe_branch="$(printf '%s' "$RAW_BRANCH" | sed 's/[^A-Za-z0-9_.-]/-/g')"
           test -n "$safe_branch"
           test -n "$COMMIT_SHA"
+          dependency_sha="$(sha256sum go.mod go.sum web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml | awk '{print $1}' | sha256sum | awk '{print $1}')"
+          test -n "$dependency_sha"
           printf 'GOPS_IMAGE=%s:%s-%s\n' "$GOPS_IMAGE_REPOSITORY" "$safe_branch" "$COMMIT_SHA" >> "$GITHUB_ENV"
+          printf 'GOPS_BASE_IMAGE=%s:%s\n' "$GOPS_BASE_IMAGE_REPOSITORY" "$dependency_sha" >> "$GITHUB_ENV"
 
+      - name: Prepare base image
+        shell: sh
+        run: |
+          set -eu
+          if podman manifest inspect "$GOPS_BASE_IMAGE" >/dev/null 2>&1; then
+            echo "Base image exists: $GOPS_BASE_IMAGE"
+            podman pull "$GOPS_BASE_IMAGE"
+          else
+            echo "Base image not found, building: $GOPS_BASE_IMAGE"
+            podman build --pull=missing --tag "$GOPS_BASE_IMAGE" --file docker/Dockerfile.base .
+            podman image exists "$GOPS_BASE_IMAGE"
+            podman push "$GOPS_BASE_IMAGE"
+          fi
 
       - name: Build image
+        shell: sh
         run: |
-          podman build --pull --tag "$GOPS_IMAGE" --file Dockerfile .
+          set -eu
+          podman build --pull=missing --build-arg "GOPS_BASE_IMAGE=$GOPS_BASE_IMAGE" --tag "$GOPS_IMAGE" --file Dockerfile .
           podman image exists "$GOPS_IMAGE"
 
       - name: Push image

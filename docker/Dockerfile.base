@@ -1,0 +1,15 @@
+FROM golang:1.27.1-alpine
+
+WORKDIR /src
+ENV GOPROXY=https://goproxy.cn,direct
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories \
+    && apk add --no-cache ca-certificates git npm pnpm make \
+    && pnpm config set registry https://registry.npmmirror.com
+
+COPY go.mod go.sum ./
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./web/
+
+RUN go mod download \
+    && go install github.com/google/wire/cmd/wire@latest \
+    && pnpm --dir web install --frozen-lockfile
