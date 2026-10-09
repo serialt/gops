@@ -11,6 +11,9 @@ type SSLCertificateListRequest struct {
 type SSLCertificateIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
 }
+type SSLCertificateDownloadRequest struct {
+	IDs []int64 `json:"ids" binding:"required,min=1"`
+}
 type SSLCertificateApplyRequest struct {
 	Name            string `json:"name" binding:"required"`
 	Domain          string `json:"domain" binding:"required"`
