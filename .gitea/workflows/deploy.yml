@@ -104,7 +104,3 @@ jobs:
         if: failure()
         run: |
           podman compose logs --tail=200 gops || true
-
-      - name: Logout from Aliyun Container Registry
-        if: always()
-        run: podman logout "$ALI_ACR_REGISTRY" || true
