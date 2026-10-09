@@ -31,7 +31,7 @@ jobs:
       - name: Wait for health check
         shell: sh
         run: |
-          container_id="$(docker compose ps -q gops)"
+          container_id="$(podman ps -q --filter name=gops)"
           test -n "$container_id"
           for attempt in $(seq 1 36); do
             status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
