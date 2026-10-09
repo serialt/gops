@@ -14,7 +14,7 @@ services:
       GOPS_REFRESH_TOKEN_TIMEOUT: ${GOPS_REFRESH_TOKEN_TIMEOUT:-168h}
       GOPS_IOT_ENABLED: ${GOPS_IOT_ENABLED:-false}
     volumes:
-      - sqlite_data:/app/data
+      - /opt/app/gops/data:/app/data
     ports:
       - "${GOPS_HTTP_PORT:-9876}:9876"
     healthcheck:
@@ -42,6 +42,3 @@ services:
 
       # 后端服务端口
       - "traefik.http.services.gops.loadbalancer.server.port=9876"
-
-volumes:
-  sqlite_data:
