@@ -80,7 +80,7 @@ func NewGinEngine(
 	}
 
 	r = gin.New()
-	r.Use(gzipMiddleware())
+	// r.Use(gingzip.Gzip(gingzip.DefaultCompression))
 	schedulerCtx, cancelSchedulers := context.WithCancel(context.Background())
 	whitelistMap := lo.KeyBy(whitelist, func(item string) string { return item })
 	middleware.RegisterMiddleware(r, cfg, whitelistMap)
