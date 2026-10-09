@@ -1,17 +1,11 @@
-FROM golang:1.27.1-alpine AS backend-builder
-WORKDIR /src
-ENV GOPROXY=https://goproxy.cn,direct
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && apk update
-RUN apk add --no-cache ca-certificates git npm pnpm make && pnpm config set registry https://registry.npmmirror.com
-
+ARG GOPS_BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/serialt/gops-base:latest
+FROM ${GOPS_BASE_IMAGE} AS backend-builder
 COPY . .
-RUN go install github.com/google/wire/cmd/wire@latest
 RUN make deps && make build
 
 FROM alpine:3.24
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories \
-    && apk update \
-    && apk add --no-cache ca-certificates tzdata wget curl\
+    && apk add --no-cache ca-certificates tzdata wget curl \
     && adduser -D -u 10001 app \
     && install -d -o app -g app /app/data
 USER app
