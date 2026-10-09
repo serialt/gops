@@ -434,7 +434,12 @@ func certificateDetailResponse(x *model.SslCertificate) *api.SSLCertificateDetai
 	}
 	chainPEM := strings.TrimSpace(x.Certificate + "\n" + displayChain)
 	chain, err := parseCertificateChain(chainPEM)
-	response := &api.SSLCertificateDetailResponse{SSLCertificateResponse: certificateResponse(x), Certificate: x.Certificate, PrivateKey: x.PrivateKey, CertChain: displayChain, ChainCertificates: chain}
+	response := &api.SSLCertificateDetailResponse{
+		SSLCertificateResponse: certificateResponse(x),
+		Certificate:            x.Certificate,
+		PrivateKey:             x.PrivateKey,
+		CertChain:              displayChain,
+		ChainCertificates:      chain}
 	if err != nil {
 		response.ChainParseError = err.Error()
 	}
@@ -486,7 +491,14 @@ func parseCertificateChain(value string) ([]*api.SSLCertificateChainResponse, er
 			continue
 		}
 		seen[fingerprint] = struct{}{}
-		result = append(result, &api.SSLCertificateChainResponse{Position: len(result) + 1, Version: cert.Version, Subject: cert.Subject.String(), Issuer: cert.Issuer.String(), SerialNumber: strings.ToUpper(cert.SerialNumber.Text(16)), DNSNames: cert.DNSNames, EmailAddresses: cert.EmailAddresses, IPAddresses: certificateIPAddresses(cert), URIs: certificateURIs(cert), NotBefore: nonZeroTime(cert.NotBefore), NotAfter: nonZeroTime(cert.NotAfter), Fingerprint: fingerprint, IsCA: cert.IsCA, BasicConstraints: cert.BasicConstraintsValid, MaxPathLen: cert.MaxPathLen, MaxPathLenZero: cert.MaxPathLenZero, SignatureAlgorithm: cert.SignatureAlgorithm.String(), PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(), PublicKeyBits: certificatePublicKeyBits(cert), KeyUsage: certificateKeyUsages(cert.KeyUsage), ExtKeyUsage: certificateExtKeyUsages(cert.ExtKeyUsage), SubjectKeyID: strings.ToUpper(hex.EncodeToString(cert.SubjectKeyId)), AuthorityKeyID: strings.ToUpper(hex.EncodeToString(cert.AuthorityKeyId)), OCSPServers: cert.OCSPServer, IssuerURLs: cert.IssuingCertificateURL, CRLPoints: cert.CRLDistributionPoints, Policies: certificatePolicies(cert)})
+		result = append(result, &api.SSLCertificateChainResponse{
+			Position:     len(result) + 1,
+			Version:      cert.Version,
+			CommonName:   cert.Subject.CommonName,
+			Subject:      cert.Subject.String(),
+			Issuer:       cert.Issuer.String(),
+			SerialNumber: strings.ToUpper(cert.SerialNumber.Text(16)),
+			DNSNames:     cert.DNSNames, EmailAddresses: cert.EmailAddresses, IPAddresses: certificateIPAddresses(cert), URIs: certificateURIs(cert), NotBefore: nonZeroTime(cert.NotBefore), NotAfter: nonZeroTime(cert.NotAfter), Fingerprint: fingerprint, IsCA: cert.IsCA, BasicConstraints: cert.BasicConstraintsValid, MaxPathLen: cert.MaxPathLen, MaxPathLenZero: cert.MaxPathLenZero, SignatureAlgorithm: cert.SignatureAlgorithm.String(), PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(), PublicKeyBits: certificatePublicKeyBits(cert), KeyUsage: certificateKeyUsages(cert.KeyUsage), ExtKeyUsage: certificateExtKeyUsages(cert.ExtKeyUsage), SubjectKeyID: strings.ToUpper(hex.EncodeToString(cert.SubjectKeyId)), AuthorityKeyID: strings.ToUpper(hex.EncodeToString(cert.AuthorityKeyId)), OCSPServers: cert.OCSPServer, IssuerURLs: cert.IssuingCertificateURL, CRLPoints: cert.CRLDistributionPoints, Policies: certificatePolicies(cert)})
 	}
 	if strings.TrimSpace(value) != "" && len(result) == 0 {
 		return result, errors.New("证书链中未找到 X.509 证书")

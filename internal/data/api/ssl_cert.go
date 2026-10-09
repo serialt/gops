@@ -77,6 +77,7 @@ type SSLCertificateDetailResponse struct {
 type SSLCertificateChainResponse struct {
 	Position           int        `json:"position"`
 	Version            int        `json:"version"`
+	CommonName         string     `json:"common_name"`
 	Subject            string     `json:"subject"`
 	Issuer             string     `json:"issuer"`
 	SerialNumber       string     `json:"serial_number"`
