@@ -35,12 +35,14 @@ jobs:
           test -n "$COMMIT_SHA"
           dependency_sha="$(sha256sum go.mod go.sum web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml | awk '{print $1}' | sha256sum | awk '{print $1}')"
           test -n "$dependency_sha"
+          commit_short_sha="$(printf '%s' "$COMMIT_SHA" | cut -c1-12)"
+          dependency_short_sha="$(printf '%s' "$dependency_sha" | cut -c1-12)"
           GOPS_IMAGE_REPOSITORY="$ALI_ACR_REGISTRY/$ALI_ACR_USERNAME/gops"
           GOPS_BASE_IMAGE_REPOSITORY="$ALI_ACR_REGISTRY/$ALI_ACR_USERNAME/gops-base"
           printf 'GOPS_IMAGE_REPOSITORY=%s\n' "$GOPS_IMAGE_REPOSITORY" >> "$GITHUB_ENV"
           printf 'GOPS_BASE_IMAGE_REPOSITORY=%s\n' "$GOPS_BASE_IMAGE_REPOSITORY" >> "$GITHUB_ENV"
-          printf 'GOPS_IMAGE=%s:%s-%s\n' "$GOPS_IMAGE_REPOSITORY" "$safe_branch" "$COMMIT_SHA" >> "$GITHUB_ENV"
-          printf 'GOPS_BASE_IMAGE=%s:%s\n' "$GOPS_BASE_IMAGE_REPOSITORY" "$dependency_sha" >> "$GITHUB_ENV"
+          printf 'GOPS_IMAGE=%s:%s-%s\n' "$GOPS_IMAGE_REPOSITORY" "$safe_branch" "$commit_short_sha" >> "$GITHUB_ENV"
+          printf 'GOPS_BASE_IMAGE=%s:%s\n' "$GOPS_BASE_IMAGE_REPOSITORY" "$dependency_short_sha" >> "$GITHUB_ENV"
 
       - name: Login to Aliyun Container Registry
         shell: sh

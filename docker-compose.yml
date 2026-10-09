@@ -23,6 +23,25 @@ services:
       timeout: 3s
       retries: 12
       start_period: 20s
+    labels:
+      - "traefik.enable=true"
+
+      # HTTP 路由：接收 80 端口请求，并跳转到 HTTPS
+      - "traefik.http.routers.gops-http.rule=Host(`gops.imau.cc`)"
+      - "traefik.http.routers.gops-http.entrypoints=web"
+      - "traefik.http.routers.gops-http.middlewares=gops-redirect"
+
+      # 定义重定向中间件
+      - "traefik.http.middlewares.gops-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.gops-redirect.redirectscheme.permanent=true"
+
+      # HTTPS 路由：处理真正的 HTTPS 请求
+      - "traefik.http.routers.gops.rule=Host(`gops.imau.cc`)"
+      - "traefik.http.routers.gops.entrypoints=websecure"
+      - "traefik.http.routers.gops.tls=true"
+
+      # 后端服务端口
+      - "traefik.http.services.gops.loadbalancer.server.port=9876"
 
 volumes:
   sqlite_data:
