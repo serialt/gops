@@ -15,18 +15,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      GOPS_IMAGE: gin-vue:${{ gitea.sha }}
+      GOPS_IMAGE: gin-vue:${{ gitea.ref_name }}-${{ gitea.sha }}
       GOPS_JWT_SECRET: ${{ secrets.GOPS_JWT_SECRET }}
       GOPS_AES_KEY: ${{ secrets.GOPS_AES_KEY }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Build image in container runtime
-        run: docker compose build --pull gops
+      - name: Build image
+        run: docker build --pull --tag "$GOPS_IMAGE" --file Dockerfile .
 
       - name: Start service
-        run: docker compose up -d --remove-orphans gops
+        run: docker compose up -d  gops
 
       - name: Wait for health check
         shell: sh

@@ -1,8 +1,5 @@
 services:
   gops:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: ${GOPS_IMAGE:-gin-vue:local}
     container_name: ${GOPS_CONTAINER_NAME:-gops}
     restart: unless-stopped
