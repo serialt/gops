@@ -76,6 +76,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'audit/operations', name: 'audit-operations', component: () => import('@/views/audit/OperationLogsView.vue'), meta: { title: '操作日志', permission: 'POST /api/v1/audit/operation-logs/list' } },
       { path: 'audit/logins', name: 'audit-logins', component: () => import('@/views/audit/LoginLogsView.vue'), meta: { title: '登录日志', permission: 'POST /api/v1/audit/login-logs/list' } },
       { path: 'ssl-cert/certificates', name: 'ssl-certificates', component: () => import('@/views/ssl-cert/CertificatesView.vue'), meta: { title: '证书管理', permission: 'POST /api/v1/ssl-cert/certificates/list' } },
+      { path: 'ssl-cert/applications', name: 'ssl-cert-applications', component: () => import('@/views/ssl-cert/CertificateApplyView.vue'), meta: { title: '证书申请', permission: 'POST /api/v1/ssl-cert/applications/create' } },
       { path: 'ssl-cert/dns-providers', name: 'ssl-dns-providers', component: () => import('@/views/ssl-cert/DNSProvidersView.vue'), meta: { title: 'DNS 配置', permission: 'POST /api/v1/ssl-cert/dns-providers/list' } },
       { path: 'ssl-cert/deploy-configs', name: 'ssl-deploy-configs', component: () => import('@/views/ssl-cert/DeployConfigsView.vue'), meta: { title: '部署配置', permission: 'POST /api/v1/ssl-cert/deploy-configs/list' } },
       { path: 'ssl-cert/tasks', name: 'ssl-tasks', component: () => import('@/views/ssl-cert/TasksView.vue'), meta: { title: '任务记录', permission: 'POST /api/v1/ssl-cert/tasks/list' } },

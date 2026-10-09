@@ -1,7 +1,9 @@
 import request, { type PageResponse } from '@/utils/request'
 
-export interface SSLCertificate { id:number; name:string; domain:string; san_domains:string; acme_email:string; ca_provider:string; key_algorithm:string; source_type:string; cloud_account_id:number; dns_provider_id:number; issuer:string; fingerprint:string; status:string; auto_renew:boolean; renew_days_before:number; not_before:string|null; not_after:string|null; last_renew_at:string|null; last_error:string; certificate?:string; private_key?:string; cert_chain?:string }
+export interface SSLCertificateChain { position:number; subject:string; issuer:string; serial_number:string; dns_names:string[]; not_before:string|null; not_after:string|null; fingerprint:string; is_ca:boolean; signature_algorithm:string }
+export interface SSLCertificate { id:number; name:string; domain:string; san_domains:string; acme_email:string; ca_provider:string; key_algorithm:string; source_type:string; cloud_account_id:number; dns_provider_id:number; issuer:string; fingerprint:string; status:string; auto_renew:boolean; renew_days_before:number; not_before:string|null; not_after:string|null; last_renew_at:string|null; last_error:string; certificate?:string; private_key?:string; cert_chain?:string; chain_certificates?:SSLCertificateChain[]; chain_parse_error?:string }
 export interface SSLCertificateForm { id?:number; name:string; domain:string; san_domains:string; acme_email:string; ca_provider:string; key_algorithm:string; source_type:string; cloud_account_id:number; dns_provider_id:number; certificate:string; private_key:string; cert_chain:string; auto_renew:boolean; renew_days_before:number }
+export interface SSLCertificateApplyForm { name:string; domain:string; san_domains:string; acme_email:string; ca_provider:string; key_algorithm:string; dns_provider_id:number; auto_renew:boolean; renew_days_before:number }
 export interface SSLDNSProvider { id:number; name:string; provider:string; config?:string; email:string; phone:string; enabled:boolean; last_test_at:string|null; last_test_ok:boolean }
 export interface SSLDeployConfig { id:number; certificate_id:number; certificate_name:string; name:string; deploy_type:string; target_config:string; auto_deploy:boolean; enabled:boolean; last_deploy_at:string|null; last_deploy_ok:boolean; last_error:string }
 export interface SSLTask { id:number; certificate_id:number; certificate_name:string; task_type:string; status:string; trigger_type:string; started_at:string|null; finished_at:string|null; error_message:string; result:string; created_at:string }
@@ -11,6 +13,7 @@ export const getCertificate = (id:number) => request.post<SSLCertificate>('/ssl-
 export const saveCertificate = (data:SSLCertificateForm) => request.post<SSLCertificate>('/ssl-cert/certificates/save', data)
 export const deleteCertificate = (id:number) => request.post('/ssl-cert/certificates/delete', { id })
 export const renewCertificate = (id:number) => request.post<SSLTask>('/ssl-cert/certificates/renew', { id })
+export const applyCertificate = (data:SSLCertificateApplyForm) => request.post<SSLTask>('/ssl-cert/applications/create', data)
 
 export const listDNSProviders = (params:{keyword:string;provider:string;page:number;limit:number}) => request.post<PageResponse<SSLDNSProvider>>('/ssl-cert/dns-providers/list', params)
 export const getDNSProvider = (id:number) => request.post<SSLDNSProvider>('/ssl-cert/dns-providers/get', { id })

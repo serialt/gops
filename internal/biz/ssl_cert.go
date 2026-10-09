@@ -47,7 +47,7 @@ func (b *SSLCertBiz) GetCertificate(ctx context.Context, id int64) (*api.SSLCert
 	if err != nil {
 		return nil, err
 	}
-	return &api.SSLCertificateDetailResponse{SSLCertificateResponse: certificateResponse(row), Certificate: row.Certificate, PrivateKey: row.PrivateKey, CertChain: row.CertChain}, nil
+	return certificateDetailResponse(row), nil
 }
 
 func (b *SSLCertBiz) SaveCertificate(ctx context.Context, req *api.SSLCertificateRequest) (*api.SSLCertificateDetailResponse, error) {
@@ -85,7 +85,7 @@ func (b *SSLCertBiz) SaveCertificate(ctx context.Context, req *api.SSLCertificat
 			return nil, err
 		}
 	}
-	return &api.SSLCertificateDetailResponse{SSLCertificateResponse: certificateResponse(row), Certificate: row.Certificate, PrivateKey: row.PrivateKey, CertChain: row.CertChain}, nil
+	return certificateDetailResponse(row), nil
 }
 
 func (b *SSLCertBiz) DeleteCertificate(ctx context.Context, id int64) error {
@@ -100,12 +100,51 @@ func (b *SSLCertBiz) RenewCertificate(ctx context.Context, id int64) (*api.SSLTa
 	if err != nil {
 		return nil, err
 	}
+	if cert.SourceType != "acme" {
+		return nil, errors.New("仅 ACME 证书支持自动续期")
+	}
 	now := time.Now()
 	task := &model.SslTask{CertificateID: id, TaskType: "renew", Status: "pending", TriggerType: "manual", CreatedAt: now, UpdatedAt: now}
 	if err := b.repo.CreateTask(ctx, b.db, task); err != nil {
 		return nil, err
 	}
-	go b.runUnsupportedRenewTask(task.ID)
+	go b.runACMETask(task.ID, cert.ID)
+	return taskResponse(task, cert.Name), nil
+}
+
+func (b *SSLCertBiz) ApplyCertificate(ctx context.Context, req *api.SSLCertificateApplyRequest) (*api.SSLTaskResponse, error) {
+	provider, err := b.repo.GetDNSProvider(ctx, b.db, req.DNSProviderID)
+	if err != nil {
+		return nil, errors.New("DNS 配置不存在")
+	}
+	if !provider.Enabled {
+		return nil, errors.New("DNS 配置未启用")
+	}
+	if _, err = newLegoDNSProvider(provider); err != nil {
+		return nil, err
+	}
+	name := strings.TrimSpace(req.Name)
+	domain := strings.TrimSpace(req.Domain)
+	if name == "" || domain == "" {
+		return nil, errors.New("证书名称和主域名不能为空")
+	}
+	if req.RenewDaysBefore <= 0 {
+		req.RenewDaysBefore = 30
+	}
+	now := time.Now()
+	cert := &model.SslCertificate{Name: name, Domain: domain, SanDomains: strings.TrimSpace(req.SanDomains), AcmeEmail: strings.TrimSpace(req.AcmeEmail), CaProvider: defaultString(req.CAProvider, "letsencrypt"), KeyAlgorithm: defaultString(req.KeyAlgorithm, "rsa2048"), SourceType: "acme", DNSProviderID: req.DNSProviderID, AutoRenew: req.AutoRenew, RenewDaysBefore: req.RenewDaysBefore, Status: "pending", CreatedAt: now, UpdatedAt: now}
+	task := &model.SslTask{TaskType: "issue", Status: "pending", TriggerType: "manual", CreatedAt: now, UpdatedAt: now}
+	err = b.db.Transaction(func(tx *gorm.DB) error {
+		if err := b.repo.CreateCertificate(ctx, tx, cert); err != nil {
+			return err
+		}
+		task.CertificateID = cert.ID
+		return b.repo.CreateTask(ctx, tx, task)
+	})
+	if err != nil {
+		return nil, err
+	}
+	go b.runACMETask(task.ID, cert.ID)
 	return taskResponse(task, cert.Name), nil
 }
 
@@ -158,8 +197,8 @@ func (b *SSLCertBiz) TestDNSProvider(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	if !json.Valid([]byte(row.Config)) || strings.TrimSpace(row.Config) == "{}" {
-		return errors.New("DNS 配置不完整")
+	if _, err = newLegoDNSProvider(row); err != nil {
+		return err
 	}
 	row.LastTestAt, row.LastTestOk = time.Now(), true
 	return b.repo.SaveDNSProvider(ctx, b.db, row)
@@ -299,6 +338,46 @@ func populateCertificate(row *model.SslCertificate) error {
 }
 func certificateResponse(x *model.SslCertificate) *api.SSLCertificateResponse {
 	return &api.SSLCertificateResponse{ID: x.ID, Name: x.Name, Domain: x.Domain, SanDomains: x.SanDomains, AcmeEmail: x.AcmeEmail, CaProvider: x.CaProvider, KeyAlgorithm: x.KeyAlgorithm, SourceType: x.SourceType, CloudAccountID: x.CloudAccountID, DNSProviderID: x.DNSProviderID, Issuer: x.Issuer, Fingerprint: x.Fingerprint, Status: x.Status, AutoRenew: x.AutoRenew, RenewDaysBefore: x.RenewDaysBefore, NotBefore: nonZeroTime(x.NotBefore), NotAfter: nonZeroTime(x.NotAfter), LastRenewAt: nonZeroTime(x.LastRenewAt), LastError: x.LastError, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
+}
+func certificateDetailResponse(x *model.SslCertificate) *api.SSLCertificateDetailResponse {
+	chainPEM := strings.TrimSpace(x.Certificate + "\n" + x.CertChain)
+	chain, err := parseCertificateChain(chainPEM)
+	response := &api.SSLCertificateDetailResponse{SSLCertificateResponse: certificateResponse(x), Certificate: x.Certificate, PrivateKey: x.PrivateKey, CertChain: x.CertChain, ChainCertificates: chain}
+	if err != nil {
+		response.ChainParseError = err.Error()
+	}
+	return response
+}
+
+func parseCertificateChain(value string) ([]*api.SSLCertificateChainResponse, error) {
+	remaining := []byte(strings.TrimSpace(value))
+	result := make([]*api.SSLCertificateChainResponse, 0)
+	seen := make(map[string]struct{})
+	for len(remaining) > 0 {
+		block, rest := pem.Decode(remaining)
+		if block == nil {
+			return result, errors.New("证书链包含无法解析的 PEM 内容")
+		}
+		remaining = rest
+		if block.Type != "CERTIFICATE" {
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return result, errors.New("证书链包含无效的 X.509 证书")
+		}
+		sum := sha256.Sum256(cert.Raw)
+		fingerprint := strings.ToUpper(hex.EncodeToString(sum[:]))
+		if _, ok := seen[fingerprint]; ok {
+			continue
+		}
+		seen[fingerprint] = struct{}{}
+		result = append(result, &api.SSLCertificateChainResponse{Position: len(result) + 1, Subject: cert.Subject.String(), Issuer: cert.Issuer.String(), SerialNumber: strings.ToUpper(cert.SerialNumber.Text(16)), DNSNames: cert.DNSNames, NotBefore: nonZeroTime(cert.NotBefore), NotAfter: nonZeroTime(cert.NotAfter), Fingerprint: fingerprint, IsCA: cert.IsCA, SignatureAlgorithm: cert.SignatureAlgorithm.String()})
+	}
+	if strings.TrimSpace(value) != "" && len(result) == 0 {
+		return result, errors.New("证书链中未找到 X.509 证书")
+	}
+	return result, nil
 }
 func dnsResponse(x *model.SslDNSProvider, detail bool) *api.SSLDNSProviderResponse {
 	config := ""

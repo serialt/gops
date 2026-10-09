@@ -18,6 +18,7 @@ func (h *SSLCertHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/ssl-cert/certificates/save", h.SaveCertificate)
 	g.POST("/ssl-cert/certificates/delete", h.DeleteCertificate)
 	g.POST("/ssl-cert/certificates/renew", h.RenewCertificate)
+	g.POST("/ssl-cert/applications/create", h.ApplyCertificate)
 	g.POST("/ssl-cert/dns-providers/list", h.ListDNSProviders)
 	g.POST("/ssl-cert/dns-providers/get", h.GetDNSProvider)
 	g.POST("/ssl-cert/dns-providers/save", h.SaveDNSProvider)
@@ -31,6 +32,15 @@ func (h *SSLCertHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/ssl-cert/deploy-configs/execute", h.ExecuteDeploy)
 	g.POST("/ssl-cert/tasks/list", h.ListTasks)
 	g.POST("/ssl-cert/tasks/get", h.GetTask)
+}
+
+// ApplyCertificate POST /api/v1/ssl-cert/applications/create 创建 ACME 证书申请任务。
+func (h *SSLCertHandler) ApplyCertificate(c *gin.Context) {
+	req := new(api.SSLCertificateApplyRequest)
+	if bindSSL(c, req) {
+		data, err := h.biz.ApplyCertificate(c.Request.Context(), req)
+		sslReply(c, data, err)
+	}
 }
 
 func bindSSL(c *gin.Context, req any) bool {
