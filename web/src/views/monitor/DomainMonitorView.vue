@@ -95,6 +95,7 @@ async function save() {
 }
 async function remove(row: MonitorDomain) { await ElMessageBox.confirm(`删除监控 ${row.domain}？`, '确认删除'); await deleteMonitorDomain(row.id); await load() }
 async function batchRemove(selectedRows: unknown[]) { const selected = selectedRows as MonitorDomain[]; if (!selected.length) return; await ElMessageBox.confirm(`确定删除选中的 ${selected.length} 条监控？`, '批量删除确认', { type: 'warning' }); await Promise.all(selected.map(row => deleteMonitorDomain(row.id))); ElMessage.success('批量删除成功'); await load() }
+async function batchCollect(selectedRows: unknown[]) { const selected = selectedRows as MonitorDomain[]; if (!selected.length) return; await Promise.all(selected.map(row => checkMonitorDomain(row.id))); ElMessage.success(`已完成 ${selected.length} 条域名监控采集`); await load() }
 async function check(row: MonitorDomain) { await checkMonitorDomain(row.id); ElMessage.success('检测完成'); await load() }
 async function detail(row: MonitorDomain) { const { data } = await listMonitorCheckHistory(row.id); historyRows.value = data.data.list; detailMonitor.value = row; detailDialog.value = true }
 async function exportExcel() {
@@ -180,7 +181,7 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
                     清除筛选
                 </el-button>
             </div>
-            <div class="toolbar-actions"><el-dropdown
+            <div class="toolbar-actions"><span class="app-data-grid-bulk-action-anchor"></span><el-dropdown
                     v-if="auth.hasPermission('POST /api/v1/monitor/domains/export') || auth.hasPermission('POST /api/v1/monitor/domains/import') || auth.hasPermission('POST /api/v1/monitor/domains/template')"
                     split-button class="excel-transfer-dropdown" popper-class="excel-transfer-popper"
                     :loading="exporting || importing"
@@ -226,7 +227,7 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
                 clearable />
         </div>
         <AppDataGrid class="grid" :row-data="rows" :column-defs="columns" pagination server-pagination :total="total"
-            :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove"
+            :current-page="page" :page-size="pageSize" :bulk-delete="batchRemove" :bulk-collect="batchCollect"
             @selection-changed="selectedRows = $event as MonitorDomain[]"
             @page-change="value => { page = value; void load() }"
             @page-size-change="value => { pageSize = value; page = 1; void load() }" />
@@ -303,7 +304,9 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
     display: flex;
     flex-direction: column;
     gap: 8px;
-    min-height: 0
+    min-height: 0;
+    padding-inline: 4px;
+    box-sizing: border-box
 }
 
 .toolbar {

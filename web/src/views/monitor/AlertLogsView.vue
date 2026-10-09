@@ -118,7 +118,9 @@ onMounted(load)
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-height: 0
+    min-height: 0;
+    padding-inline: 4px;
+    box-sizing: border-box
 }
 
 .toolbar {

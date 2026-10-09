@@ -273,6 +273,11 @@ onMounted(() => {
   const actionArea = toolbar.matches('.toolbar-actions, .header-actions, .node-header-actions, .el-dialog__header')
     ? toolbar
     : toolbar.querySelector<HTMLElement>(':scope > .toolbar-actions, :scope > .header-actions, :scope > .node-header-actions') || toolbar
+  const explicitTarget = actionArea.querySelector<HTMLElement>(':scope > .app-data-grid-bulk-action-anchor')
+  if (explicitTarget) {
+    bulkActionTarget.value = explicitTarget
+    return
+  }
   bulkActionHost = document.createElement('span')
   bulkActionHost.className = 'app-data-grid-bulk-action-host'
   bulkActionHost.style.display = 'contents'
