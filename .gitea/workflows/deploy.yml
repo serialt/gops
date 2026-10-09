@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      GOPS_IMAGE_REPOSITORY: registry.cn-hangzhou.aliyuncs.com/serialt/gops
-      GOPS_BASE_IMAGE_REPOSITORY: registry.cn-hangzhou.aliyuncs.com/serialt/gops-base
+      ALI_ACR_REGISTRY: registry.cn-hangzhou.aliyuncs.com
+      ALI_ACR_USERNAME: serialt
       GOPS_JWT_SECRET: ${{ secrets.GOPS_JWT_SECRET }}
       GOPS_AES_KEY: ${{ secrets.GOPS_AES_KEY }}
     steps:
@@ -35,8 +35,21 @@ jobs:
           test -n "$COMMIT_SHA"
           dependency_sha="$(sha256sum go.mod go.sum web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml | awk '{print $1}' | sha256sum | awk '{print $1}')"
           test -n "$dependency_sha"
+          GOPS_IMAGE_REPOSITORY="$ALI_ACR_REGISTRY/$ALI_ACR_USERNAME/gops"
+          GOPS_BASE_IMAGE_REPOSITORY="$ALI_ACR_REGISTRY/$ALI_ACR_USERNAME/gops-base"
+          printf 'GOPS_IMAGE_REPOSITORY=%s\n' "$GOPS_IMAGE_REPOSITORY" >> "$GITHUB_ENV"
+          printf 'GOPS_BASE_IMAGE_REPOSITORY=%s\n' "$GOPS_BASE_IMAGE_REPOSITORY" >> "$GITHUB_ENV"
           printf 'GOPS_IMAGE=%s:%s-%s\n' "$GOPS_IMAGE_REPOSITORY" "$safe_branch" "$COMMIT_SHA" >> "$GITHUB_ENV"
           printf 'GOPS_BASE_IMAGE=%s:%s\n' "$GOPS_BASE_IMAGE_REPOSITORY" "$dependency_sha" >> "$GITHUB_ENV"
+
+      - name: Login to Aliyun Container Registry
+        shell: sh
+        env:
+          ALI_ACR_PASSWORD: ${{ secrets.ALI_ACR_PASSWORD }}
+        run: |
+          set -eu
+          test -n "$ALI_ACR_PASSWORD"
+          printf '%s' "$ALI_ACR_PASSWORD" | podman login --username "$ALI_ACR_USERNAME" --password-stdin "$ALI_ACR_REGISTRY"
 
       - name: Prepare base image
         shell: sh
@@ -91,3 +104,7 @@ jobs:
         if: failure()
         run: |
           podman compose logs --tail=200 gops || true
+
+      - name: Logout from Aliyun Container Registry
+        if: always()
+        run: podman logout "$ALI_ACR_REGISTRY" || true
