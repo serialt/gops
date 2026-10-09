@@ -33,9 +33,7 @@
 
 .certificate-detail-dialog .chain-list {
   display: flex;
-  max-height: 240px;
   margin-bottom: 7px;
-  overflow: auto;
   flex-direction: column;
   gap: 6px;
 }
@@ -61,7 +59,7 @@
 
 .certificate-detail-dialog .chain-list article > div {
   display: grid;
-  grid-template-columns: 70px minmax(0, 1fr);
+  grid-template-columns: 88px minmax(0, 1fr) 88px minmax(0, 1fr);
 }
 
 .certificate-detail-dialog .chain-list article > div > * {
@@ -83,6 +81,62 @@
 .certificate-detail-dialog .pem-tabs .chain-pem {
   height: 110px;
 }
+
+.certificate-detail-dialog .certificate-material,
+.certificate-detail-dialog .certificate-chain {
+  margin-top: 10px;
+}
+
+.certificate-detail-dialog .certificate-chain > header h3 {
+  margin: 0;
+  font-size: 11px;
+}
+
+.certificate-detail-dialog .certificate-material .el-tabs__header {
+  margin-bottom: 6px;
+}
+
+.certificate-detail-dialog .certificate-material .el-tabs__item {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.certificate-detail-dialog .certificate-material pre {
+  height: 150px;
+  margin: 0;
+  padding: 9px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #f7f8fb;
+  white-space: pre;
+  font: 9px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.certificate-detail-dialog .certificate-chain > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.certificate-detail-dialog .certificate-chain > header span {
+  color: var(--text-soft);
+  font-size: 10px;
+}
+
+.certificate-detail-dialog .el-dialog__body {
+  max-height: calc(100vh - 130px);
+  overflow: auto;
+}
+
+@media (max-width: 760px) {
+  .certificate-detail-dialog .chain-list article > div {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+}
+
 
 * {
   box-sizing: border-box;

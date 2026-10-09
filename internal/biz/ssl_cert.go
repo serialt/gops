@@ -2,6 +2,9 @@ package biz
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -72,6 +75,12 @@ func (b *SSLCertBiz) SaveCertificate(ctx context.Context, req *api.SSLCertificat
 		}
 	}
 	if row.Certificate != "" {
+		if leaf, bundledChain := splitCertificateBundle(row.Certificate); bundledChain != "" {
+			row.Certificate = leaf
+			if strings.TrimSpace(row.CertChain) == "" {
+				row.CertChain = bundledChain
+			}
+		}
 		if err := populateCertificate(row); err != nil {
 			return nil, err
 		}
@@ -340,13 +349,40 @@ func certificateResponse(x *model.SslCertificate) *api.SSLCertificateResponse {
 	return &api.SSLCertificateResponse{ID: x.ID, Name: x.Name, Domain: x.Domain, SanDomains: x.SanDomains, AcmeEmail: x.AcmeEmail, CaProvider: x.CaProvider, KeyAlgorithm: x.KeyAlgorithm, SourceType: x.SourceType, CloudAccountID: x.CloudAccountID, DNSProviderID: x.DNSProviderID, Issuer: x.Issuer, Fingerprint: x.Fingerprint, Status: x.Status, AutoRenew: x.AutoRenew, RenewDaysBefore: x.RenewDaysBefore, NotBefore: nonZeroTime(x.NotBefore), NotAfter: nonZeroTime(x.NotAfter), LastRenewAt: nonZeroTime(x.LastRenewAt), LastError: x.LastError, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
 }
 func certificateDetailResponse(x *model.SslCertificate) *api.SSLCertificateDetailResponse {
-	chainPEM := strings.TrimSpace(x.Certificate + "\n" + x.CertChain)
+	_, bundledChain := splitCertificateBundle(x.Certificate)
+	displayChain := strings.TrimSpace(x.CertChain)
+	if displayChain == "" {
+		displayChain = bundledChain
+	}
+	chainPEM := strings.TrimSpace(x.Certificate + "\n" + displayChain)
 	chain, err := parseCertificateChain(chainPEM)
-	response := &api.SSLCertificateDetailResponse{SSLCertificateResponse: certificateResponse(x), Certificate: x.Certificate, PrivateKey: x.PrivateKey, CertChain: x.CertChain, ChainCertificates: chain}
+	response := &api.SSLCertificateDetailResponse{SSLCertificateResponse: certificateResponse(x), Certificate: x.Certificate, PrivateKey: x.PrivateKey, CertChain: displayChain, ChainCertificates: chain}
 	if err != nil {
 		response.ChainParseError = err.Error()
 	}
 	return response
+}
+
+func splitCertificateBundle(value string) (string, string) {
+	remaining := []byte(strings.TrimSpace(value))
+	certificates := make([]string, 0)
+	for len(remaining) > 0 {
+		block, rest := pem.Decode(remaining)
+		if block == nil {
+			break
+		}
+		remaining = rest
+		if block.Type == "CERTIFICATE" {
+			certificates = append(certificates, strings.TrimSpace(string(pem.EncodeToMemory(block))))
+		}
+	}
+	if len(certificates) == 0 {
+		return strings.TrimSpace(value), ""
+	}
+	if len(certificates) == 1 {
+		return certificates[0], ""
+	}
+	return certificates[0], strings.Join(certificates[1:], "\n")
 }
 
 func parseCertificateChain(value string) ([]*api.SSLCertificateChainResponse, error) {
@@ -372,12 +408,76 @@ func parseCertificateChain(value string) ([]*api.SSLCertificateChainResponse, er
 			continue
 		}
 		seen[fingerprint] = struct{}{}
-		result = append(result, &api.SSLCertificateChainResponse{Position: len(result) + 1, Subject: cert.Subject.String(), Issuer: cert.Issuer.String(), SerialNumber: strings.ToUpper(cert.SerialNumber.Text(16)), DNSNames: cert.DNSNames, NotBefore: nonZeroTime(cert.NotBefore), NotAfter: nonZeroTime(cert.NotAfter), Fingerprint: fingerprint, IsCA: cert.IsCA, SignatureAlgorithm: cert.SignatureAlgorithm.String()})
+		result = append(result, &api.SSLCertificateChainResponse{Position: len(result) + 1, Version: cert.Version, Subject: cert.Subject.String(), Issuer: cert.Issuer.String(), SerialNumber: strings.ToUpper(cert.SerialNumber.Text(16)), DNSNames: cert.DNSNames, EmailAddresses: cert.EmailAddresses, IPAddresses: certificateIPAddresses(cert), URIs: certificateURIs(cert), NotBefore: nonZeroTime(cert.NotBefore), NotAfter: nonZeroTime(cert.NotAfter), Fingerprint: fingerprint, IsCA: cert.IsCA, BasicConstraints: cert.BasicConstraintsValid, MaxPathLen: cert.MaxPathLen, MaxPathLenZero: cert.MaxPathLenZero, SignatureAlgorithm: cert.SignatureAlgorithm.String(), PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(), PublicKeyBits: certificatePublicKeyBits(cert), KeyUsage: certificateKeyUsages(cert.KeyUsage), ExtKeyUsage: certificateExtKeyUsages(cert.ExtKeyUsage), SubjectKeyID: strings.ToUpper(hex.EncodeToString(cert.SubjectKeyId)), AuthorityKeyID: strings.ToUpper(hex.EncodeToString(cert.AuthorityKeyId)), OCSPServers: cert.OCSPServer, IssuerURLs: cert.IssuingCertificateURL, CRLPoints: cert.CRLDistributionPoints, Policies: certificatePolicies(cert)})
 	}
 	if strings.TrimSpace(value) != "" && len(result) == 0 {
 		return result, errors.New("证书链中未找到 X.509 证书")
 	}
 	return result, nil
+}
+
+func certificatePublicKeyBits(cert *x509.Certificate) int {
+	switch key := cert.PublicKey.(type) {
+	case *rsa.PublicKey:
+		return key.N.BitLen()
+	case *ecdsa.PublicKey:
+		return key.Curve.Params().BitSize
+	case ed25519.PublicKey:
+		return len(key) * 8
+	default:
+		return 0
+	}
+}
+
+func certificateIPAddresses(cert *x509.Certificate) []string {
+	values := make([]string, 0, len(cert.IPAddresses))
+	for _, value := range cert.IPAddresses {
+		values = append(values, value.String())
+	}
+	return values
+}
+
+func certificateURIs(cert *x509.Certificate) []string {
+	values := make([]string, 0, len(cert.URIs))
+	for _, value := range cert.URIs {
+		values = append(values, value.String())
+	}
+	return values
+}
+
+func certificatePolicies(cert *x509.Certificate) []string {
+	values := make([]string, 0, len(cert.PolicyIdentifiers))
+	for _, value := range cert.PolicyIdentifiers {
+		values = append(values, value.String())
+	}
+	return values
+}
+
+func certificateKeyUsages(usage x509.KeyUsage) []string {
+	items := []struct {
+		value x509.KeyUsage
+		label string
+	}{{x509.KeyUsageDigitalSignature, "数字签名"}, {x509.KeyUsageContentCommitment, "内容承诺"}, {x509.KeyUsageKeyEncipherment, "密钥加密"}, {x509.KeyUsageDataEncipherment, "数据加密"}, {x509.KeyUsageKeyAgreement, "密钥协商"}, {x509.KeyUsageCertSign, "证书签名"}, {x509.KeyUsageCRLSign, "CRL 签名"}, {x509.KeyUsageEncipherOnly, "仅加密"}, {x509.KeyUsageDecipherOnly, "仅解密"}}
+	values := make([]string, 0)
+	for _, item := range items {
+		if usage&item.value != 0 {
+			values = append(values, item.label)
+		}
+	}
+	return values
+}
+
+func certificateExtKeyUsages(usages []x509.ExtKeyUsage) []string {
+	labels := map[x509.ExtKeyUsage]string{x509.ExtKeyUsageAny: "任意", x509.ExtKeyUsageServerAuth: "服务器认证", x509.ExtKeyUsageClientAuth: "客户端认证", x509.ExtKeyUsageCodeSigning: "代码签名", x509.ExtKeyUsageEmailProtection: "邮件保护", x509.ExtKeyUsageIPSECEndSystem: "IPsec 终端", x509.ExtKeyUsageIPSECTunnel: "IPsec 隧道", x509.ExtKeyUsageIPSECUser: "IPsec 用户", x509.ExtKeyUsageTimeStamping: "时间戳", x509.ExtKeyUsageOCSPSigning: "OCSP 签名", x509.ExtKeyUsageMicrosoftServerGatedCrypto: "Microsoft SGC", x509.ExtKeyUsageNetscapeServerGatedCrypto: "Netscape SGC", x509.ExtKeyUsageMicrosoftCommercialCodeSigning: "Microsoft 商业代码签名", x509.ExtKeyUsageMicrosoftKernelCodeSigning: "Microsoft 内核代码签名"}
+	values := make([]string, 0, len(usages))
+	for _, usage := range usages {
+		if label, ok := labels[usage]; ok {
+			values = append(values, label)
+		} else {
+			values = append(values, "其他")
+		}
+	}
+	return values
 }
 func dnsResponse(x *model.SslDNSProvider, detail bool) *api.SSLDNSProviderResponse {
 	config := ""

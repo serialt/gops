@@ -73,15 +73,32 @@ type SSLCertificateDetailResponse struct {
 
 type SSLCertificateChainResponse struct {
 	Position           int        `json:"position"`
+	Version            int        `json:"version"`
 	Subject            string     `json:"subject"`
 	Issuer             string     `json:"issuer"`
 	SerialNumber       string     `json:"serial_number"`
 	DNSNames           []string   `json:"dns_names"`
+	EmailAddresses     []string   `json:"email_addresses"`
+	IPAddresses        []string   `json:"ip_addresses"`
+	URIs               []string   `json:"uris"`
 	NotBefore          *time.Time `json:"not_before"`
 	NotAfter           *time.Time `json:"not_after"`
 	Fingerprint        string     `json:"fingerprint"`
 	IsCA               bool       `json:"is_ca"`
+	BasicConstraints   bool       `json:"basic_constraints_valid"`
+	MaxPathLen         int        `json:"max_path_len"`
+	MaxPathLenZero     bool       `json:"max_path_len_zero"`
 	SignatureAlgorithm string     `json:"signature_algorithm"`
+	PublicKeyAlgorithm string     `json:"public_key_algorithm"`
+	PublicKeyBits      int        `json:"public_key_bits"`
+	KeyUsage           []string   `json:"key_usage"`
+	ExtKeyUsage        []string   `json:"ext_key_usage"`
+	SubjectKeyID       string     `json:"subject_key_id"`
+	AuthorityKeyID     string     `json:"authority_key_id"`
+	OCSPServers        []string   `json:"ocsp_servers"`
+	IssuerURLs         []string   `json:"issuer_urls"`
+	CRLPoints          []string   `json:"crl_points"`
+	Policies           []string   `json:"policies"`
 }
 
 type SSLDNSProviderListRequest struct {
