@@ -70,6 +70,7 @@ const iotMenus = computed(() => [
 const auditMenus = computed(() => [{ path: '/audit/operations', title: '操作日志', icon: DataAnalysis, permission: 'POST /api/v1/audit/operation-logs/list' }, { path: '/audit/logins', title: '登录日志', icon: User, permission: 'POST /api/v1/audit/login-logs/list' }].filter(item => auth.hasPermission(item.permission)))
 const sslCertMenus = computed(() => [
   { path: '/ssl-cert/certificates', title: '证书管理', icon: Key, permission: 'POST /api/v1/ssl-cert/certificates/list' },
+  { path: '/ssl-cert/applications', title: '证书申请', icon: Tickets, permission: 'POST /api/v1/ssl-cert/applications/create' },
   { path: '/ssl-cert/dns-providers', title: 'DNS 配置', icon: Setting, permission: 'POST /api/v1/ssl-cert/dns-providers/list' },
   { path: '/ssl-cert/deploy-configs', title: '部署配置', icon: OfficeBuilding, permission: 'POST /api/v1/ssl-cert/deploy-configs/list' },
   { path: '/ssl-cert/tasks', title: '任务记录', icon: DataAnalysis, permission: 'POST /api/v1/ssl-cert/tasks/list' },

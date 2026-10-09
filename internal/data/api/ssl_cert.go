@@ -11,6 +11,17 @@ type SSLCertificateListRequest struct {
 type SSLCertificateIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
 }
+type SSLCertificateApplyRequest struct {
+	Name            string `json:"name" binding:"required"`
+	Domain          string `json:"domain" binding:"required"`
+	SanDomains      string `json:"san_domains"`
+	AcmeEmail       string `json:"acme_email" binding:"required,email"`
+	DNSProviderID   int64  `json:"dns_provider_id" binding:"required"`
+	KeyAlgorithm    string `json:"key_algorithm"`
+	CAProvider      string `json:"ca_provider"`
+	AutoRenew       bool   `json:"auto_renew"`
+	RenewDaysBefore int64  `json:"renew_days_before"`
+}
 type SSLCertificateRequest struct {
 	ID              int64  `json:"id"`
 	Name            string `json:"name" binding:"required"`
@@ -53,9 +64,24 @@ type SSLCertificateResponse struct {
 }
 type SSLCertificateDetailResponse struct {
 	*SSLCertificateResponse
-	Certificate string `json:"certificate"`
-	PrivateKey  string `json:"private_key"`
-	CertChain   string `json:"cert_chain"`
+	Certificate       string                         `json:"certificate"`
+	PrivateKey        string                         `json:"private_key"`
+	CertChain         string                         `json:"cert_chain"`
+	ChainCertificates []*SSLCertificateChainResponse `json:"chain_certificates"`
+	ChainParseError   string                         `json:"chain_parse_error"`
+}
+
+type SSLCertificateChainResponse struct {
+	Position           int        `json:"position"`
+	Subject            string     `json:"subject"`
+	Issuer             string     `json:"issuer"`
+	SerialNumber       string     `json:"serial_number"`
+	DNSNames           []string   `json:"dns_names"`
+	NotBefore          *time.Time `json:"not_before"`
+	NotAfter           *time.Time `json:"not_after"`
+	Fingerprint        string     `json:"fingerprint"`
+	IsCA               bool       `json:"is_ca"`
+	SignatureAlgorithm string     `json:"signature_algorithm"`
 }
 
 type SSLDNSProviderListRequest struct {
