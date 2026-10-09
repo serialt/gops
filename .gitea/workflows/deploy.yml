@@ -15,39 +15,55 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      GOPS_IMAGE: gin-vue:${{ gitea.ref_name }}-${{ gitea.sha }}
       GOPS_JWT_SECRET: ${{ secrets.GOPS_JWT_SECRET }}
       GOPS_AES_KEY: ${{ secrets.GOPS_AES_KEY }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Prepare image tag
+        shell: sh
+        env:
+          RAW_BRANCH: ${{ gitea.ref_name }}
+          COMMIT_SHA: ${{ gitea.sha }}
+        run: |
+          set -eu
+          safe_branch="$(printf '%s' "$RAW_BRANCH" | sed 's/[^A-Za-z0-9_.-]/-/g')"
+          test -n "$safe_branch"
+          test -n "$COMMIT_SHA"
+          printf 'GOPS_IMAGE=gin-vue:%s-%s\n' "$safe_branch" "$COMMIT_SHA" >> "$GITHUB_ENV"
+
+
       - name: Build image
-        run: docker build --pull --tag "$GOPS_IMAGE" --file Dockerfile .
+        run: |
+          podman build --pull --tag "$GOPS_IMAGE" --file Dockerfile .
+          podman image exists "$GOPS_IMAGE"
 
       - name: Start service
-        run: docker compose up -d  gops
+        run: |
+          podman compose up -d --no-build --remove-orphans gops
 
       - name: Wait for health check
-        shell: sh
         run: |
-          container_id="$(docker compose ps -q gops)"
+          container_name="${GOPS_CONTAINER_NAME:-gops}"
+          container_id="$(podman container inspect --format '{{.Id}}' "$container_name")"
           test -n "$container_id"
           for attempt in $(seq 1 36); do
-            status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+            status="$(podman inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
             if [ "$status" = "healthy" ]; then
-              docker compose ps
+              podman compose ps
               exit 0
             fi
             if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
-              docker compose logs  gops
+              podman compose logs gops
               exit 1
             fi
             sleep 5
           done
-          docker compose logs  gops
+          podman compose logs gops
           exit 1
 
       - name: Show logs on failure
         if: failure()
-        run: docker compose logs  --tail=200 gops
+        run: |
+          podman compose logs --tail=200 gops || true
