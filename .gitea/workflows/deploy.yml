@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      GOPS_IMAGE_REPOSITORY: registry.cn-hangzhou.aliyuncs.com/serialt/gops
       GOPS_JWT_SECRET: ${{ secrets.GOPS_JWT_SECRET }}
       GOPS_AES_KEY: ${{ secrets.GOPS_AES_KEY }}
     steps:
@@ -31,13 +32,17 @@ jobs:
           safe_branch="$(printf '%s' "$RAW_BRANCH" | sed 's/[^A-Za-z0-9_.-]/-/g')"
           test -n "$safe_branch"
           test -n "$COMMIT_SHA"
-          printf 'GOPS_IMAGE=gin-vue:%s-%s\n' "$safe_branch" "$COMMIT_SHA" >> "$GITHUB_ENV"
+          printf 'GOPS_IMAGE=%s:%s-%s\n' "$GOPS_IMAGE_REPOSITORY" "$safe_branch" "$COMMIT_SHA" >> "$GITHUB_ENV"
 
 
       - name: Build image
         run: |
           podman build --pull --tag "$GOPS_IMAGE" --file Dockerfile .
           podman image exists "$GOPS_IMAGE"
+
+      - name: Push image
+        run: |
+          podman push "$GOPS_IMAGE"
 
       - name: Start service
         run: |
