@@ -7,7 +7,6 @@ require (
 	github.com/casbin/gorm-adapter/v3 v3.41.0
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/gin-contrib/cors v1.7.7
-	github.com/gin-contrib/gzip v1.2.6
 	github.com/gin-contrib/slog v1.2.1
 	github.com/gin-contrib/timeout v1.2.1
 	github.com/gin-gonic/gin v1.12.0
