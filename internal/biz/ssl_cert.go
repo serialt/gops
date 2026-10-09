@@ -1,6 +1,8 @@
 package biz
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -11,6 +13,8 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -51,6 +55,80 @@ func (b *SSLCertBiz) GetCertificate(ctx context.Context, id int64) (*api.SSLCert
 		return nil, err
 	}
 	return certificateDetailResponse(row), nil
+}
+
+func (b *SSLCertBiz) DownloadCertificates(ctx context.Context, req *api.SSLCertificateDownloadRequest) ([]byte, error) {
+	if len(req.IDs) == 0 {
+		return nil, errors.New("请选择要下载的证书")
+	}
+	var output bytes.Buffer
+	archive := zip.NewWriter(&output)
+	usedNames := make(map[string]struct{}, len(req.IDs))
+	for _, id := range req.IDs {
+		cert, err := b.repo.GetCertificate(ctx, b.db, id)
+		if err != nil {
+			_ = archive.Close()
+			return nil, errors.New("所选证书不存在")
+		}
+		if strings.TrimSpace(cert.Certificate) == "" {
+			_ = archive.Close()
+			return nil, fmt.Errorf("证书“%s”缺少证书内容", cert.Name)
+		}
+		if strings.TrimSpace(cert.PrivateKey) == "" {
+			_ = archive.Close()
+			return nil, fmt.Errorf("证书“%s”缺少私钥", cert.Name)
+		}
+		directory := nginxCertificateArchiveName(cert.Name)
+		if _, exists := usedNames[directory]; exists {
+			directory = fmt.Sprintf("%s-%d", directory, cert.ID)
+		}
+		usedNames[directory] = struct{}{}
+		certificate := strings.TrimSpace(cert.Certificate) + "\n"
+		chain := strings.TrimSpace(cert.CertChain)
+		fullChain := certificate
+		if chain != "" {
+			fullChain += chain + "\n"
+		}
+		files := []struct {
+			name string
+			body string
+			mode uint32
+		}{{"cert.pem", certificate, 0o644}, {"chain.pem", chain + "\n", 0o644}, {"fullchain.pem", fullChain, 0o644}, {"privkey.pem", strings.TrimSpace(cert.PrivateKey) + "\n", 0o600}, {"nginx.conf.example", fmt.Sprintf("ssl_certificate     /etc/nginx/ssl/%s/fullchain.pem;\nssl_certificate_key /etc/nginx/ssl/%s/privkey.pem;\n", directory, directory), 0o644}}
+		for _, file := range files {
+			if file.name == "chain.pem" && chain == "" {
+				continue
+			}
+			header := &zip.FileHeader{Name: directory + "/" + file.name, Method: zip.Deflate}
+			header.SetMode(os.FileMode(file.mode))
+			writer, createErr := archive.CreateHeader(header)
+			if createErr != nil {
+				_ = archive.Close()
+				return nil, createErr
+			}
+			if _, writeErr := writer.Write([]byte(file.body)); writeErr != nil {
+				_ = archive.Close()
+				return nil, writeErr
+			}
+		}
+	}
+	if err := archive.Close(); err != nil {
+		return nil, err
+	}
+	return output.Bytes(), nil
+}
+
+func nginxCertificateArchiveName(value string) string {
+	name := strings.Map(func(r rune) rune {
+		if r < 32 || strings.ContainsRune(`/\\:*?"<>|`, r) {
+			return '-'
+		}
+		return r
+	}, strings.TrimSpace(value))
+	name = strings.Trim(name, ".- ")
+	if name == "" {
+		return "certificate"
+	}
+	return name
 }
 
 func (b *SSLCertBiz) SaveCertificate(ctx context.Context, req *api.SSLCertificateRequest) (*api.SSLCertificateDetailResponse, error) {
