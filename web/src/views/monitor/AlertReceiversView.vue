@@ -104,6 +104,8 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-inline: 4px;
+  box-sizing: border-box;
 }
 
 .toolbar {
