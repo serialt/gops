@@ -20,6 +20,7 @@ const props = defineProps<{
   bulkDelete?: (rows: unknown[]) => Promise<void>
   bulkCollect?: (rows: unknown[]) => Promise<void>
   bulkDownload?: (rows: unknown[]) => Promise<void>
+  bulkDownloadLabel?: string
 }>()
 const emit = defineEmits<{
   selectionChanged: [rows: unknown[]]
@@ -27,7 +28,7 @@ const emit = defineEmits<{
   pageSizeChange: [pageSize: number]
 }>()
 const instance = getCurrentInstance()
-const selectable = computed(() => Boolean(props.bulkDelete || props.bulkCollect || instance?.vnode.props?.onSelectionChanged))
+const selectable = computed(() => Boolean(props.bulkDelete || props.bulkCollect || props.bulkDownload || instance?.vnode.props?.onSelectionChanged))
 
 const defaultColDef: ColDef = {
   minWidth: 40,
@@ -366,8 +367,8 @@ function handleGridReady(event: any) {
           :loading="collectingRows" @click="handleBulkCollect">{{ selectedRows.length > 1 ?
             `批量采集（${selectedRows.length}）` : '采集信息' }}</el-button>
         <el-button v-if="bulkDownload" class="app-data-grid-bulk-collect-button" type="primary" plain :icon="Download"
-          :loading="collectingRows" @click="handleBulkDownload">{{ selectedRows.length > 1 ?
-            `批量下载（${selectedRows.length}）` : '下载证书' }}</el-button>
+          :loading="collectingRows" @click="handleBulkDownload">{{ bulkDownloadLabel || (selectedRows.length > 1 ?
+            `批量下载（${selectedRows.length}）` : '下载') }}</el-button>
         <el-button v-if="bulkDelete" class="app-data-grid-bulk-button" type="danger" plain @click="handleBulkDelete">{{
           selectedRows.length > 1 ? `批量删除（${selectedRows.length}）` : '删除' }}</el-button>
       </template>
@@ -386,7 +387,7 @@ function handleGridReady(event: any) {
             <el-dropdown-item v-if="bulkDownload" class="app-data-grid-bulk-menu-item" command="download">
               <el-icon>
                 <Download />
-              </el-icon>批量下载
+              </el-icon>{{ bulkDownloadLabel || '批量下载' }}
             </el-dropdown-item>
             <el-dropdown-item v-if="bulkDelete" class="app-data-grid-bulk-menu-item is-danger" command="delete">
               <el-icon>
