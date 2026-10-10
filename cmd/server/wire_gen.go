@@ -59,7 +59,7 @@ func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(
 	taskHandler := handler.NewTaskHandler(taskBiz)
 	sslCertRepo := repo.NewSSLCertRepo()
 	kubernetesBiz := biz.NewKubernetesBiz(db)
-	sslCertBiz := biz.NewSSLCertBiz(db, sslCertRepo, assetBiz, kubernetesBiz)
+	sslCertBiz := biz.NewSSLCertBiz(db, sslCertRepo, assetBiz, kubernetesBiz, cfg)
 	sslCertHandler := handler.NewSSLCertHandler(sslCertBiz)
 	kubernetesHandler := handler.NewKubernetesHandler(kubernetesBiz)
 	auditBiz := biz.NewAuditBiz(db)

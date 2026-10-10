@@ -2,7 +2,7 @@
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef, type RowSelectionOptions, type SelectionColumnDef } from 'ag-grid-community'
-import { ArrowDown, Delete, Refresh } from '@element-plus/icons-vue'
+import { ArrowDown, Delete, Download, Refresh } from '@element-plus/icons-vue'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
@@ -19,6 +19,8 @@ const props = defineProps<{
   getRowId?: (row: unknown) => string
   bulkDelete?: (rows: unknown[]) => Promise<void>
   bulkCollect?: (rows: unknown[]) => Promise<void>
+  bulkDownload?: (rows: unknown[]) => Promise<void>
+  bulkDownloadLabel?: string
 }>()
 const emit = defineEmits<{
   selectionChanged: [rows: unknown[]]
@@ -26,7 +28,7 @@ const emit = defineEmits<{
   pageSizeChange: [pageSize: number]
 }>()
 const instance = getCurrentInstance()
-const selectable = computed(() => Boolean(props.bulkDelete || props.bulkCollect || instance?.vnode.props?.onSelectionChanged))
+const selectable = computed(() => Boolean(props.bulkDelete || props.bulkCollect || props.bulkDownload || instance?.vnode.props?.onSelectionChanged))
 
 const defaultColDef: ColDef = {
   minWidth: 40,
@@ -72,7 +74,7 @@ const localCurrentPage = ref(1)
 const localPageSize = ref(20)
 const selectedRows = ref<unknown[]>([])
 const collectingRows = ref(false)
-const bulkOperationCount = computed(() => Number(Boolean(props.bulkCollect)) + Number(Boolean(props.bulkDelete)))
+const bulkOperationCount = computed(() => Number(Boolean(props.bulkCollect)) + Number(Boolean(props.bulkDownload)) + Number(Boolean(props.bulkDelete)))
 const shellRef = ref<HTMLElement>()
 const bulkActionTarget = ref<HTMLElement>()
 let gridApi: any
@@ -261,7 +263,7 @@ onMounted(() => {
       attributeFilter: ['placeholder'],
     })
   }
-  if (!props.bulkDelete && !props.bulkCollect) return
+  if (!props.bulkDelete && !props.bulkCollect && !props.bulkDownload) return
   let container = shellRef.value?.parentElement
   let toolbar: HTMLElement | null = null
   while (container && container !== document.body) {
@@ -273,6 +275,11 @@ onMounted(() => {
   const actionArea = toolbar.matches('.toolbar-actions, .header-actions, .node-header-actions, .el-dialog__header')
     ? toolbar
     : toolbar.querySelector<HTMLElement>(':scope > .toolbar-actions, :scope > .header-actions, :scope > .node-header-actions') || toolbar
+  const explicitTarget = actionArea.querySelector<HTMLElement>(':scope > .app-data-grid-bulk-action-anchor')
+  if (explicitTarget) {
+    bulkActionTarget.value = explicitTarget
+    return
+  }
   bulkActionHost = document.createElement('span')
   bulkActionHost.className = 'app-data-grid-bulk-action-host'
   bulkActionHost.style.display = 'contents'
@@ -330,8 +337,19 @@ async function handleBulkCollect() {
   }
 }
 
+async function handleBulkDownload() {
+  if (!props.bulkDownload || !selectedRows.value.length) return
+  collectingRows.value = true
+  try {
+    await props.bulkDownload([...selectedRows.value])
+  } finally {
+    collectingRows.value = false
+  }
+}
+
 function handleBulkCommand(command: string) {
   if (command === 'collect') void handleBulkCollect()
+  if (command === 'download') void handleBulkDownload()
   if (command === 'delete') void handleBulkDelete()
 }
 
@@ -348,6 +366,9 @@ function handleGridReady(event: any) {
         <el-button v-if="bulkCollect" class="app-data-grid-bulk-collect-button" type="primary" plain :icon="Refresh"
           :loading="collectingRows" @click="handleBulkCollect">{{ selectedRows.length > 1 ?
             `批量采集（${selectedRows.length}）` : '采集信息' }}</el-button>
+        <el-button v-if="bulkDownload" class="app-data-grid-bulk-collect-button" type="primary" plain :icon="Download"
+          :loading="collectingRows" @click="handleBulkDownload">{{ bulkDownloadLabel || (selectedRows.length > 1 ?
+            `批量下载（${selectedRows.length}）` : '下载') }}</el-button>
         <el-button v-if="bulkDelete" class="app-data-grid-bulk-button" type="danger" plain @click="handleBulkDelete">{{
           selectedRows.length > 1 ? `批量删除（${selectedRows.length}）` : '删除' }}</el-button>
       </template>
@@ -362,6 +383,11 @@ function handleGridReady(event: any) {
               <el-icon>
                 <Refresh />
               </el-icon>批量采集
+            </el-dropdown-item>
+            <el-dropdown-item v-if="bulkDownload" class="app-data-grid-bulk-menu-item" command="download">
+              <el-icon>
+                <Download />
+              </el-icon>{{ bulkDownloadLabel || '批量下载' }}
             </el-dropdown-item>
             <el-dropdown-item v-if="bulkDelete" class="app-data-grid-bulk-menu-item is-danger" command="delete">
               <el-icon>

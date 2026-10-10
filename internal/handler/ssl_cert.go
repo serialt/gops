@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"gops/internal/biz"
 	"gops/internal/data/api"
 	"gops/internal/pkg/response"
@@ -18,6 +19,8 @@ func (h *SSLCertHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/ssl-cert/certificates/save", h.SaveCertificate)
 	g.POST("/ssl-cert/certificates/delete", h.DeleteCertificate)
 	g.POST("/ssl-cert/certificates/renew", h.RenewCertificate)
+	g.POST("/ssl-cert/certificates/download", h.DownloadCertificates)
+	g.POST("/ssl-cert/applications/create", h.ApplyCertificate)
 	g.POST("/ssl-cert/dns-providers/list", h.ListDNSProviders)
 	g.POST("/ssl-cert/dns-providers/get", h.GetDNSProvider)
 	g.POST("/ssl-cert/dns-providers/save", h.SaveDNSProvider)
@@ -31,6 +34,30 @@ func (h *SSLCertHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/ssl-cert/deploy-configs/execute", h.ExecuteDeploy)
 	g.POST("/ssl-cert/tasks/list", h.ListTasks)
 	g.POST("/ssl-cert/tasks/get", h.GetTask)
+}
+
+// DownloadCertificates POST /api/v1/ssl-cert/certificates/download 下载 Nginx 证书压缩包。
+func (h *SSLCertHandler) DownloadCertificates(c *gin.Context) {
+	req := new(api.SSLCertificateDownloadRequest)
+	if !bindSSL(c, req) {
+		return
+	}
+	data, err := h.biz.DownloadCertificates(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="nginx-certificates.zip"`)
+	c.DataFromReader(200, int64(len(data)), "application/zip", bytes.NewReader(data), nil)
+}
+
+// ApplyCertificate POST /api/v1/ssl-cert/applications/create 创建 ACME 证书申请任务。
+func (h *SSLCertHandler) ApplyCertificate(c *gin.Context) {
+	req := new(api.SSLCertificateApplyRequest)
+	if bindSSL(c, req) {
+		data, err := h.biz.ApplyCertificate(c.Request.Context(), req)
+		sslReply(c, data, err)
+	}
 }
 
 func bindSSL(c *gin.Context, req any) bool {

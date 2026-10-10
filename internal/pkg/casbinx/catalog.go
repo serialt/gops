@@ -169,6 +169,8 @@ func Catalog() []Permission {
 		{Group: "SSL 证书", Name: "保存证书", Path: "/api/v1/ssl-cert/certificates/save", Method: "POST"},
 		{Group: "SSL 证书", Name: "删除证书", Path: "/api/v1/ssl-cert/certificates/delete", Method: "POST"},
 		{Group: "SSL 证书", Name: "续期证书", Path: "/api/v1/ssl-cert/certificates/renew", Method: "POST"},
+		{Group: "SSL 证书", Name: "下载 Nginx 证书包", Path: "/api/v1/ssl-cert/certificates/download", Method: "POST"},
+		{Group: "SSL 证书", Name: "申请证书", Path: "/api/v1/ssl-cert/applications/create", Method: "POST"},
 		{Group: "SSL 证书", Name: "查看 DNS 配置", Path: "/api/v1/ssl-cert/dns-providers/list", Method: "POST"},
 		{Group: "SSL 证书", Name: "查看 DNS 配置详情", Path: "/api/v1/ssl-cert/dns-providers/get", Method: "POST"},
 		{Group: "SSL 证书", Name: "保存 DNS 配置", Path: "/api/v1/ssl-cert/dns-providers/save", Method: "POST"},

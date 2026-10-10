@@ -11,10 +11,24 @@ type SSLCertificateListRequest struct {
 type SSLCertificateIDRequest struct {
 	ID int64 `json:"id" binding:"required"`
 }
-type SSLCertificateRequest struct {
-	ID              int64  `json:"id"`
+type SSLCertificateDownloadRequest struct {
+	IDs []int64 `json:"ids" binding:"required,min=1"`
+}
+type SSLCertificateApplyRequest struct {
 	Name            string `json:"name" binding:"required"`
 	Domain          string `json:"domain" binding:"required"`
+	SanDomains      string `json:"san_domains"`
+	AcmeEmail       string `json:"acme_email" binding:"required,email"`
+	DNSProviderID   int64  `json:"dns_provider_id" binding:"required"`
+	KeyAlgorithm    string `json:"key_algorithm"`
+	CAProvider      string `json:"ca_provider"`
+	AutoRenew       bool   `json:"auto_renew"`
+	RenewDaysBefore int64  `json:"renew_days_before"`
+}
+type SSLCertificateRequest struct {
+	ID              int64  `json:"id"`
+	Name            string `json:"name"`
+	Domain          string `json:"domain"`
 	SanDomains      string `json:"san_domains"`
 	AcmeEmail       string `json:"acme_email"`
 	CaProvider      string `json:"ca_provider"`
@@ -53,9 +67,42 @@ type SSLCertificateResponse struct {
 }
 type SSLCertificateDetailResponse struct {
 	*SSLCertificateResponse
-	Certificate string `json:"certificate"`
-	PrivateKey  string `json:"private_key"`
-	CertChain   string `json:"cert_chain"`
+	Certificate       string                         `json:"certificate"`
+	PrivateKey        string                         `json:"private_key"`
+	CertChain         string                         `json:"cert_chain"`
+	ChainCertificates []*SSLCertificateChainResponse `json:"chain_certificates"`
+	ChainParseError   string                         `json:"chain_parse_error"`
+}
+
+type SSLCertificateChainResponse struct {
+	Position           int        `json:"position"`
+	Version            int        `json:"version"`
+	CommonName         string     `json:"common_name"`
+	Subject            string     `json:"subject"`
+	Issuer             string     `json:"issuer"`
+	SerialNumber       string     `json:"serial_number"`
+	DNSNames           []string   `json:"dns_names"`
+	EmailAddresses     []string   `json:"email_addresses"`
+	IPAddresses        []string   `json:"ip_addresses"`
+	URIs               []string   `json:"uris"`
+	NotBefore          *time.Time `json:"not_before"`
+	NotAfter           *time.Time `json:"not_after"`
+	Fingerprint        string     `json:"fingerprint"`
+	IsCA               bool       `json:"is_ca"`
+	BasicConstraints   bool       `json:"basic_constraints_valid"`
+	MaxPathLen         int        `json:"max_path_len"`
+	MaxPathLenZero     bool       `json:"max_path_len_zero"`
+	SignatureAlgorithm string     `json:"signature_algorithm"`
+	PublicKeyAlgorithm string     `json:"public_key_algorithm"`
+	PublicKeyBits      int        `json:"public_key_bits"`
+	KeyUsage           []string   `json:"key_usage"`
+	ExtKeyUsage        []string   `json:"ext_key_usage"`
+	SubjectKeyID       string     `json:"subject_key_id"`
+	AuthorityKeyID     string     `json:"authority_key_id"`
+	OCSPServers        []string   `json:"ocsp_servers"`
+	IssuerURLs         []string   `json:"issuer_urls"`
+	CRLPoints          []string   `json:"crl_points"`
+	Policies           []string   `json:"policies"`
 }
 
 type SSLDNSProviderListRequest struct {

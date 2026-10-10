@@ -117,19 +117,6 @@ func (b *SSLCertBiz) runDeployTask(taskID, configID int64) {
 	}
 }
 
-func (b *SSLCertBiz) runUnsupportedRenewTask(taskID int64) {
-	ctx := context.Background()
-	task, err := b.repo.GetTask(ctx, b.db, taskID)
-	if err != nil {
-		return
-	}
-	now := time.Now()
-	task.StartedAt, task.FinishedAt, task.UpdatedAt = now, now, now
-	task.Status = "failed"
-	task.ErrorMessage = "当前版本尚未配置 ACME 签发执行器，请先手动导入证书"
-	_ = b.repo.SaveTask(ctx, b.db, task)
-}
-
 func (b *SSLCertBiz) deployCertificate(ctx context.Context, cert *model.SslCertificate, config *model.SslDeployConfig) error {
 	switch config.DeployType {
 	case "nginx_ssh":

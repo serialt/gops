@@ -25,6 +25,7 @@ var gzipExcludedPaths = []string{
 	"/api/v1/assets/hosts/export",
 	"/api/v1/assets/db-instances/export",
 	"/api/v1/kubernetes/pods/files/download",
+	"/api/v1/ssl-cert/certificates/download",
 }
 
 // gzipMiddleware buffers ordinary responses and compresses them only when
