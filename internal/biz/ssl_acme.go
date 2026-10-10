@@ -13,26 +13,27 @@ import (
 
 	"gops/internal/data/model"
 
-	"github.com/go-acme/lego/v4/certcrypto"
-	"github.com/go-acme/lego/v4/certificate"
-	"github.com/go-acme/lego/v4/challenge"
-	"github.com/go-acme/lego/v4/lego"
-	"github.com/go-acme/lego/v4/providers/dns/alidns"
-	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
-	"github.com/go-acme/lego/v4/providers/dns/huaweicloud"
-	"github.com/go-acme/lego/v4/providers/dns/tencentcloud"
-	"github.com/go-acme/lego/v4/registration"
+	"github.com/go-acme/lego/v5/acme"
+	"github.com/go-acme/lego/v5/certcrypto"
+	"github.com/go-acme/lego/v5/certificate"
+	"github.com/go-acme/lego/v5/challenge"
+	"github.com/go-acme/lego/v5/lego"
+	"github.com/go-acme/lego/v5/providers/dns/alidns"
+	"github.com/go-acme/lego/v5/providers/dns/cloudflare"
+	"github.com/go-acme/lego/v5/providers/dns/huaweicloud"
+	"github.com/go-acme/lego/v5/providers/dns/tencentcloud"
+	"github.com/go-acme/lego/v5/registration"
 )
 
 type legoUser struct {
 	email        string
-	registration *registration.Resource
-	privateKey   crypto.PrivateKey
+	registration *acme.ExtendedAccount
+	privateKey   crypto.Signer
 }
 
-func (u *legoUser) GetEmail() string                        { return u.email }
-func (u *legoUser) GetRegistration() *registration.Resource { return u.registration }
-func (u *legoUser) GetPrivateKey() crypto.PrivateKey        { return u.privateKey }
+func (u *legoUser) GetEmail() string                       { return u.email }
+func (u *legoUser) GetRegistration() *acme.ExtendedAccount { return u.registration }
+func (u *legoUser) GetPrivateKey() crypto.Signer           { return u.privateKey }
 
 type aliDNSConfig struct {
 	AccessKeyID     string `json:"access_key_id"`
@@ -61,14 +62,18 @@ type huaweiCloudDNSConfig struct {
 	Region          string `json:"region"`
 }
 
-func newLegoDNSProvider(row *model.SslDNSProvider) (challenge.Provider, error) {
+func newLegoDNSProvider(aesKey string, row *model.SslDNSProvider) (challenge.Provider, error) {
 	if row == nil || strings.TrimSpace(row.Config) == "" || strings.TrimSpace(row.Config) == "{}" {
 		return nil, errors.New("DNS 配置不完整")
+	}
+	plainConfig, err := decryptDNSProviderConfig(aesKey, row.Provider, row.Config)
+	if err != nil {
+		return nil, err
 	}
 	switch strings.ToLower(strings.TrimSpace(row.Provider)) {
 	case "alidns", "aliyun":
 		var value aliDNSConfig
-		if err := json.Unmarshal([]byte(row.Config), &value); err != nil {
+		if err := json.Unmarshal([]byte(plainConfig), &value); err != nil {
 			return nil, fmt.Errorf("解析 AliDNS 配置: %w", err)
 		}
 		config := alidns.NewDefaultConfig()
@@ -80,7 +85,7 @@ func newLegoDNSProvider(row *model.SslDNSProvider) (challenge.Provider, error) {
 		return provider, wrapDNSProviderError("AliDNS", err)
 	case "tencentcloud":
 		var value tencentCloudDNSConfig
-		if err := json.Unmarshal([]byte(row.Config), &value); err != nil {
+		if err := json.Unmarshal([]byte(plainConfig), &value); err != nil {
 			return nil, fmt.Errorf("解析 Tencent Cloud DNS 配置: %w", err)
 		}
 		config := tencentcloud.NewDefaultConfig()
@@ -89,7 +94,7 @@ func newLegoDNSProvider(row *model.SslDNSProvider) (challenge.Provider, error) {
 		return provider, wrapDNSProviderError("Tencent Cloud DNS", err)
 	case "cloudflare":
 		var value cloudflareDNSConfig
-		if err := json.Unmarshal([]byte(row.Config), &value); err != nil {
+		if err := json.Unmarshal([]byte(plainConfig), &value); err != nil {
 			return nil, fmt.Errorf("解析 Cloudflare 配置: %w", err)
 		}
 		config := cloudflare.NewDefaultConfig()
@@ -98,7 +103,7 @@ func newLegoDNSProvider(row *model.SslDNSProvider) (challenge.Provider, error) {
 		return provider, wrapDNSProviderError("Cloudflare", err)
 	case "huaweicloud", "huawei":
 		var value huaweiCloudDNSConfig
-		if err := json.Unmarshal([]byte(row.Config), &value); err != nil {
+		if err := json.Unmarshal([]byte(plainConfig), &value); err != nil {
 			return nil, fmt.Errorf("解析 Huawei Cloud DNS 配置: %w", err)
 		}
 		config := huaweicloud.NewDefaultConfig()
@@ -147,7 +152,7 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 	if !providerRow.Enabled {
 		return nil, errors.New("DNS 配置未启用")
 	}
-	dnsProvider, err := newLegoDNSProvider(providerRow)
+	dnsProvider, err := newLegoDNSProvider(b.aesKey, providerRow)
 	if err != nil {
 		return nil, err
 	}
@@ -157,13 +162,12 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 	}
 	user := &legoUser{email: cert.AcmeEmail, privateKey: accountKey}
 	config := lego.NewConfig(user)
-	config.CADirURL = lego.LEDirectoryProduction
+	config.CADirURL = lego.DirectoryURLLetsEncrypt
 	if strings.EqualFold(cert.CaProvider, "letsencrypt_staging") {
-		config.CADirURL = lego.LEDirectoryStaging
+		config.CADirURL = lego.DirectoryURLLetsEncryptStaging
 	} else if !strings.EqualFold(cert.CaProvider, "letsencrypt") {
 		return nil, fmt.Errorf("暂不支持的 ACME CA %q", cert.CaProvider)
 	}
-	config.Certificate.KeyType = legoKeyType(cert.KeyAlgorithm)
 	client, err := lego.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("创建 ACME 客户端: %w", err)
@@ -171,7 +175,7 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 	if err = client.Challenge.SetDNS01Provider(dnsProvider); err != nil {
 		return nil, fmt.Errorf("配置 DNS-01: %w", err)
 	}
-	registrationResource, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+	registrationResource, err := client.Registration.Register(ctx, registration.RegisterOptions{TermsOfServiceAgreed: true})
 	if err != nil {
 		return nil, fmt.Errorf("注册 ACME 账户: %w", err)
 	}
@@ -181,14 +185,19 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 	if len(domains) == 0 {
 		return nil, errors.New("至少需要一个有效域名")
 	}
-	var privateKey crypto.PrivateKey
+	var privateKey crypto.Signer
 	if strings.TrimSpace(cert.PrivateKey) != "" {
 		privateKey, err = certcrypto.ParsePEMPrivateKey([]byte(cert.PrivateKey))
 		if err != nil {
 			return nil, fmt.Errorf("解析现有证书私钥: %w", err)
 		}
 	}
-	resource, err := client.Certificate.Obtain(certificate.ObtainRequest{Domains: domains, PrivateKey: privateKey, Bundle: false})
+	resource, err := client.Certificate.Obtain(ctx, certificate.ObtainRequest{
+		Domains:    domains,
+		PrivateKey: privateKey,
+		KeyType:    legoKeyType(cert.KeyAlgorithm),
+		Bundle:     false,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("申请 ACME 证书: %w", err)
 	}
@@ -214,7 +223,7 @@ func (b *SSLCertBiz) finishACMETask(ctx context.Context, task *model.SslTask, ce
 			cert.Status, cert.LastError = "error", err.Error()
 		} else {
 			task.Status, task.ErrorMessage = "success", ""
-			result, _ := json.Marshal(map[string]any{"domain": resource.Domain, "cert_url": resource.CertURL, "not_after": cert.NotAfter})
+			result, _ := json.Marshal(map[string]any{"domain": primaryCertificateDomain(resource.Domains), "cert_url": resource.CertURL, "not_after": cert.NotAfter})
 			task.Result = string(result)
 		}
 		if err := b.repo.SaveCertificate(ctx, b.db, cert); err != nil {
@@ -222,6 +231,13 @@ func (b *SSLCertBiz) finishACMETask(ctx context.Context, task *model.SslTask, ce
 		}
 	}
 	_ = b.repo.SaveTask(ctx, b.db, task)
+}
+
+func primaryCertificateDomain(domains []string) string {
+	if len(domains) == 0 {
+		return ""
+	}
+	return domains[0]
 }
 
 func legoKeyType(value string) certcrypto.KeyType {

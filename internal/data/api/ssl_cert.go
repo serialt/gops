@@ -27,8 +27,8 @@ type SSLCertificateApplyRequest struct {
 }
 type SSLCertificateRequest struct {
 	ID              int64  `json:"id"`
-	Name            string `json:"name" binding:"required"`
-	Domain          string `json:"domain" binding:"required"`
+	Name            string `json:"name"`
+	Domain          string `json:"domain"`
 	SanDomains      string `json:"san_domains"`
 	AcmeEmail       string `json:"acme_email"`
 	CaProvider      string `json:"ca_provider"`

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { useRouter } from 'vue-router'
 import { applyCertificate, listDNSProviders, type SSLDNSProvider, type SSLCertificateApplyForm } from '@/api/ssl-cert'
 
-const router = useRouter()
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+const emit = defineEmits<{ submitted: []; cancel: [] }>()
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
 const providers = ref<SSLDNSProvider[]>([])
@@ -40,7 +40,7 @@ async function submit() {
   try {
     await applyCertificate({ ...form })
     ElMessage.success('证书申请任务已创建，可在任务记录中查看进度')
-    await router.push('/ssl-cert/tasks')
+    emit('submitted')
   } finally {
     submitting.value = false
   }
@@ -50,8 +50,8 @@ onMounted(loadProviders)
 </script>
 
 <template>
-  <section class="apply-page">
-    <header>
+  <section class="apply-page" :class="{ 'is-embedded': embedded }">
+    <header v-if="!embedded">
       <h2>证书申请</h2>
       <p>通过 ACME DNS-01 自动申请 SSL 证书，支持通配符域名。</p>
     </header>
@@ -76,12 +76,12 @@ onMounted(loadProviders)
           <el-form-item label="提前续期"><el-input-number v-model="form.renew_days_before" :min="1" :max="90" /><span class="unit">天</span></el-form-item>
           <el-form-item label="自动续期"><el-switch v-model="form.auto_renew" /></el-form-item>
         </div>
-        <div class="form-actions"><el-button type="primary" :loading="submitting" @click="submit">提交申请</el-button></div>
+        <div class="form-actions"><el-button v-if="embedded" @click="emit('cancel')">取消</el-button><el-button type="primary" :loading="submitting" @click="submit">提交申请</el-button></div>
       </el-form>
     </div>
   </section>
 </template>
 
 <style scoped>
-.apply-page{height:100%;min-width:0;padding:0 4px;box-sizing:border-box;font-size:11px}.apply-page header h2{margin:0;font-size:20px}.apply-page header p{margin:3px 0 10px;color:var(--text-secondary)}.apply-card{max-width:960px;padding:18px 20px;border:1px solid var(--line);border-radius:9px;background:#fff}.form-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px 16px}.apply-form :deep(.el-select){width:100%}.unit{margin-left:5px;color:var(--text-secondary)}.form-actions{display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--line)}@media(max-width:760px){.form-grid{grid-template-columns:1fr}.apply-card{padding:14px 12px}}
+.apply-page{height:100%;min-width:0;padding:0 4px;box-sizing:border-box;font-size:11px}.apply-page header h2{margin:0;font-size:20px}.apply-page header p{margin:3px 0 10px;color:var(--text-secondary)}.apply-card{max-width:960px;padding:18px 20px;border:1px solid var(--line);border-radius:9px;background:#fff}.is-embedded{padding:0}.is-embedded .apply-card{max-width:none;padding:0;border:0}.form-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px 16px}.apply-form :deep(.el-select){width:100%}.unit{margin-left:5px;color:var(--text-secondary)}.form-actions{display:flex;justify-content:flex-end;gap:6px;padding-top:8px;border-top:1px solid var(--line)}@media(max-width:760px){.form-grid{grid-template-columns:1fr}.apply-card{padding:14px 12px}.is-embedded .apply-card{padding:0}}
 </style>
