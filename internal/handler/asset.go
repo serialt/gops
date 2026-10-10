@@ -339,7 +339,17 @@ func (h *AssetHandler) ConnectDatabaseTerminal(c *gin.Context) {
 					return
 				}
 				if statement != "" {
-					if writeDatabaseQuery(connection, write, statement) != nil {
+					ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+					query, message, handled := connection.ResolveMetaCommand(ctx, statement)
+					cancel()
+					if !handled {
+						query = statement
+					}
+					if handled && message != "" {
+						if write(message) != nil {
+							return
+						}
+					} else if writeDatabaseQuery(connection, write, query) != nil {
 						return
 					}
 				}

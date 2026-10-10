@@ -137,6 +137,12 @@ function vncSocketURL(host: Host) {
 function sendResize(runtime: Runtime) {
   if (runtime.socket.readyState === WebSocket.OPEN) runtime.socket.send(JSON.stringify({ type: 'resize', cols: runtime.terminal.cols, rows: runtime.terminal.rows }))
 }
+function fitTerminal(fitAddon: FitAddon, runtime?: Runtime) {
+  requestAnimationFrame(() => {
+    fitAddon.fit()
+    if (runtime) sendResize(runtime)
+  })
+}
 async function initializeSession(session: Session) {
   await nextTick()
   if (session.kind === 'vnc') {
@@ -171,7 +177,7 @@ async function initializeSession(session: Session) {
   terminal.writeln(`正在连接 ${target}...`)
   const socket = new WebSocket(socketURL(session, terminal))
   socket.binaryType = 'arraybuffer'
-  const resizeObserver = new ResizeObserver(() => { fitAddon.fit(); const runtime = runtimes.get(session.key); if (runtime) sendResize(runtime) })
+  const resizeObserver = new ResizeObserver(() => fitTerminal(fitAddon, runtimes.get(session.key)))
   const connectTimer = setTimeout(() => {
     if (socket.readyState !== WebSocket.OPEN) {
       terminal.writeln('\r\n连接超时，请检查后端服务、代理和网络。')
@@ -184,7 +190,7 @@ async function initializeSession(session: Session) {
   const runtime = { terminal, fitAddon, socket, resizeObserver, connectTimer, heartbeatTimer }
   runtimes.set(session.key, runtime)
   terminal.onData(data => socket.readyState === WebSocket.OPEN && socket.send(data))
-  socket.onopen = () => { clearTimeout(connectTimer); fitAddon.fit(); sendResize(runtime); terminal.focus() }
+  socket.onopen = () => { clearTimeout(connectTimer); fitTerminal(fitAddon, runtime); terminal.focus() }
   socket.onmessage = event => terminal.write(event.data instanceof ArrayBuffer ? new Uint8Array(event.data) : String(event.data))
   socket.onerror = () => terminal.writeln('\r\n连接失败，请检查主机、凭证和网络。')
   socket.onclose = () => terminal.writeln('\r\n连接已关闭。')
@@ -1262,7 +1268,7 @@ onBeforeUnmount(() => {
 
 .terminal-body {
   position: absolute;
-  inset: 0 0 8px;
+  inset: 0 0 16px;
   padding: 10px 12px;
   box-sizing: border-box;
   overflow: hidden
