@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/go-acme/lego/v5/certcrypto"
 )
 
 func TestCertificateDomains(t *testing.T) {
@@ -16,8 +18,8 @@ func TestCertificateDomains(t *testing.T) {
 }
 
 func TestLegoKeyTypeDefaultsToRSA2048(t *testing.T) {
-	if got := string(legoKeyType("unknown")); got != "2048" {
-		t.Fatalf("legoKeyType() = %q, want %q", got, "2048")
+	if got := legoKeyType("unknown"); got != certcrypto.RSA2048 {
+		t.Fatalf("legoKeyType() = %q, want %q", got, certcrypto.RSA2048)
 	}
 }
 

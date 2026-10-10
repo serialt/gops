@@ -8,6 +8,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"gops/internal/config"
 	"gops/internal/data/api"
 	"gops/internal/data/define"
 	"gops/internal/data/model"
@@ -31,10 +33,11 @@ type SSLCertBiz struct {
 	repo       *repo.SSLCertRepo
 	assets     *AssetBiz
 	kubernetes *KubernetesBiz
+	aesKey     string
 }
 
-func NewSSLCertBiz(db *gorm.DB, sslRepo *repo.SSLCertRepo, assets *AssetBiz, kubernetes *KubernetesBiz) *SSLCertBiz {
-	return &SSLCertBiz{db: db, repo: sslRepo, assets: assets, kubernetes: kubernetes}
+func NewSSLCertBiz(db *gorm.DB, sslRepo *repo.SSLCertRepo, assets *AssetBiz, kubernetes *KubernetesBiz, cfg *config.Config) *SSLCertBiz {
+	return &SSLCertBiz{db: db, repo: sslRepo, assets: assets, kubernetes: kubernetes, aesKey: cfg.Server.AESKey}
 }
 
 func (b *SSLCertBiz) ListCertificates(ctx context.Context, req *api.SSLCertificateListRequest) (*api.PageResponse[*api.SSLCertificateResponse], error) {
@@ -162,6 +165,15 @@ func (b *SSLCertBiz) SaveCertificate(ctx context.Context, req *api.SSLCertificat
 		if err := populateCertificate(row); err != nil {
 			return nil, err
 		}
+		if strings.TrimSpace(row.PrivateKey) == "" {
+			return nil, errors.New("证书私钥不能为空")
+		}
+		if _, err := tls.X509KeyPair([]byte(row.Certificate), []byte(row.PrivateKey)); err != nil {
+			return nil, errors.New("证书与私钥不匹配或私钥格式无效")
+		}
+	}
+	if row.Name == "" || row.Domain == "" {
+		return nil, errors.New("无法从证书解析名称或主域名")
 	}
 	if req.ID > 0 {
 		if err := b.repo.SaveCertificate(ctx, b.db, row); err != nil {
@@ -207,7 +219,7 @@ func (b *SSLCertBiz) ApplyCertificate(ctx context.Context, req *api.SSLCertifica
 	if !provider.Enabled {
 		return nil, errors.New("DNS 配置未启用")
 	}
-	if _, err = newLegoDNSProvider(provider); err != nil {
+	if _, err = newLegoDNSProvider(b.aesKey, provider); err != nil {
 		return nil, err
 	}
 	name := strings.TrimSpace(req.Name)
@@ -251,18 +263,33 @@ func (b *SSLCertBiz) GetDNSProvider(ctx context.Context, id int64) (*api.SSLDNSP
 	if err != nil {
 		return nil, err
 	}
-	return dnsResponse(row, true), nil
+	maskedConfig, err := maskDNSProviderConfig(row.Provider, row.Config)
+	if err != nil {
+		return nil, err
+	}
+	response := dnsResponse(row, false)
+	response.Config = maskedConfig
+	return response, nil
 }
 func (b *SSLCertBiz) SaveDNSProvider(ctx context.Context, req *api.SSLDNSProviderRequest) (*api.SSLDNSProviderResponse, error) {
-	if !json.Valid([]byte(req.Config)) {
-		return nil, errors.New("DNS 配置必须是有效 JSON")
-	}
-	row := &model.SslDNSProvider{ID: req.ID, Name: req.Name, Provider: req.Provider, Config: req.Config, Email: req.Email, Phone: req.Phone, Enabled: req.Enabled}
+	var old *model.SslDNSProvider
 	if req.ID > 0 {
-		old, err := b.repo.GetDNSProvider(ctx, b.db, req.ID)
+		var err error
+		old, err = b.repo.GetDNSProvider(ctx, b.db, req.ID)
 		if err != nil {
 			return nil, err
 		}
+	}
+	oldConfig := ""
+	if old != nil && strings.EqualFold(old.Provider, req.Provider) {
+		oldConfig = old.Config
+	}
+	encryptedConfig, err := encryptDNSProviderConfig(b.aesKey, req.Provider, req.Config, oldConfig)
+	if err != nil {
+		return nil, err
+	}
+	row := &model.SslDNSProvider{ID: req.ID, Name: req.Name, Provider: req.Provider, Config: encryptedConfig, Email: req.Email, Phone: req.Phone, Enabled: req.Enabled}
+	if old != nil {
 		row.CreatedAt, row.LastTestAt, row.LastTestOk = old.CreatedAt, old.LastTestAt, old.LastTestOk
 		if err = b.repo.SaveDNSProvider(ctx, b.db, row); err != nil {
 			return nil, err
@@ -270,7 +297,13 @@ func (b *SSLCertBiz) SaveDNSProvider(ctx context.Context, req *api.SSLDNSProvide
 	} else if err := b.repo.CreateDNSProvider(ctx, b.db, row); err != nil {
 		return nil, err
 	}
-	return dnsResponse(row, true), nil
+	maskedConfig, err := maskDNSProviderConfig(row.Provider, row.Config)
+	if err != nil {
+		return nil, err
+	}
+	response := dnsResponse(row, false)
+	response.Config = maskedConfig
+	return response, nil
 }
 func (b *SSLCertBiz) DeleteDNSProvider(ctx context.Context, id int64) error {
 	row, err := b.repo.GetDNSProvider(ctx, b.db, id)
@@ -284,7 +317,7 @@ func (b *SSLCertBiz) TestDNSProvider(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	if _, err = newLegoDNSProvider(row); err != nil {
+	if _, err = newLegoDNSProvider(b.aesKey, row); err != nil {
 		return err
 	}
 	row.LastTestAt, row.LastTestOk = time.Now(), true
@@ -414,6 +447,19 @@ func populateCertificate(row *model.SslCertificate) error {
 		return errors.New("证书内容无效")
 	}
 	sum := sha256.Sum256(cert.Raw)
+	if row.Domain == "" {
+		row.Domain = strings.TrimSpace(cert.Subject.CommonName)
+		if row.Domain == "" && len(cert.DNSNames) > 0 {
+			row.Domain = cert.DNSNames[0]
+		}
+	}
+	if row.Name == "" {
+		row.Name = row.Domain
+	}
+	if strings.TrimSpace(row.SanDomains) == "" {
+		row.SanDomains = strings.Join(cert.DNSNames, ", ")
+	}
+	row.KeyAlgorithm = certificateKeyAlgorithm(cert)
 	row.Issuer, row.NotBefore, row.NotAfter, row.Fingerprint = cert.Issuer.String(), cert.NotBefore, cert.NotAfter, strings.ToUpper(hex.EncodeToString(sum[:]))
 	row.Status = "active"
 	if time.Now().After(cert.NotAfter) {
@@ -422,6 +468,19 @@ func populateCertificate(row *model.SslCertificate) error {
 		row.Status = "expiring"
 	}
 	return nil
+}
+
+func certificateKeyAlgorithm(cert *x509.Certificate) string {
+	switch key := cert.PublicKey.(type) {
+	case *rsa.PublicKey:
+		return fmt.Sprintf("rsa%d", key.N.BitLen())
+	case *ecdsa.PublicKey:
+		return fmt.Sprintf("ec%d", key.Curve.Params().BitSize)
+	case ed25519.PublicKey:
+		return "ed25519"
+	default:
+		return strings.ToLower(cert.PublicKeyAlgorithm.String())
+	}
 }
 func certificateResponse(x *model.SslCertificate) *api.SSLCertificateResponse {
 	return &api.SSLCertificateResponse{ID: x.ID, Name: x.Name, Domain: x.Domain, SanDomains: x.SanDomains, AcmeEmail: x.AcmeEmail, CaProvider: x.CaProvider, KeyAlgorithm: x.KeyAlgorithm, SourceType: x.SourceType, CloudAccountID: x.CloudAccountID, DNSProviderID: x.DNSProviderID, Issuer: x.Issuer, Fingerprint: x.Fingerprint, Status: x.Status, AutoRenew: x.AutoRenew, RenewDaysBefore: x.RenewDaysBefore, NotBefore: nonZeroTime(x.NotBefore), NotAfter: nonZeroTime(x.NotAfter), LastRenewAt: nonZeroTime(x.LastRenewAt), LastError: x.LastError, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
