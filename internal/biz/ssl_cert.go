@@ -88,20 +88,20 @@ func (b *SSLCertBiz) DownloadCertificates(ctx context.Context, req *api.SSLCerti
 		usedNames[directory] = struct{}{}
 		certificate := strings.TrimSpace(cert.Certificate) + "\n"
 		chain := strings.TrimSpace(cert.CertChain)
-		fullChain := certificate
+		nginxCertificate := certificate
 		if chain != "" {
-			fullChain += chain + "\n"
+			nginxCertificate += chain + "\n"
 		}
 		files := []struct {
 			name string
 			body string
 			mode uint32
-		}{{"cert.pem", certificate, 0o644}, {"chain.pem", chain + "\n", 0o644}, {"fullchain.pem", fullChain, 0o644}, {"privkey.pem", strings.TrimSpace(cert.PrivateKey) + "\n", 0o600}, {"nginx.conf.example", fmt.Sprintf("ssl_certificate     /etc/nginx/ssl/%s/fullchain.pem;\nssl_certificate_key /etc/nginx/ssl/%s/privkey.pem;\n", directory, directory), 0o644}}
+		}{
+			{name: directory + ".crt", body: nginxCertificate, mode: 0o644},
+			{name: directory + ".key", body: strings.TrimSpace(cert.PrivateKey) + "\n", mode: 0o600},
+		}
 		for _, file := range files {
-			if file.name == "chain.pem" && chain == "" {
-				continue
-			}
-			header := &zip.FileHeader{Name: directory + "/" + file.name, Method: zip.Deflate}
+			header := &zip.FileHeader{Name: file.name, Method: zip.Deflate}
 			header.SetMode(os.FileMode(file.mode))
 			writer, createErr := archive.CreateHeader(header)
 			if createErr != nil {

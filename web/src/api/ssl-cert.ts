@@ -13,6 +13,7 @@ export const getCertificate = (id:number) => request.post<SSLCertificate>('/ssl-
 export const saveCertificate = (data:SSLCertificateForm) => request.post<SSLCertificate>('/ssl-cert/certificates/save', data)
 export const deleteCertificate = (id:number) => request.post('/ssl-cert/certificates/delete', { id })
 export const renewCertificate = (id:number) => request.post<SSLTask>('/ssl-cert/certificates/renew', { id })
+export const downloadCertificates = (ids:number[]) => request.post<Blob>('/ssl-cert/certificates/download', { ids }, { responseType: 'blob' })
 export const applyCertificate = (data:SSLCertificateApplyForm) => request.post<SSLTask>('/ssl-cert/applications/create', data)
 
 export const listDNSProviders = (params:{keyword:string;provider:string;page:number;limit:number}) => request.post<PageResponse<SSLDNSProvider>>('/ssl-cert/dns-providers/list', params)
