@@ -122,14 +122,14 @@ release: clean frontend
 	@ls -lh $(DIST_DIR)/$(APP_NAME)-*.tar.gz
 
 image:
-	docker build --tag $(IMAGE) .
+	docker build --file container/Dockerfile --tag $(IMAGE) .
 
 # A multi-platform image cannot be loaded into Docker's classic local image
 # store. Publish the manifest and architecture-specific images to the registry.
 # Example: make image-multiarch IMAGE=registry.example.com/team/gops:v1.0.0
 image-multiarch:
 	@test -n "$(IMAGE)" || (echo "IMAGE is required"; exit 1)
-	$(BUILDX) --platform $(IMAGE_PLATFORMS) --tag $(IMAGE) --push .
+	$(BUILDX) --file container/Dockerfile --platform $(IMAGE_PLATFORMS) --tag $(IMAGE) --push .
 
 run:
 	go run $(CMD_PATH)

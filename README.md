@@ -200,8 +200,12 @@ pnpm preview    # 本地预览生产构建
 │   │   └── views/              # 页面视图
 │   ├── Dockerfile
 │   └── nginx.conf
+├── container/
+│   ├── Dockerfile              # 后端镜像
+│   ├── docker-compose.yml      # 容器编排配置
+│   ├── docker/                 # 镜像基础文件与入口脚本
+│   └── helm/                   # Kubernetes Helm Chart
 ├── config.yaml                 # 本地运行配置（不要提交真实密钥）
-├── Dockerfile                  # 后端镜像
 ├── Makefile
 └── go.mod
 ```
@@ -289,7 +293,7 @@ pnpm build
 
 ### Docker
 
-仓库根目录的 `Dockerfile` 会在多阶段构建中编译前端，并将其内置到最终后端镜像；不再需要额外的前端容器。运行容器时需要挂载生产 `config.yaml` 和 SQLite 数据目录，并确保 `dsn` 指向持久化目录中的数据库文件。`web/Dockerfile` 仅在需要独立部署前端时使用。
+`container/Dockerfile` 会以仓库根目录作为构建上下文，在多阶段构建中编译前端并将其内置到最终后端镜像；不再需要额外的前端容器。运行容器时使用 `container/docker-compose.yml`，并挂载 SQLite 数据目录。`web/Dockerfile` 仅在需要独立部署前端时使用。
 
 ## 开发检查
 

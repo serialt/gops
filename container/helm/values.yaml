@@ -1,0 +1,104 @@
+replicaCount: 1
+
+image:
+  repository: gops
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+config:
+  timezone: Asia/Shanghai
+  logLevel: info
+  accessTokenTimeout: 15m
+  refreshTokenTimeout: 168h
+  jwtSecret: "replace-with-a-long-random-secret"
+  aesKey: "0123456789abcdef0123456789abcdef"
+  existingSecret: ""
+  jwtSecretKey: jwt-secret
+  aesKeyKey: aes-key
+
+service:
+  type: ClusterIP
+  port: 9876
+  annotations: {}
+
+iot:
+  enabled: false
+  port: 1883
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: gops.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+persistence:
+  enabled: true
+  mountPath: /app/data
+  accessModes: ["ReadWriteOnce"]
+  size: 2Gi
+  storageClass: ""
+  annotations: {}
+  existingClaim: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+probes:
+  liveness:
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 6
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 6
+  startup:
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 24
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
