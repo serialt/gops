@@ -1,0 +1,6 @@
+apiVersion: v2
+name: gops
+description: Helm chart for the Gops operations management platform
+type: application
+version: 0.1.0
+appVersion: "latest"

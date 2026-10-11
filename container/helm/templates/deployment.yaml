@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gops.fullname" . }}
+  labels:
+    {{- include "gops.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "gops.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gops.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "gops.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: gops
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: TZ
+              value: {{ .Values.config.timezone | quote }}
+            - name: GOPS_HTTP_PORT
+              value: "9876"
+            - name: GOPS_DB_DSN
+              value: {{ printf "%s/gops.db" .Values.persistence.mountPath | quote }}
+            - name: GOPS_LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: GOPS_ACCESS_TOKEN_TIMEOUT
+              value: {{ .Values.config.accessTokenTimeout | quote }}
+            - name: GOPS_REFRESH_TOKEN_TIMEOUT
+              value: {{ .Values.config.refreshTokenTimeout | quote }}
+            - name: GOPS_IOT_ENABLED
+              value: {{ .Values.iot.enabled | quote }}
+            - name: GOPS_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gops.secretName" . }}
+                  key: {{ .Values.config.jwtSecretKey }}
+            - name: GOPS_AES_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gops.secretName" . }}
+                  key: {{ .Values.config.aesKeyKey }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 9876
+              protocol: TCP
+            {{- if .Values.iot.enabled }}
+            - name: mqtt
+              containerPort: {{ .Values.iot.port }}
+            {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath }}
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            exec:
+              command: ["wget", "-q", "--spider", "--post-data=", "http://127.0.0.1:9876/health"]
+            {{- toYaml .Values.probes.startup | nindent 12 }}
+          livenessProbe:
+            exec:
+              command: ["wget", "-q", "--spider", "--post-data=", "http://127.0.0.1:9876/health"]
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: ["wget", "-q", "--spider", "--post-data=", "http://127.0.0.1:9876/health"]
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "gops.claimName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

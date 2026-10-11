@@ -1,0 +1,15 @@
+1. Get the application URL:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get service --namespace {{ .Release.Namespace }} {{ include "gops.fullname" . }} -o jsonpath="{.spec.ports[0].nodePort}")
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else }}
+  kubectl port-forward --namespace {{ .Release.Namespace }} service/{{ include "gops.fullname" . }} 9876:{{ .Values.service.port }}
+  echo http://127.0.0.1:9876
+{{- end }}
+
+SQLite uses a single-writer persistent volume. Keep replicaCount at 1 unless the database is moved to shared external storage.
