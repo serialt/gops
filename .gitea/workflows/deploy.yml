@@ -19,6 +19,9 @@ jobs:
       ALI_ACR_USERNAME: serialt
       GOPS_JWT_SECRET: ${{ secrets.GOPS_JWT_SECRET }}
       GOPS_AES_KEY: ${{ secrets.GOPS_AES_KEY }}
+      GOPS_BASE_DOCKERFILE: container/docker/Dockerfile.base
+      GOPS_DOCKERFILE: container/Dockerfile
+      GOPS_COMPOSE_FILE: container/docker-compose.yml
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -57,12 +60,13 @@ jobs:
         shell: sh
         run: |
           set -eu
+          test -f "$GOPS_BASE_DOCKERFILE"
           if podman manifest inspect "$GOPS_BASE_IMAGE" >/dev/null 2>&1; then
             echo "Base image exists: $GOPS_BASE_IMAGE"
             podman pull "$GOPS_BASE_IMAGE"
           else
             echo "Base image not found, building: $GOPS_BASE_IMAGE"
-            podman build --pull=missing --tag "$GOPS_BASE_IMAGE" --file docker/Dockerfile.base .
+            podman build --pull=missing --tag "$GOPS_BASE_IMAGE" --file "$GOPS_BASE_DOCKERFILE" .
             podman image exists "$GOPS_BASE_IMAGE"
             podman push "$GOPS_BASE_IMAGE"
           fi
@@ -71,7 +75,8 @@ jobs:
         shell: sh
         run: |
           set -eu
-          podman build --pull=missing --build-arg "GOPS_BASE_IMAGE=$GOPS_BASE_IMAGE" --tag "$GOPS_IMAGE" --file Dockerfile .
+          test -f "$GOPS_DOCKERFILE"
+          podman build --pull=missing --build-arg "GOPS_BASE_IMAGE=$GOPS_BASE_IMAGE" --tag "$GOPS_IMAGE" --file "$GOPS_DOCKERFILE" .
           podman image exists "$GOPS_IMAGE"
 
       - name: Push image
@@ -79,30 +84,36 @@ jobs:
           podman push "$GOPS_IMAGE"
 
       - name: Start service
+        shell: sh
         run: |
-          podman compose up -d --no-build --remove-orphans gops
+          set -eu
+          test -f "$GOPS_COMPOSE_FILE"
+          podman compose --file "$GOPS_COMPOSE_FILE" up -d --no-build --remove-orphans gops
 
       - name: Wait for health check
+        shell: sh
         run: |
+          set -eu
           container_name="${GOPS_CONTAINER_NAME:-gops}"
           container_id="$(podman container inspect --format '{{.Id}}' "$container_name")"
           test -n "$container_id"
           for attempt in $(seq 1 36); do
             status="$(podman inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
             if [ "$status" = "healthy" ]; then
-              podman compose ps
+              podman compose --file "$GOPS_COMPOSE_FILE" ps
               exit 0
             fi
             if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
-              podman compose logs gops
+              podman compose --file "$GOPS_COMPOSE_FILE" logs gops
               exit 1
             fi
             sleep 5
           done
-          podman compose logs gops
+          podman compose --file "$GOPS_COMPOSE_FILE" logs gops
           exit 1
 
       - name: Show logs on failure
         if: failure()
+        shell: sh
         run: |
-          podman compose logs --tail=200 gops || true
+          podman compose --file "$GOPS_COMPOSE_FILE" logs --tail=200 gops || true
