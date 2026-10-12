@@ -37,6 +37,10 @@ const terminalHeartbeatTimeout = 3 * time.Minute
 
 func NewAssetHandler(assetBiz *biz.AssetBiz) *AssetHandler { return &AssetHandler{biz: assetBiz} }
 
+func (h *AssetHandler) StartAssetCollectionScheduler(ctx context.Context) {
+	h.biz.StartAssetCollectionScheduler(ctx)
+}
+
 func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/groups/list", h.ListGroups)
 	g.POST("/assets/groups/create", h.CreateGroup)
@@ -738,7 +742,7 @@ func (h *AssetHandler) CollectHostInfo(c *gin.Context) {
 		response.Error(c, 400, "invalid host id")
 		return
 	}
-	result, err := h.biz.CollectHostInfo(req)
+	result, err := h.biz.CollectHostInfo(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return
