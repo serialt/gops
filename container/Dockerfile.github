@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1.7
+
+# Build on the runner architecture and cross-compile Go for the target image.
+# This avoids emulating the complete frontend/backend build for arm64.
+FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine AS builder
+
+WORKDIR /src
+
+RUN apk add --no-cache git nodejs pnpm
+
+# Keep dependency layers reusable when only application sources change.
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./web/
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm --dir web install --frozen-lockfile
+
+COPY . .
+
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm --dir web build \
+    && rm -rf internal/webui/dist \
+    && mkdir -p internal/webui/dist \
+    && cp -R web/dist/. internal/webui/dist/
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath \
+      -ldflags="-s -w -X 'main.APPVersion=$VERSION' -X 'main.GoVersion=$(go version | awk '{print $3}')' -X 'main.BuildTime=$BUILD_TIME' -X 'main.GitCommit=$GIT_COMMIT'" \
+      -o /out/gops ./cmd/server
+
+FROM alpine:3.24 AS runtime
+
+RUN apk add --no-cache ca-certificates tzdata \
+    && adduser -D -u 10001 app \
+    && install -d -o app -g app /app/data
+
+COPY --from=builder /out/gops /usr/local/bin/gops
+COPY --chmod=755 container/docker/entrypoint.sh /usr/local/bin/gops-entrypoint
+
+USER app
+WORKDIR /app/data
+
+EXPOSE 9876
+ENTRYPOINT ["/usr/local/bin/gops-entrypoint"]

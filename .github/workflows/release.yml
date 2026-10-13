@@ -11,7 +11,6 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   release:
@@ -96,11 +95,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prepare build variables
+        id: vars
+        shell: bash
+        run: |
+          echo "image=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.vars.outputs.image }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -112,11 +118,15 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: container/Dockerfile
+          file: container/Dockerfile.github
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.vars.outputs.build_time }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: true
