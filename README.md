@@ -177,7 +177,7 @@ make migrate-up       # 执行 Goose 迁移
 make migration-create NAME=add_example  # 创建迁移文件
 make gmodel           # 生成 GORM model/query
 make wire             # 重新生成 Wire 依赖注入代码
-make release          # 构建多平台单文件程序
+make release          # 构建多平台单文件 tar.gz 发布包
 ```
 
 ### 前端
