@@ -93,6 +93,7 @@ func NewGinEngine(
 	// }
 
 	go monitorHandler.StartScheduler(schedulerCtx)
+	go assetHandler.StartAssetCollectionScheduler(schedulerCtx)
 	go kubernetesHandler.StartStatusScheduler(schedulerCtx, 6*time.Hour)
 	go func() {
 		if err := iotBroker.Run(); err != nil {

@@ -27,12 +27,15 @@ import (
 )
 
 type AssetBiz struct {
-	db             *gorm.DB
-	repo           *repo.AssetRepo
-	aesKey         string
-	log            *slog.Logger
-	sftpTransferMu sync.RWMutex
-	sftpTransfers  map[string]*api.SFTPTransferProgressResponse
+	db               *gorm.DB
+	repo             *repo.AssetRepo
+	aesKey           string
+	log              *slog.Logger
+	sftpTransferMu   sync.RWMutex
+	sftpTransfers    map[string]*api.SFTPTransferProgressResponse
+	collectionMu     sync.Mutex
+	hostFailures     map[int64]int
+	databaseFailures map[int64]int
 }
 
 var cloudProviderOptions = []*api.CloudProviderOptionResponse{
@@ -72,7 +75,7 @@ func cloudRegions(values ...string) []*api.CloudRegionOptionResponse {
 }
 
 func NewAssetBiz(db *gorm.DB, assetRepo *repo.AssetRepo, cfg *config.Config, log *slog.Logger) *AssetBiz {
-	return &AssetBiz{db: db, repo: assetRepo, aesKey: cfg.Server.AESKey, log: log, sftpTransfers: make(map[string]*api.SFTPTransferProgressResponse)}
+	return &AssetBiz{db: db, repo: assetRepo, aesKey: cfg.Server.AESKey, log: log, sftpTransfers: make(map[string]*api.SFTPTransferProgressResponse), hostFailures: make(map[int64]int), databaseFailures: make(map[int64]int)}
 }
 
 // CloudProviderOptions 返回后端定义的云服务商与区域枚举。
@@ -557,27 +560,101 @@ func (b *AssetBiz) TestHostConnection(ctx context.Context, req *api.HostTestRequ
 	return client.Close()
 }
 
-func (b *AssetBiz) CollectHostInfo(req *api.HostIDRequest) (*api.HostResponse, error) {
+func (b *AssetBiz) CollectHostInfo(ctx context.Context, req *api.HostIDRequest) (*api.HostResponse, error) {
 	host, client, err := b.dialHostSSH(req.ID)
 	if err != nil {
-		_ = b.db.Model(&model.Host{}).Where("id = ?", req.ID).Update("status", 0).Error
+		b.recordHostCollectionFailure(ctx, req.ID)
 		return nil, err
 	}
 	defer client.Close()
 	info, err := collector.New(sshCommandExecutor{client: client}).CollectAll()
 	if err != nil {
-		_ = b.db.Model(host).Update("status", 0).Error
+		b.recordHostCollectionFailure(ctx, req.ID)
 		return nil, err
 	}
-	now := time.Now()
-	updates := map[string]any{"status": 1, "last_seen_at": now, "os": info.OS, "kernel": info.Kernel, "arch": info.Arch, "cpu_info": info.CPU.JSON(), "cpu_cores": info.CPU.Cores, "cpu_usage": info.CPU.Usage, "memory_total": info.Memory.Total, "memory_used": info.Memory.Used, "memory_usage": info.Memory.Usage, "disk_total": info.Disk.Total, "disk_used": info.Disk.Used, "disk_usage": info.Disk.Usage, "uptime": info.Uptime, "hostname": info.Hostname}
-	if err := b.db.Model(host).Updates(updates).Error; err != nil {
+	updated, err := b.repo.UpdateHostCollectedInfo(ctx, b.db, host.ID, &define.HostCollectedInfo{
+		LastSeenAt: time.Now(), OS: info.OS, Kernel: info.Kernel, Arch: info.Arch, CPUInfo: info.CPU.JSON(),
+		CPUCores: int64(info.CPU.Cores), CPUUsage: info.CPU.Usage, MemoryTotal: int64(info.Memory.Total),
+		MemoryUsed: int64(info.Memory.Used), MemoryUsage: info.Memory.Usage, DiskTotal: int64(info.Disk.Total),
+		DiskUsed: int64(info.Disk.Used), DiskUsage: info.Disk.Usage, Uptime: info.Uptime, Hostname: info.Hostname,
+	})
+	if err != nil {
 		return nil, err
 	}
-	if err := b.db.First(host, host.ID).Error; err != nil {
-		return nil, err
+	b.collectionMu.Lock()
+	delete(b.hostFailures, req.ID)
+	b.collectionMu.Unlock()
+	return hostResponse(*updated), nil
+}
+
+func (b *AssetBiz) recordHostCollectionFailure(ctx context.Context, hostID int64) {
+	b.collectionMu.Lock()
+	b.hostFailures[hostID]++
+	failures := b.hostFailures[hostID]
+	b.collectionMu.Unlock()
+	if failures >= 2 {
+		if err := b.repo.UpdateHostStatus(ctx, b.db, hostID, 0); err != nil {
+			b.log.Warn("更新离线主机状态失败", "host_id", hostID, "error", err)
+		}
 	}
-	return hostResponse(*host), nil
+}
+
+// StartAssetCollectionScheduler starts host and database collection two minutes after startup and repeats every twenty minutes.
+func (b *AssetBiz) StartAssetCollectionScheduler(ctx context.Context) {
+	timer := time.NewTimer(2 * time.Minute)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-timer.C:
+		b.collectAssets(ctx)
+	}
+	ticker := time.NewTicker(20 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			b.collectAssets(ctx)
+		}
+	}
+}
+
+func (b *AssetBiz) collectAssets(ctx context.Context) {
+	var group sync.WaitGroup
+	group.Add(2)
+	go func() {
+		defer group.Done()
+		b.collectHosts(ctx)
+	}()
+	go func() {
+		defer group.Done()
+		b.collectDBInstances(ctx)
+	}()
+	group.Wait()
+}
+
+func (b *AssetBiz) collectHosts(ctx context.Context) {
+	const pageSize = 100
+	for page := 1; ; page++ {
+		hosts, total, err := b.repo.ListHosts(ctx, b.db, &define.HostListCond{Page: page, Limit: pageSize})
+		if err != nil {
+			b.log.Warn("加载待采集主机失败", "error", err)
+			return
+		}
+		for _, host := range hosts {
+			if host.Port == nil || host.CredentialID == nil {
+				continue
+			}
+			if _, err := b.CollectHostInfo(ctx, &api.HostIDRequest{ID: host.ID}); err != nil {
+				b.log.Warn("定时采集主机信息失败", "host_id", host.ID, "host", host.Name, "error", err)
+			}
+		}
+		if int64(page*pageSize) >= total || ctx.Err() != nil {
+			return
+		}
+	}
 }
 func hostModel(req *api.HostRequest) model.Host {
 	return model.Host{Name: req.Name, GroupID: req.GroupID, HostType: req.HostType, IP: req.IP, Port: req.Port, CredentialID: req.CredentialID, VncCredentialID: req.VNCCredentialID, VncPort: req.VNCPort, CloudAccountID: req.CloudAccountID, Tags: req.Tags, Description: req.Description, Status: req.Status}
@@ -645,28 +722,65 @@ func (b *AssetBiz) DeleteDBInstance(req *api.DbInstanceIDRequest) error {
 func (b *AssetBiz) CollectDBInstanceInfo(ctx context.Context, req *api.DbInstanceIDRequest) (*api.DbInstanceResponse, error) {
 	instance, credential, err := b.repo.GetDBInstanceAndCredential(ctx, b.db, req.ID)
 	if err != nil {
+		b.recordDBCollectionFailure(ctx, req.ID)
 		return nil, err
 	}
 	if credential.CredentialType != "password" {
+		b.recordDBCollectionFailure(ctx, req.ID)
 		return nil, fmt.Errorf("数据库采集仅支持用户名密码凭据")
 	}
 	username, password := credential.Username, ""
 	password, err = cryptox.Decrypt(b.aesKey, credential.Password)
 	if err != nil {
+		b.recordDBCollectionFailure(ctx, req.ID)
 		return nil, fmt.Errorf("解密数据库凭据: %w", err)
 	}
 	collectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	version, err := collectDatabaseVersion(collectCtx, instance, username, password)
 	if err != nil {
-		_, _ = b.repo.UpdateDBInstanceCollectedInfo(ctx, b.db, instance.ID, false, "")
+		b.recordDBCollectionFailure(ctx, instance.ID)
 		return nil, err
 	}
 	updated, err := b.repo.UpdateDBInstanceCollectedInfo(ctx, b.db, instance.ID, true, version)
 	if err != nil {
 		return nil, err
 	}
+	b.collectionMu.Lock()
+	delete(b.databaseFailures, req.ID)
+	b.collectionMu.Unlock()
 	return dbInstanceResponse(*updated), nil
+}
+
+func (b *AssetBiz) recordDBCollectionFailure(ctx context.Context, databaseID int64) {
+	b.collectionMu.Lock()
+	b.databaseFailures[databaseID]++
+	failures := b.databaseFailures[databaseID]
+	b.collectionMu.Unlock()
+	if failures >= 2 {
+		if err := b.repo.UpdateDBInstanceStatus(ctx, b.db, databaseID, false); err != nil {
+			b.log.Warn("更新不可用数据库状态失败", "database_id", databaseID, "error", err)
+		}
+	}
+}
+
+func (b *AssetBiz) collectDBInstances(ctx context.Context) {
+	const pageSize = 100
+	for page := 1; ; page++ {
+		instances, total, err := b.repo.ListDBInstances(ctx, b.db, &define.DBInstanceListCond{Page: page, Limit: pageSize})
+		if err != nil {
+			b.log.Warn("加载待采集数据库失败", "error", err)
+			return
+		}
+		for _, instance := range instances {
+			if _, err := b.CollectDBInstanceInfo(ctx, &api.DbInstanceIDRequest{ID: instance.ID}); err != nil {
+				b.log.Warn("定时采集数据库信息失败", "database_id", instance.ID, "database", instance.Name, "error", err)
+			}
+		}
+		if int64(page*pageSize) >= total || ctx.Err() != nil {
+			return
+		}
+	}
 }
 
 func (b *AssetBiz) TestDBInstanceConnection(ctx context.Context, req *api.DbInstanceTestRequest) (*api.DbInstanceTestResponse, error) {

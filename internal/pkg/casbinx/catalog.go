@@ -151,6 +151,7 @@ func Catalog() []Permission {
 		{Group: "监控管理", Name: "下载域名监控导入模板", Path: "/api/v1/monitor/domains/template", Method: "POST"},
 		{Group: "监控管理", Name: "导入域名监控", Path: "/api/v1/monitor/domains/import", Method: "POST"},
 		{Group: "监控管理", Name: "查看域名请求日志", Path: "/api/v1/monitor/domains/history", Method: "POST"},
+		{Group: "监控管理", Name: "查看域名证书链", Path: "/api/v1/monitor/domains/certificate-chain", Method: "POST"},
 		{Group: "监控管理", Name: "查看告警通道", Path: "/api/v1/monitor/channels/list", Method: "POST"},
 		{Group: "监控管理", Name: "保存告警通道", Path: "/api/v1/monitor/channels/save", Method: "POST"},
 		{Group: "监控管理", Name: "删除告警通道", Path: "/api/v1/monitor/channels/delete", Method: "POST"},
