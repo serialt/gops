@@ -88,7 +88,7 @@ jobs:
         run: |
           set -eu
           test -f "$GOPS_COMPOSE_FILE"
-          podman compose --file "$GOPS_COMPOSE_FILE" up -d --replace --no-build --remove-orphans gops
+          podman compose --file "$GOPS_COMPOSE_FILE" up -d --force-recreate--no-build --remove-orphans gops
 
       - name: Wait for health check
         shell: sh
