@@ -88,6 +88,10 @@ jobs:
         run: |
           set -eu
           test -f "$GOPS_COMPOSE_FILE"
+          container_name="${GOPS_CONTAINER_NAME:-gops}"
+          if podman container exists "$container_name"; then
+            podman container rm --force "$container_name"
+          fi
           podman compose --file "$GOPS_COMPOSE_FILE" up -d --force-recreate --no-build --remove-orphans gops
 
       - name: Wait for health check
