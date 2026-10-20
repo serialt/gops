@@ -7,7 +7,7 @@ import { FitAddon } from 'xterm-addon-fit'
 import RFB from '@novnc/novnc'
 import 'xterm/css/xterm.css'
 import gopsLogoUrl from '@/assets/gops.svg'
-import { downloadSftp, getSftpTransferProgress, getTerminalAssetTree, listSftp, uploadSftp, type AssetTreeNode, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
+import { cancelSftpTransfer, downloadSftp, getSftpTransferProgress, getTerminalAssetTree, listSftp, uploadSftp, type AssetTreeNode, type DbInstance, type Host, type SftpEntry } from '@/api/asset'
 import { useSystemConfigStore } from '@/stores/system-config'
 import { downloadAttachment } from '@/utils/download'
 
@@ -20,8 +20,9 @@ interface SftpTransferRecord {
   name: string
   path: string
   createdAt: string
-  status: 'processing' | 'success' | 'failed'
+  status: 'processing' | 'success' | 'failed' | 'canceled'
   progress: number
+  transferID: string
 }
 interface SftpUploadFile { file: File; relativePath: string }
 
@@ -44,8 +45,8 @@ const runtimes = new Map<string, Runtime>()
 const vncRuntimes = new Map<string, VNCRuntime>()
 const sftpVisible = ref(false)
 const sftpOriginKey = ref<number | null>(null)
-const sftpPath = ref('/root')
-const sftpCommittedPath = ref('/root')
+const sftpPath = ref('')
+const sftpCommittedPath = ref('')
 const sftpKeyword = ref('')
 const sftpSearchVisible = ref(false)
 const sftpSearchInput = ref<HTMLInputElement>()
@@ -59,6 +60,7 @@ const sftpUploadRecords = ref<SftpTransferRecord[]>([])
 const sftpDownloadRecords = ref<SftpTransferRecord[]>([])
 const sftpRecordPanel = ref<'upload' | 'download' | null>(null)
 const sftpDownloadNames = new Set<string>()
+const sftpTransferControllers = new Map<string, AbortController>()
 let sftpTransferRecordID = 0
 let sftpDragDepth = 0
 type SftpColumn = 'size' | 'modified' | 'permissions'
@@ -283,8 +285,8 @@ function openSftp() {
   sftpRecordPanel.value = null
   sftpSelected.value = []
   sftpKeyword.value = ''
-  sftpPath.value = '/root'
-  sftpCommittedPath.value = '/root'
+  sftpPath.value = ''
+  sftpCommittedPath.value = ''
   void loadSftpDirectory()
 }
 function closeSftp() {
@@ -358,7 +360,7 @@ function stopSftpColumnResize() {
 function sftpAction(message: string) {
   ElMessage.info(message)
 }
-function createSftpTransferRecord(name: string): SftpTransferRecord {
+function createSftpTransferRecord(name: string, transferID: string): SftpTransferRecord {
   return reactive({
     id: ++sftpTransferRecordID,
     name,
@@ -366,6 +368,7 @@ function createSftpTransferRecord(name: string): SftpTransferRecord {
     createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     status: 'processing',
     progress: 0,
+    transferID,
   })
 }
 function nextSftpDownloadName(filename: string) {
@@ -397,10 +400,26 @@ async function trackSftpTransfer(transferID: string, records: SftpTransferRecord
         records.forEach(record => { record.status = 'failed' })
         return
       }
+      if (progress.status === 'canceled') {
+        records.forEach(record => { record.status = 'canceled' })
+        return
+      }
     } catch {
       // The transfer request owns user-facing error reporting; polling retries quietly.
     }
     await new Promise(resolve => window.setTimeout(resolve, 250))
+  }
+}
+async function cancelActiveSftpTransfer(record: SftpTransferRecord) {
+  const relatedRecords = [...sftpUploadRecords.value, ...sftpDownloadRecords.value]
+    .filter(item => item.transferID === record.transferID && item.status === 'processing')
+  relatedRecords.forEach(item => { item.status = 'canceled' })
+  sftpTransferControllers.get(record.transferID)?.abort()
+  try {
+    await cancelSftpTransfer(record.transferID)
+    ElMessage.info('已取消文件传输')
+  } finally {
+    sftpTransferControllers.delete(record.transferID)
   }
 }
 function chooseSftpUpload(kind: 'file' | 'directory') {
@@ -422,23 +441,28 @@ async function startSftpUpload(uploadFiles: SftpUploadFile[]) {
   }
   const files = uploadFiles.map(item => item.file)
   const relativePaths = uploadFiles.map(item => item.relativePath)
-  const records = uploadFiles.map(item => createSftpTransferRecord(item.relativePath))
+  const transferID = crypto.randomUUID()
+  const controller = new AbortController()
+  const records = uploadFiles.map(item => createSftpTransferRecord(item.relativePath, transferID))
   sftpUploadRecords.value.unshift(...records)
   sftpRecordPanel.value = 'upload'
   sftpUploading.value = true
-  const transferID = crypto.randomUUID()
+  sftpTransferControllers.set(transferID, controller)
   void trackSftpTransfer(transferID, records, 20, 80)
   try {
     await uploadSftp(sftpOriginKey.value, sftpCommittedPath.value, files, transferID, progress => {
       records.forEach(record => { record.progress = Math.max(record.progress, Math.round(progress * .2)) })
-    }, relativePaths)
+    }, relativePaths, controller.signal)
+    if (records.some(record => record.status === 'canceled')) return
     records.forEach(record => { record.progress = 100; record.status = 'success' })
     ElMessage.success('上传成功')
     await loadSftpDirectory()
   } catch (error) {
+    if (records.some(record => record.status === 'canceled')) return
     records.forEach(record => { record.status = 'failed' })
     throw error
   } finally {
+    sftpTransferControllers.delete(transferID)
     sftpUploading.value = false
   }
 }
@@ -493,19 +517,25 @@ async function dropSftpFiles(event: DragEvent) {
 async function downloadSelectedSftp() {
   if (sftpOriginKey.value === null || !sftpSelected.value.length) return
   const names = [...sftpSelected.value]
-  const record = createSftpTransferRecord(names.length === 1 ? names[0] : `${names.length} 个文件`)
+  const transferID = crypto.randomUUID()
+  const controller = new AbortController()
+  const record = createSftpTransferRecord(names.length === 1 ? names[0] : `${names.length} 个文件`, transferID)
   sftpDownloadRecords.value.unshift(record)
   sftpRecordPanel.value = 'download'
-  const transferID = crypto.randomUUID()
+  sftpTransferControllers.set(transferID, controller)
   void trackSftpTransfer(transferID, [record])
   try {
-    const response = await downloadSftp(sftpOriginKey.value, sftpCommittedPath.value, names, transferID)
+    const response = await downloadSftp(sftpOriginKey.value, sftpCommittedPath.value, names, transferID, controller.signal)
+    if (record.status === 'canceled') return
     downloadAttachment(response.data as unknown as Blob, undefined, nextSftpDownloadName('sftp-download.zip'))
     record.progress = 100
     record.status = 'success'
   } catch (error) {
+    if (record.status === 'canceled') return
     record.status = 'failed'
     throw error
+  } finally {
+    sftpTransferControllers.delete(transferID)
   }
 }
 async function loadSftpDirectory(path = sftpPath.value) {
@@ -513,6 +543,8 @@ async function loadSftpDirectory(path = sftpPath.value) {
   try {
     const result = await listSftp(sftpOriginKey.value, path)
     sftpEntries.value = result.data.data.list
+    sftpPath.value = result.data.data.path
+    sftpCommittedPath.value = result.data.data.path
     return true
   } catch {
     sftpEntries.value = []
@@ -528,7 +560,6 @@ async function navigateSftpPath(path: string) {
     ElMessage.error('目录不存在或没有访问权限')
     return
   }
-  sftpCommittedPath.value = normalizedPath
 }
 function toggleSftpSearch() {
   sftpSearchVisible.value = !sftpSearchVisible.value
@@ -728,10 +759,12 @@ onBeforeUnmount(() => {
                   <div v-if="!sftpUploadRecords.length" class="sftp-record-empty">暂无上传记录</div>
                   <div v-else class="sftp-record-list">
                     <div v-for="record in sftpUploadRecords" :key="record.id" class="sftp-record-item">
+                      <button v-if="record.status === 'processing'" type="button" class="sftp-record-cancel"
+                        aria-label="取消上传" title="取消上传" @click.stop="void cancelActiveSftpTransfer(record)"><el-icon><Close /></el-icon></button>
                       <div><strong :title="record.name">{{ record.name }}</strong><span>{{ record.path }}</span></div>
                       <div><span>{{ record.createdAt }}</span><em :class="`is-${record.status}`">{{ record.status ===
-                        'processing' ? `上传中 ${record.progress}%` : record.status === 'success' ? '成功' : '失败' }}</em></div>
-                      <div class="sftp-record-progress" :class="{ 'is-failed': record.status === 'failed' }"><i
+                        'processing' ? `上传中 ${record.progress}%` : record.status === 'success' ? '成功' : record.status === 'canceled' ? '已取消' : '失败' }}</em></div>
+                      <div class="sftp-record-progress" :class="{ 'is-failed': record.status === 'failed', 'is-canceled': record.status === 'canceled' }"><i
                           :style="{ width: `${record.progress}%` }" /></div>
                     </div>
                   </div>
@@ -752,12 +785,14 @@ onBeforeUnmount(() => {
                   <div v-if="!sftpDownloadRecords.length" class="sftp-record-empty">暂无下载记录</div>
                   <div v-else class="sftp-record-list">
                     <div v-for="record in sftpDownloadRecords" :key="record.id" class="sftp-record-item">
+                      <button v-if="record.status === 'processing'" type="button" class="sftp-record-cancel"
+                        aria-label="取消下载" title="取消下载" @click.stop="void cancelActiveSftpTransfer(record)"><el-icon><Close /></el-icon></button>
                       <div><strong :title="record.name">{{ record.name }}</strong><span>{{ record.path }}</span></div>
                       <div><span>{{ record.createdAt }}</span><em :class="`is-${record.status}`">{{ record.status ===
                         'processing' ? (record.progress >= 0 ? `下载中 ${record.progress}%` : '下载中') : record.status ===
-                          'success' ? '成功' : '失败' }}</em></div>
+                          'success' ? '成功' : record.status === 'canceled' ? '已取消' : '失败' }}</em></div>
                       <div class="sftp-record-progress"
-                        :class="{ 'is-failed': record.status === 'failed', 'is-indeterminate': record.progress < 0 }"><i
+                        :class="{ 'is-failed': record.status === 'failed', 'is-canceled': record.status === 'canceled', 'is-indeterminate': record.progress < 0 && record.status === 'processing' }"><i
                           :style="{ width: record.progress < 0 ? '35%' : `${record.progress}%` }" /></div>
                     </div>
                   </div>
@@ -1683,12 +1718,39 @@ onBeforeUnmount(() => {
 }
 
 .sftp-record-item {
+  position: relative;
   padding: 8px 10px;
   display: grid;
   gap: 4px;
   border-bottom: 1px solid #343537;
   font-size: 9px;
   animation: sftp-record-enter .22s ease-out both
+}
+
+.sftp-record-item:has(>.sftp-record-cancel) {
+  padding-right: 28px
+}
+
+.sftp-record-cancel {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  color: #8a95a6;
+  background: transparent;
+  cursor: pointer
+}
+
+.sftp-record-cancel:hover {
+  color: #fff;
+  background: #414348
 }
 
 .sftp-record-item:last-child {
@@ -1731,6 +1793,10 @@ onBeforeUnmount(() => {
   color: #f56c6c
 }
 
+.sftp-record-item em.is-canceled {
+  color: #8a95a6
+}
+
 .sftp-record-item>.sftp-record-progress {
   width: 100%;
   height: 3px;
@@ -1750,6 +1816,10 @@ onBeforeUnmount(() => {
 
 .sftp-record-progress.is-failed i {
   background: #f56c6c
+}
+
+.sftp-record-progress.is-canceled i {
+  background: #8a95a6
 }
 
 .sftp-record-progress.is-indeterminate i {

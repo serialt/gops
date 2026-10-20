@@ -72,6 +72,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal/sftp/upload", h.UploadSFTP)
 	g.POST("/assets/terminal/sftp/download", h.DownloadSFTP)
 	g.POST("/assets/terminal/sftp/progress", h.SFTPTransferProgress)
+	g.POST("/assets/terminal/sftp/cancel", h.CancelSFTPTransfer)
 
 	g.POST("/assets/db-instances/options", h.DatabaseTypeOptions)
 	g.POST("/assets/db-instances/list", h.ListDBInstances)
@@ -87,6 +88,17 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
 	g.POST("/assets/terminal-sessions/recording", h.GetTerminalSessionRecording)
 	g.POST("/assets/terminal-sessions/delete", h.DeleteTerminalSession)
+}
+
+// CancelSFTPTransfer POST /api/v1/assets/terminal/sftp/cancel 取消正在进行的文件传输。
+func (h *AssetHandler) CancelSFTPTransfer(c *gin.Context) {
+	req := new(api.SFTPTransferCancelRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid SFTP transfer cancel request")
+		return
+	}
+	h.biz.CancelSFTPTransfer(req.TransferID)
+	response.OK(c, nil)
 }
 
 // AssetTree POST /api/v1/assets/terminal/tree returns groups and their host/database nodes.

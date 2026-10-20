@@ -181,6 +181,11 @@ type SFTPEntryResponse struct {
 	Modified    string `json:"modified"`
 	Permissions string `json:"permissions"`
 }
+type SFTPListResponse struct {
+	List  []*SFTPEntryResponse `json:"list"`
+	Total int64                `json:"total"`
+	Path  string               `json:"path"`
+}
 type SFTPDownloadRequest struct {
 	HostID     int64    `json:"host_id" binding:"required"`
 	Path       string   `json:"path"`
@@ -188,6 +193,9 @@ type SFTPDownloadRequest struct {
 	TransferID string   `json:"transfer_id" binding:"required"`
 }
 type SFTPTransferProgressRequest struct {
+	TransferID string `json:"transfer_id" binding:"required"`
+}
+type SFTPTransferCancelRequest struct {
 	TransferID string `json:"transfer_id" binding:"required"`
 }
 type SFTPTransferProgressResponse struct {

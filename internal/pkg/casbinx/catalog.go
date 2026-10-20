@@ -51,6 +51,7 @@ func Catalog() []Permission {
 		{Group: "资产管理", Name: "上传终端文件", Path: "/api/v1/assets/terminal/sftp/upload", Method: "POST"},
 		{Group: "资产管理", Name: "下载终端文件", Path: "/api/v1/assets/terminal/sftp/download", Method: "POST"},
 		{Group: "资产管理", Name: "查看文件传输进度", Path: "/api/v1/assets/terminal/sftp/progress", Method: "POST"},
+		{Group: "资产管理", Name: "取消终端文件传输", Path: "/api/v1/assets/terminal/sftp/cancel", Method: "POST"},
 		{Group: "资产管理", Name: "新增主机", Path: "/api/v1/assets/hosts/create", Method: "POST"},
 		{Group: "资产管理", Name: "修改主机", Path: "/api/v1/assets/hosts/update", Method: "POST"},
 		{Group: "资产管理", Name: "测试主机连接", Path: "/api/v1/assets/hosts/test", Method: "POST"},
