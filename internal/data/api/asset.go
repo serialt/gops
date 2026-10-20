@@ -112,6 +112,36 @@ type HostExcelImportResponse struct {
 	Created int `json:"created"`
 	Updated int `json:"updated"`
 }
+type CloudHostPreviewRequest struct {
+	CloudAccountID int64 `json:"cloud_account_id" binding:"required"`
+}
+type CloudHostPreviewResponse struct {
+	InstanceID  string `json:"instance_id"`
+	Name        string `json:"name"`
+	IP          string `json:"ip"`
+	Port        int64  `json:"port"`
+	Description string `json:"description"`
+}
+type CloudHostImportItem struct {
+	InstanceID  string `json:"instance_id"`
+	Name        string `json:"name" binding:"required"`
+	IP          string `json:"ip" binding:"required"`
+	Port        int64  `json:"port" binding:"min=1,max=65535"`
+	Description string `json:"description"`
+}
+type CloudHostImportRequest struct {
+	CloudAccountID int64                  `json:"cloud_account_id" binding:"required"`
+	GroupID        int64                  `json:"group_id"`
+	CredentialID   int64                  `json:"credential_id" binding:"required"`
+	ConfirmUpdate  bool                   `json:"confirm_update"`
+	List           []*CloudHostImportItem `json:"list" binding:"required,min=1,dive"`
+}
+type CloudHostImportResponse struct {
+	Created        int  `json:"created"`
+	Updated        int  `json:"updated"`
+	DuplicateCount int  `json:"duplicate_count"`
+	NeedsConfirm   bool `json:"needs_confirm"`
+}
 type HostRequest struct {
 	ID              int64  `json:"id"`
 	Name            string `json:"name" binding:"required"`

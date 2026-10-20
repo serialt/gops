@@ -51,6 +51,8 @@ export const deleteCloudAccount = (id: number) => request.post<null>('/assets/cl
 export interface Host { id: number; name: string; group_id: number; host_type: string; ip: string; port: number | null; credential_id: number | null; vnc_credential_id: number | null; vnc_port: number | null; cloud_account_id: number; tags: string; description: string; status: number; last_seen_at: string; os: string; kernel: string; arch: string; cpu_info: string; cpu_cores: number; cpu_usage: number; memory_total: number; memory_used: number; memory_usage: number; disk_total: number; disk_used: number; disk_usage: number; uptime: string; hostname: string; created_at: string; updated_at: string }
 export interface HostRequest { id?: number; name: string; group_id: number; host_type: string; ip: string; port: number | null; credential_id: number | null; vnc_credential_id: number | null; vnc_port: number | null; cloud_account_id: number; tags: string; description: string; status: number }
 export interface HostExcelImportResult { created: number; updated: number }
+export interface CloudHostPreview { instance_id: string; name: string; ip: string; port: number; description: string }
+export interface CloudHostImportResult { created: number; updated: number; duplicate_count: number; needs_confirm: boolean }
 export const listHosts = (keyword = '', group_id = 0, page = 1, limit = 20, status: number | null = null) => request.post<PageResponse<Host>>('/assets/hosts/list', { keyword, group_id, page, limit, status })
 export const createHost = (data: HostRequest) => request.post<Host>('/assets/hosts/create', data)
 export const updateHost = (data: Required<Pick<HostRequest, 'id'>> & HostRequest) => request.post<Host>('/assets/hosts/update', data)
@@ -64,6 +66,8 @@ export const importHosts = (file: File) => {
   form.append('file', file, file.name)
   return request.post<HostExcelImportResult>('/assets/hosts/import', form)
 }
+export const previewCloudHosts = (cloud_account_id: number) => request.post<CloudHostPreview[]>('/assets/hosts/cloud/preview', { cloud_account_id })
+export const importCloudHosts = (data: { cloud_account_id: number; group_id: number; credential_id: number; confirm_update: boolean; list: CloudHostPreview[] }) => request.post<CloudHostImportResult>('/assets/hosts/cloud/import', data)
 export interface SftpEntry { name: string; type: 'directory' | 'file'; size: number; modified: string; permissions: string }
 export interface SftpListResponse extends PageResponse<SftpEntry> { path: string }
 export interface SftpTransferProgress { transferred: number; total: number; status: 'processing' | 'success' | 'failed' | 'canceled'; message: string }

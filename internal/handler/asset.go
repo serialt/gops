@@ -63,6 +63,8 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/hosts/export", h.ExportHosts)
 	g.POST("/assets/hosts/template", h.HostImportTemplate)
 	g.POST("/assets/hosts/import", h.ImportHosts)
+	g.POST("/assets/hosts/cloud/preview", h.PreviewCloudHosts)
+	g.POST("/assets/hosts/cloud/import", h.ImportCloudHosts)
 	g.POST("/assets/terminal/tree", h.AssetTree)
 	g.POST("/assets/hosts/create", h.CreateHost)
 	g.POST("/assets/hosts/update", h.UpdateHost)
@@ -89,6 +91,36 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
 	g.POST("/assets/terminal-sessions/recording", h.GetTerminalSessionRecording)
 	g.POST("/assets/terminal-sessions/delete", h.DeleteTerminalSession)
+}
+
+// PreviewCloudHosts POST /api/v1/assets/hosts/cloud/preview 从云账号拉取云主机列表。
+func (h *AssetHandler) PreviewCloudHosts(c *gin.Context) {
+	req := new(api.CloudHostPreviewRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid cloud account")
+		return
+	}
+	result, err := h.biz.PreviewCloudHosts(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// ImportCloudHosts POST /api/v1/assets/hosts/cloud/import 导入或更新云主机。
+func (h *AssetHandler) ImportCloudHosts(c *gin.Context) {
+	req := new(api.CloudHostImportRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid cloud host data")
+		return
+	}
+	result, err := h.biz.ImportCloudHosts(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 // CopyCredential POST /api/v1/assets/credentials/copy 复制资产凭证。
