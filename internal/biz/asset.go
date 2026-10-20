@@ -300,6 +300,20 @@ func (b *AssetBiz) ListCredentials(ctx context.Context, req *api.CredentialListR
 	}
 	return &api.PageResponse[*api.CredentialResponse]{List: result, Total: total}, nil
 }
+func (b *AssetBiz) CopyCredential(ctx context.Context, req *api.CredentialIDRequest) (*api.CredentialResponse, error) {
+	row, err := b.repo.GetCredential(ctx, b.db, req.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	copy := &model.Credential{Name: row.Name + " 副本", CredentialType: row.CredentialType, Username: row.Username, Password: row.Password, PrivateKey: row.PrivateKey, Passphrase: row.Passphrase, Description: row.Description}
+	if err = b.repo.CreateCredential(ctx, b.db, copy); err != nil {
+		return nil, err
+	}
+	return credentialResponse(*copy), nil
+}
 func (b *AssetBiz) CreateCredential(req *api.CredentialRequest) (*api.CredentialResponse, error) {
 	row, err := b.credentialModel(req)
 	if err != nil {

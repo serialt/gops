@@ -34,6 +34,7 @@ func Catalog() []Permission {
 		{Group: "资产管理", Name: "修改资产分组", Path: "/api/v1/assets/groups/update", Method: "POST"},
 		{Group: "资产管理", Name: "删除资产分组", Path: "/api/v1/assets/groups/delete", Method: "POST"},
 		{Group: "资产管理", Name: "查看资产凭证", Path: "/api/v1/assets/credentials/list", Method: "POST"},
+		{Group: "资产管理", Name: "复制资产凭证", Path: "/api/v1/assets/credentials/copy", Method: "POST"},
 		{Group: "资产管理", Name: "新增资产凭证", Path: "/api/v1/assets/credentials/create", Method: "POST"},
 		{Group: "资产管理", Name: "修改资产凭证", Path: "/api/v1/assets/credentials/update", Method: "POST"},
 		{Group: "资产管理", Name: "删除资产凭证", Path: "/api/v1/assets/credentials/delete", Method: "POST"},

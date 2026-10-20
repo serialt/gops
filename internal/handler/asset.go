@@ -48,6 +48,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/groups/delete", h.DeleteGroup)
 
 	g.POST("/assets/credentials/list", h.ListCredentials)
+	g.POST("/assets/credentials/copy", h.CopyCredential)
 	g.POST("/assets/credentials/create", h.CreateCredential)
 	g.POST("/assets/credentials/update", h.UpdateCredential)
 	g.POST("/assets/credentials/delete", h.DeleteCredential)
@@ -88,6 +89,21 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
 	g.POST("/assets/terminal-sessions/recording", h.GetTerminalSessionRecording)
 	g.POST("/assets/terminal-sessions/delete", h.DeleteTerminalSession)
+}
+
+// CopyCredential POST /api/v1/assets/credentials/copy 复制资产凭证。
+func (h *AssetHandler) CopyCredential(c *gin.Context) {
+	req := new(api.CredentialIDRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid credential id")
+		return
+	}
+	result, err := h.biz.CopyCredential(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 // CancelSFTPTransfer POST /api/v1/assets/terminal/sftp/cancel 取消正在进行的文件传输。

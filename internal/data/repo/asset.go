@@ -167,6 +167,10 @@ func (r *AssetRepo) GetCredential(ctx context.Context, db *gorm.DB, id int64) (*
 	return q.Credential.WithContext(ctx).Where(q.Credential.ID.Eq(id)).First()
 }
 
+func (r *AssetRepo) CreateCredential(ctx context.Context, db *gorm.DB, credential *model.Credential) error {
+	return query.Use(db).Credential.WithContext(ctx).Create(credential)
+}
+
 func (r *AssetRepo) GetDBInstanceAndCredential(ctx context.Context, db *gorm.DB, id int64) (*model.DbInstance, *model.Credential, error) {
 	q := query.Use(db)
 	instance, err := q.DbInstance.WithContext(ctx).Where(q.DbInstance.ID.Eq(id)).First()

@@ -57,7 +57,6 @@ type CredentialResponse struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
-
 type CloudAccountListRequest struct {
 	PageRequest
 	Keyword string `json:"keyword"`

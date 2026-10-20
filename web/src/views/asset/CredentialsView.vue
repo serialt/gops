@@ -3,17 +3,18 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ColDef } from 'ag-grid-community'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { createCredential, deleteCredential, listCredentials, updateCredential, type Credential } from '@/api/asset'
+import { copyCredential as copyCredentialRequest, createCredential, deleteCredential, listCredentials, updateCredential, type Credential } from '@/api/asset'
 
 const rows = ref<Credential[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const keyword = ref(''); const dialogVisible = ref(false); const editingID = ref<number | null>(null)
 const form = reactive({ name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' })
 function action(text: string, kind: string, fn: () => void) { const el = document.createElement('button'); el.textContent = text; el.className = `credential-action ${kind}`; el.onclick = fn; return el }
-const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '凭证名称', minWidth: 120 }, { field: 'credential_type', headerName: '类型', width: 100, cellRenderer: (p: { value: string }) => `<span class="credential-type ${p.value === 'key' ? 'is-key' : 'is-password'}">${p.value === 'key' ? '密钥' : '密码'}</span>` }, { field: 'username', headerName: '用户名', minWidth: 120 }, { field: 'description', headerName: '说明', minWidth: 160 }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'credential-actions'; wrap.append(action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
+const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 70 }, { field: 'name', headerName: '凭证名称', minWidth: 120 }, { field: 'credential_type', headerName: '类型', width: 100, cellRenderer: (p: { value: string }) => `<span class="credential-type ${p.value === 'key' ? 'is-key' : 'is-password'}">${p.value === 'key' ? '密钥' : '密码'}</span>` }, { field: 'username', headerName: '用户名', minWidth: 120 }, { field: 'description', headerName: '说明', minWidth: 160 }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: (p: any) => { const wrap = document.createElement('div'); wrap.className = 'credential-actions'; wrap.append(action('复制', 'copy', () => copyCredential(p.data)), action('编辑', 'edit', () => edit(p.data)), action('删除', 'delete', () => remove(p.data))); return wrap } }])
 async function load(reset = false) { if (reset) page.value = 1; const { data } = await listCredentials(keyword.value, page.value, pageSize.value); rows.value = data.data.list; total.value = data.data.total }
 function changePage(value: number) { page.value = value; void load() }
 function changePageSize(value: number) { pageSize.value = value; page.value = 1; void load() }
 function create() { editingID.value = null; Object.assign(form, { name: '', credential_type: 'password', username: '', password: '', private_key: '', passphrase: '', description: '' }); dialogVisible.value = true }
 function edit(row: Credential) { editingID.value = row.id; Object.assign(form, { name: row.name, credential_type: row.credential_type, username: row.username, password: '', private_key: '', passphrase: '', description: row.description }); dialogVisible.value = true }
+async function copyCredential(row: Credential) { const { data } = await copyCredentialRequest(row.id); ElMessage.success(`已创建凭证“${data.data.name}”`); await load() }
 async function save() {
     if (!form.name.trim()) return ElMessage.warning('请填写凭证名称')
     if (!editingID.value && form.credential_type === 'password' && !form.password) return ElMessage.warning('请填写密码')
@@ -149,7 +150,7 @@ onMounted(load)
     position: absolute;
     inset: 0;
     display: flex;
-    gap: 8px;
+    gap: 5px;
     align-items: center;
     justify-content: center
 }

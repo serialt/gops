@@ -33,6 +33,7 @@ export const deleteAssetGroup = (id: number) => request.post<null>('/assets/grou
 export interface Credential { id: number; name: string; credential_type: string; username: string; description: string; created_at: string; updated_at: string }
 export interface CredentialRequest { id?: number; name: string; credential_type: string; username: string; password: string; private_key: string; passphrase: string; description: string }
 export const listCredentials = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<Credential>>('/assets/credentials/list', { keyword, page, limit })
+export const copyCredential = (id: number) => request.post<Credential>('/assets/credentials/copy', { id })
 export const createCredential = (data: CredentialRequest) => request.post<Credential>('/assets/credentials/create', data)
 export const updateCredential = (data: Required<Pick<CredentialRequest, 'id'>> & CredentialRequest) => request.post<Credential>('/assets/credentials/update', data)
 export const deleteCredential = (id: number) => request.post<null>('/assets/credentials/delete', { id })

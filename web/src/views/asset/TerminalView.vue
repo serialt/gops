@@ -63,6 +63,7 @@ const sftpDownloadNames = new Set<string>()
 const sftpTransferControllers = new Map<string, AbortController>()
 let sftpTransferRecordID = 0
 let sftpDragDepth = 0
+let sftpDirectoryRequestID = 0
 type SftpColumn = 'size' | 'modified' | 'permissions'
 const sftpColumnWidths = ref({ size: 144, modified: 210, permissions: 150 })
 const sftpResizingColumn = ref<SftpColumn | null>(null)
@@ -441,6 +442,8 @@ async function startSftpUpload(uploadFiles: SftpUploadFile[]) {
   }
   const files = uploadFiles.map(item => item.file)
   const relativePaths = uploadFiles.map(item => item.relativePath)
+  const uploadHostID = sftpOriginKey.value
+  const uploadPath = sftpCommittedPath.value
   const transferID = crypto.randomUUID()
   const controller = new AbortController()
   const records = uploadFiles.map(item => createSftpTransferRecord(item.relativePath, transferID))
@@ -450,13 +453,15 @@ async function startSftpUpload(uploadFiles: SftpUploadFile[]) {
   sftpTransferControllers.set(transferID, controller)
   void trackSftpTransfer(transferID, records, 20, 80)
   try {
-    await uploadSftp(sftpOriginKey.value, sftpCommittedPath.value, files, transferID, progress => {
+    await uploadSftp(uploadHostID, uploadPath, files, transferID, progress => {
       records.forEach(record => { record.progress = Math.max(record.progress, Math.round(progress * .2)) })
     }, relativePaths, controller.signal)
     if (records.some(record => record.status === 'canceled')) return
     records.forEach(record => { record.progress = 100; record.status = 'success' })
     ElMessage.success('上传成功')
-    await loadSftpDirectory()
+    if (sftpVisible.value && sftpOriginKey.value === uploadHostID) {
+      await loadSftpDirectory(sftpCommittedPath.value || uploadPath)
+    }
   } catch (error) {
     if (records.some(record => record.status === 'canceled')) return
     records.forEach(record => { record.status = 'failed' })
@@ -538,15 +543,18 @@ async function downloadSelectedSftp() {
     sftpTransferControllers.delete(transferID)
   }
 }
-async function loadSftpDirectory(path = sftpPath.value) {
+async function loadSftpDirectory(path = sftpCommittedPath.value || sftpPath.value) {
   if (sftpOriginKey.value === null) return
+  const requestID = ++sftpDirectoryRequestID
   try {
     const result = await listSftp(sftpOriginKey.value, path)
+    if (requestID !== sftpDirectoryRequestID) return false
     sftpEntries.value = result.data.data.list
     sftpPath.value = result.data.data.path
     sftpCommittedPath.value = result.data.data.path
     return true
   } catch {
+    if (requestID !== sftpDirectoryRequestID) return false
     sftpEntries.value = []
     return false
   }
