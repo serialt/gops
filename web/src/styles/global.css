@@ -278,6 +278,22 @@ textarea::placeholder,
   background: #f7f8ff !important;
 }
 
+.app-data-grid .credential-action.copy {
+  border-color: #b7e6a5 !important;
+  color: #58a93d !important;
+  background: #f0f9eb !important;
+  box-shadow: 0 1px 4px rgba(103, 194, 58, .16) !important;
+}
+
+.app-data-grid .credential-action.copy:hover,
+.app-data-grid .credential-action.copy:focus-visible {
+  border-color: #67c23a !important;
+  color: #45952c !important;
+  background: #e7f6df !important;
+  outline: none;
+  box-shadow: 0 1px 5px rgba(103, 194, 58, .24) !important;
+}
+
 .app-data-grid .grid-action.delete,
 .app-data-grid .asset-action.delete,
 .app-data-grid .credential-action.delete,

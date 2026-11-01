@@ -57,7 +57,6 @@ type CredentialResponse struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
-
 type CloudAccountListRequest struct {
 	PageRequest
 	Keyword string `json:"keyword"`
@@ -112,6 +111,36 @@ type HostListRequest struct {
 type HostExcelImportResponse struct {
 	Created int `json:"created"`
 	Updated int `json:"updated"`
+}
+type CloudHostPreviewRequest struct {
+	CloudAccountID int64 `json:"cloud_account_id" binding:"required"`
+}
+type CloudHostPreviewResponse struct {
+	InstanceID  string `json:"instance_id"`
+	Name        string `json:"name"`
+	IP          string `json:"ip"`
+	Port        int64  `json:"port"`
+	Description string `json:"description"`
+}
+type CloudHostImportItem struct {
+	InstanceID  string `json:"instance_id"`
+	Name        string `json:"name" binding:"required"`
+	IP          string `json:"ip" binding:"required"`
+	Port        int64  `json:"port" binding:"min=1,max=65535"`
+	Description string `json:"description"`
+}
+type CloudHostImportRequest struct {
+	CloudAccountID int64                  `json:"cloud_account_id" binding:"required"`
+	GroupID        int64                  `json:"group_id"`
+	CredentialID   int64                  `json:"credential_id" binding:"required"`
+	ConfirmUpdate  bool                   `json:"confirm_update"`
+	List           []*CloudHostImportItem `json:"list" binding:"required,min=1,dive"`
+}
+type CloudHostImportResponse struct {
+	Created        int  `json:"created"`
+	Updated        int  `json:"updated"`
+	DuplicateCount int  `json:"duplicate_count"`
+	NeedsConfirm   bool `json:"needs_confirm"`
 }
 type HostRequest struct {
 	ID              int64  `json:"id"`
@@ -181,6 +210,11 @@ type SFTPEntryResponse struct {
 	Modified    string `json:"modified"`
 	Permissions string `json:"permissions"`
 }
+type SFTPListResponse struct {
+	List  []*SFTPEntryResponse `json:"list"`
+	Total int64                `json:"total"`
+	Path  string               `json:"path"`
+}
 type SFTPDownloadRequest struct {
 	HostID     int64    `json:"host_id" binding:"required"`
 	Path       string   `json:"path"`
@@ -188,6 +222,9 @@ type SFTPDownloadRequest struct {
 	TransferID string   `json:"transfer_id" binding:"required"`
 }
 type SFTPTransferProgressRequest struct {
+	TransferID string `json:"transfer_id" binding:"required"`
+}
+type SFTPTransferCancelRequest struct {
 	TransferID string `json:"transfer_id" binding:"required"`
 }
 type SFTPTransferProgressResponse struct {

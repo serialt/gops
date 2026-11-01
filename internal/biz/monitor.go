@@ -185,6 +185,7 @@ func (b *MonitorBiz) UpdateDomain(req *api.MonitorDomainRequest) (*api.MonitorDo
 	normalized := normalizeMonitorDomainRequest(req)
 	updated := b.domainModel(normalized)
 	updated.ID, updated.CreatedAt = row.ID, row.CreatedAt
+	updated.SslCertificateChain, updated.SslCertificateChainHash = row.SslCertificateChain, row.SslCertificateChainHash
 	if err := b.db.Save(&updated).Error; err != nil {
 		return nil, monitorError(err)
 	}
@@ -209,6 +210,21 @@ func (b *MonitorBiz) CheckDomain(req *api.MonitorDomainIDRequest) (*api.MonitorD
 		return nil, err
 	}
 	return monitorDomainResponse(row), nil
+}
+
+// CertificateChain reads the current TLS certificate chain for one domain monitor.
+func (b *MonitorBiz) CertificateChain(req *api.MonitorDomainIDRequest) (*api.MonitorCertificateChainResponse, error) {
+	var row model.MonitorDomain
+	if err := b.db.First(&row, req.ID).Error; err != nil {
+		return nil, monitorError(err)
+	}
+	chain := make([]*api.SSLCertificateChainResponse, 0)
+	if strings.TrimSpace(row.SslCertificateChain) != "" {
+		if err := json.Unmarshal([]byte(row.SslCertificateChain), &chain); err != nil {
+			return nil, fmt.Errorf("解析已保存的证书链失败: %w", err)
+		}
+	}
+	return &api.MonitorCertificateChainResponse{ChainCertificates: chain}, nil
 }
 
 func (b *MonitorBiz) checkDomain(row *model.MonitorDomain) error {
@@ -253,6 +269,9 @@ func (b *MonitorBiz) checkDomain(row *model.MonitorDomain) error {
 	row.SslValid = false
 	row.SslExpiry = time.Time{}
 	row.SslRootCa = ""
+	chainCollected := !row.EnableSsl
+	chainJSON := "[]"
+	chainHash := ""
 	if row.EnableSsl {
 		conn, tlsErr := tls.Dial("tcp", fmt.Sprintf("%s:%d", row.Domain, row.Port), &tls.Config{InsecureSkipVerify: !row.VerifyCertificate}) // #nosec G402 -- controlled by the monitor certificate-verification setting.
 		if tlsErr != nil {
@@ -267,10 +286,30 @@ func (b *MonitorBiz) checkDomain(row *model.MonitorDomain) error {
 				row.SslValid = time.Now().Before(row.SslExpiry)
 				row.SslRootCa = rootCAName(state)
 			}
+			certificates := state.PeerCertificates
+			if len(state.VerifiedChains) > 0 && len(state.VerifiedChains[0]) > len(certificates) {
+				certificates = state.VerifiedChains[0]
+			}
+			chain := make([]*api.SSLCertificateChainResponse, 0, len(certificates))
+			for index, cert := range certificates {
+				chain = append(chain, certificateChainResponse(cert, index+1, ""))
+			}
+			if encoded, encodeErr := json.Marshal(chain); encodeErr == nil {
+				chainJSON = string(encoded)
+				sum := sha256.Sum256(encoded)
+				chainHash = fmt.Sprintf("%x", sum[:])
+				chainCollected = true
+			}
 		}
 	}
-	if err := b.db.Save(row).Error; err != nil {
+	if err := b.db.Omit("SslCertificateChain", "SslCertificateChainHash").Save(row).Error; err != nil {
 		return err
+	}
+	if chainCollected && (row.SslCertificateChainHash != chainHash || row.SslCertificateChain != chainJSON) {
+		if err := b.db.Model(row).Updates(map[string]any{"ssl_certificate_chain": chainJSON, "ssl_certificate_chain_hash": chainHash}).Error; err != nil {
+			return err
+		}
+		row.SslCertificateChain, row.SslCertificateChainHash = chainJSON, chainHash
 	}
 	if err := b.db.Create(&model.MonitorCheckHistory{DomainID: row.ID, Status: row.Status, ResponseTime: row.ResponseTime, SslValid: row.SslValid, SslExpiry: row.SslExpiry, StatusCode: statusCode, ErrorMessage: row.LastError, CheckedAt: now}).Error; err != nil {
 		return err
