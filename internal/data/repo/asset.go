@@ -52,6 +52,11 @@ func (r *AssetRepo) ListCloudAccounts(ctx context.Context, db *gorm.DB, cond *de
 	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
 }
 
+func (r *AssetRepo) GetCloudAccount(ctx context.Context, db *gorm.DB, id int64) (*model.CloudAccount, error) {
+	q := query.Use(db).CloudAccount
+	return q.WithContext(ctx).Where(q.ID.Eq(id)).First()
+}
+
 func (r *AssetRepo) ListHosts(ctx context.Context, db *gorm.DB, cond *define.HostListCond) ([]*model.Host, int64, error) {
 	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).Host
@@ -75,6 +80,11 @@ func (r *AssetRepo) ListHosts(ctx context.Context, db *gorm.DB, cond *define.Hos
 func (r *AssetRepo) GetHostByIP(ctx context.Context, db *gorm.DB, ip string) (*model.Host, error) {
 	q := query.Use(db).Host
 	return q.WithContext(ctx).Where(q.IP.Eq(ip)).First()
+}
+
+func (r *AssetRepo) GetCloudHostByIdentity(ctx context.Context, db *gorm.DB, name string, cloudAccountID int64, ip string, port int64) (*model.Host, error) {
+	q := query.Use(db).Host
+	return q.WithContext(ctx).Where(q.Name.Eq(name), q.CloudAccountID.Eq(cloudAccountID), q.IP.Eq(ip), q.Port.Eq(port)).First()
 }
 
 func (r *AssetRepo) GetHost(ctx context.Context, db *gorm.DB, id int64) (*model.Host, error) {
@@ -165,6 +175,10 @@ func (r *AssetRepo) SaveDBInstance(ctx context.Context, db *gorm.DB, instance *m
 func (r *AssetRepo) GetCredential(ctx context.Context, db *gorm.DB, id int64) (*model.Credential, error) {
 	q := query.Use(db)
 	return q.Credential.WithContext(ctx).Where(q.Credential.ID.Eq(id)).First()
+}
+
+func (r *AssetRepo) CreateCredential(ctx context.Context, db *gorm.DB, credential *model.Credential) error {
+	return query.Use(db).Credential.WithContext(ctx).Create(credential)
 }
 
 func (r *AssetRepo) GetDBInstanceAndCredential(ctx context.Context, db *gorm.DB, id int64) (*model.DbInstance, *model.Credential, error) {

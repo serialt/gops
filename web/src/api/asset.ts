@@ -33,6 +33,7 @@ export const deleteAssetGroup = (id: number) => request.post<null>('/assets/grou
 export interface Credential { id: number; name: string; credential_type: string; username: string; description: string; created_at: string; updated_at: string }
 export interface CredentialRequest { id?: number; name: string; credential_type: string; username: string; password: string; private_key: string; passphrase: string; description: string }
 export const listCredentials = (keyword = '', page = 1, limit = 20) => request.post<PageResponse<Credential>>('/assets/credentials/list', { keyword, page, limit })
+export const copyCredential = (id: number) => request.post<Credential>('/assets/credentials/copy', { id })
 export const createCredential = (data: CredentialRequest) => request.post<Credential>('/assets/credentials/create', data)
 export const updateCredential = (data: Required<Pick<CredentialRequest, 'id'>> & CredentialRequest) => request.post<Credential>('/assets/credentials/update', data)
 export const deleteCredential = (id: number) => request.post<null>('/assets/credentials/delete', { id })
@@ -50,6 +51,8 @@ export const deleteCloudAccount = (id: number) => request.post<null>('/assets/cl
 export interface Host { id: number; name: string; group_id: number; host_type: string; ip: string; port: number | null; credential_id: number | null; vnc_credential_id: number | null; vnc_port: number | null; cloud_account_id: number; tags: string; description: string; status: number; last_seen_at: string; os: string; kernel: string; arch: string; cpu_info: string; cpu_cores: number; cpu_usage: number; memory_total: number; memory_used: number; memory_usage: number; disk_total: number; disk_used: number; disk_usage: number; uptime: string; hostname: string; created_at: string; updated_at: string }
 export interface HostRequest { id?: number; name: string; group_id: number; host_type: string; ip: string; port: number | null; credential_id: number | null; vnc_credential_id: number | null; vnc_port: number | null; cloud_account_id: number; tags: string; description: string; status: number }
 export interface HostExcelImportResult { created: number; updated: number }
+export interface CloudHostPreview { instance_id: string; name: string; ip: string; port: number; description: string }
+export interface CloudHostImportResult { created: number; updated: number; duplicate_count: number; needs_confirm: boolean }
 export const listHosts = (keyword = '', group_id = 0, page = 1, limit = 20, status: number | null = null) => request.post<PageResponse<Host>>('/assets/hosts/list', { keyword, group_id, page, limit, status })
 export const createHost = (data: HostRequest) => request.post<Host>('/assets/hosts/create', data)
 export const updateHost = (data: Required<Pick<HostRequest, 'id'>> & HostRequest) => request.post<Host>('/assets/hosts/update', data)
@@ -63,10 +66,13 @@ export const importHosts = (file: File) => {
   form.append('file', file, file.name)
   return request.post<HostExcelImportResult>('/assets/hosts/import', form)
 }
+export const previewCloudHosts = (cloud_account_id: number) => request.post<CloudHostPreview[]>('/assets/hosts/cloud/preview', { cloud_account_id })
+export const importCloudHosts = (data: { cloud_account_id: number; group_id: number; credential_id: number; confirm_update: boolean; list: CloudHostPreview[] }) => request.post<CloudHostImportResult>('/assets/hosts/cloud/import', data)
 export interface SftpEntry { name: string; type: 'directory' | 'file'; size: number; modified: string; permissions: string }
-export interface SftpTransferProgress { transferred: number; total: number; status: 'processing' | 'success' | 'failed'; message: string }
-export const listSftp = (host_id: number, path: string, page = 1, limit = 1000) => request.post<PageResponse<SftpEntry>>('/assets/terminal/sftp/list', { host_id, path, page, limit })
-export const uploadSftp = (host_id: number, path: string, files: File[], transfer_id: string, onProgress?: (progress: number) => void, relativePaths?: string[]) => {
+export interface SftpListResponse extends PageResponse<SftpEntry> { path: string }
+export interface SftpTransferProgress { transferred: number; total: number; status: 'processing' | 'success' | 'failed' | 'canceled'; message: string }
+export const listSftp = (host_id: number, path: string, page = 1, limit = 1000) => request.post<SftpListResponse>('/assets/terminal/sftp/list', { host_id, path, page, limit })
+export const uploadSftp = (host_id: number, path: string, files: File[], transfer_id: string, onProgress?: (progress: number) => void, relativePaths?: string[], signal?: AbortSignal) => {
   const form = new FormData()
   const fileBytes = files.reduce((total, file) => total + file.size, 0)
   form.append('host_id', String(host_id))
@@ -78,19 +84,23 @@ export const uploadSftp = (host_id: number, path: string, files: File[], transfe
   })
   return request.post<null>('/assets/terminal/sftp/upload', form, {
     timeout: 0,
+    signal,
     onUploadProgress: event => {
       const total = event.total || fileBytes
       if (total > 0) onProgress?.(Math.min(100, Math.round((event.loaded / total) * 100)))
     },
   })
 }
-export const downloadSftp = (host_id: number, path: string, names: string[], transfer_id: string) =>
+export const downloadSftp = (host_id: number, path: string, names: string[], transfer_id: string, signal?: AbortSignal) =>
   request.post<Blob>('/assets/terminal/sftp/download', { host_id, path, names, transfer_id }, {
     responseType: 'blob',
     timeout: 0,
+    signal,
   })
 export const getSftpTransferProgress = (transfer_id: string) =>
   request.post<SftpTransferProgress>('/assets/terminal/sftp/progress', { transfer_id })
+export const cancelSftpTransfer = (transfer_id: string) =>
+  request.post<null>('/assets/terminal/sftp/cancel', { transfer_id })
 
 export interface DbInstance { id: number; group_id: number; name: string; db_type: string; host: string; port: number; version: string; credential_id: number; tags: string; description: string; status: boolean; created_at: string; updated_at: string }
 export interface AssetTreeNode { id: string; label: string; type: 'group' | 'host' | 'database'; count?: number; host?: Host; database?: DbInstance; children?: AssetTreeNode[] }
