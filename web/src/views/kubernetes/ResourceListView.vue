@@ -66,7 +66,7 @@ function calculateNamespaceStats(items: any[]) {
     const totalAge = items.reduce((sum, item) => { const created = new Date(String(item.created_at || '').replace(' ', 'T')).getTime(); return sum + (Number.isFinite(created) ? Math.max(0, now - created) : 0) }, 0)
     namespaceStats.value = { total: items.length, healthy: items.filter(item => ['active', '正常'].includes(String(item.status || '').toLowerCase())).length, labels: items.reduce((sum, item) => sum + Object.keys(item.labels || {}).length, 0), averageAge: items.length ? `${Math.floor(totalAge / items.length / 86400000)}d` : '0d' }
 }
-async function loadClusters() { const { data } = await listKubernetesClusters('', 1, 1000); clusters.value = data.data.list; if (!clusterID.value && clusters.value[0]) clusterID.value = clusters.value[0].id }
+async function loadClusters() { const { data } = await listKubernetesClusters('', 1, 1000); clusters.value = data.data.list; const selected = clusters.value.find(item => item.id === clusterID.value && item.status === 1); if (!selected) clusterID.value = clusters.value.find(item => item.status === 1)?.id || 0 }
 async function load() {
     if (!clusterID.value) { rows.value = []; total.value = 0; nodeStats.value = { total: 0, healthy: 0, pods: 0, podCapacity: 0, cpu: 0 }; namespaceStats.value = { total: 0, healthy: 0, labels: 0, averageAge: '0d' }; return }
     if (kind.value === 'nodes') {
@@ -210,7 +210,7 @@ const adaptiveColumns = computed<ColDef[]>(() => {
             </div>
             <div class="node-header-actions"><el-select v-model="clusterID" placeholder="选择集群"><el-option
                         v-for="item in clusters" :key="item.id" :label="item.alias || item.name"
-                        :value="item.id" /></el-select><el-button type="primary" :icon="Refresh" :loading="refreshing"
+                        :value="item.id" :disabled="item.status !== 1" /></el-select><el-button type="primary" :icon="Refresh" :loading="refreshing"
                     @click="refresh">刷新</el-button></div>
         </div>
         <div v-else-if="kind === 'namespaces'" class="node-header">
@@ -222,13 +222,13 @@ const adaptiveColumns = computed<ColDef[]>(() => {
             </div>
             <div class="node-header-actions"><el-select v-model="clusterID" placeholder="选择集群"><el-option
                         v-for="item in clusters" :key="item.id" :label="item.alias || item.name"
-                        :value="item.id" /></el-select><el-button type="primary" :icon="Refresh" :loading="refreshing"
+                        :value="item.id" :disabled="item.status !== 1" /></el-select><el-button type="primary" :icon="Refresh" :loading="refreshing"
                     @click="refresh">刷新</el-button><el-button class="yaml-create-button" :loading="namespaceYamlSaving"
                     @click="openNamespaceYamlCreate">YAML 创建</el-button></div>
         </div>
         <div v-else class="toolbar">
             <div class="filters"><el-select v-model="clusterID" placeholder="选择集群"><el-option v-for="item in clusters"
-                        :key="item.id" :label="item.alias || item.name" :value="item.id" /></el-select><el-input
+                        :key="item.id" :label="item.alias || item.name" :value="item.id" :disabled="item.status !== 1" /></el-select><el-input
                     v-model="keyword" :placeholder="`搜索${title}`" clearable /></div><strong>{{ title }}</strong>
         </div>
         <div v-if="kind === 'nodes'" class="stats">
