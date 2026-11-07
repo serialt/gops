@@ -90,6 +90,11 @@ function filterTree(value: string, data: TreeNode) {
   const assetType = data.type === 'host' ? '主机' : data.database ? databaseTypeLabel(data.database.db_type) : ''
   return `${data.label} ${assetType} ${data.host?.ip || ''} ${data.database?.host || ''} ${data.database?.db_type || ''}`.toLowerCase().includes(value.trim().toLowerCase())
 }
+function assetEndpointTooltip(data: TreeNode) {
+  if (data.type === 'host' && data.host) return data.host.port ? `${data.host.ip}:${data.host.port}` : data.host.ip
+  if (data.type === 'database' && data.database) return `${data.database.host}:${data.database.port}`
+  return undefined
+}
 function databaseTypeLabel(type: string) {
   const normalized = type.trim().toLowerCase().replace(/[\s_-]+/g, '')
   const labels: Record<string, string> = {
@@ -673,7 +678,9 @@ onBeforeUnmount(() => {
                 :title="databaseTypeLabel(data.database?.db_type || '')"
                 :aria-label="databaseTypeLabel(data.database?.db_type || '')">
                 <Coin />
-              </el-icon><span class="tree-label">{{ data.label }}</span><small v-if="data.type === 'database'"
+                </el-icon><el-tooltip :content="assetEndpointTooltip(data)" :disabled="!assetEndpointTooltip(data)"
+                :show-after="0" placement="top"><span class="tree-label">{{ data.label }}</span></el-tooltip><small
+                v-if="data.type === 'database'"
                 class="database-type-badge">{{ databaseTypeLabel(data.database?.db_type || '') }}</small><small
                 v-else-if="data.type === 'host' && data.host?.port && data.host?.credential_id" class="database-type-badge terminal-kind-action"
                 title="打开 SSH 终端" @click.stop="void openTerminal(data.host)">SSH</small><small
