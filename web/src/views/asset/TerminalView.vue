@@ -13,7 +13,7 @@ import { downloadAttachment } from '@/utils/download'
 
 type TreeNode = AssetTreeNode
 interface Session { key: string; kind: 'ssh' | 'vnc' | 'database'; label: string; host?: Host; database?: DbInstance }
-interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket?: WebSocket; resizeObserver: ResizeObserver; connectTimer?: ReturnType<typeof setTimeout>; reconnectTimer?: ReturnType<typeof setTimeout>; reconnectAttempts: number; heartbeatTimer: ReturnType<typeof setInterval> }
+interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket?: WebSocket; resizeObserver: ResizeObserver; connectTimer?: ReturnType<typeof setTimeout>; reconnectTimer?: ReturnType<typeof setTimeout>; disconnectTimer?: ReturnType<typeof setTimeout>; reconnectAttempts: number; connectionExpired: boolean; heartbeatTimer: ReturnType<typeof setInterval> }
 interface VNCRuntime { rfb: RFB }
 interface SftpTransferRecord {
   id: number
@@ -161,6 +161,9 @@ function connectTerminalSocket(session: Session, runtime: Runtime) {
   socket.onopen = () => {
     if (runtime.socket !== socket) return
     clearTimeout(runtime.connectTimer)
+    clearTimeout(runtime.disconnectTimer)
+    runtime.disconnectTimer = undefined
+    runtime.connectionExpired = false
     runtime.reconnectAttempts = 0
     fitTerminal(runtime.fitAddon, runtime)
     runtime.terminal.focus()
@@ -171,11 +174,20 @@ function connectTerminalSocket(session: Session, runtime: Runtime) {
   socket.onclose = () => {
     clearTimeout(runtime.connectTimer)
     if (runtime.socket !== socket || runtimes.get(session.key) !== runtime || !sessions.value.some(item => item.key === session.key)) return
+    if (runtime.connectionExpired) return
+    if (runtime.disconnectTimer === undefined) {
+      runtime.disconnectTimer = setTimeout(() => {
+        if (runtimes.get(session.key) !== runtime || !sessions.value.some(item => item.key === session.key)) return
+        runtime.connectionExpired = true
+        clearTimeout(runtime.reconnectTimer)
+        runtime.socket?.close()
+        runtime.terminal.writeln('\r\n连接已断开')
+      }, 120000)
+    }
     runtime.reconnectAttempts += 1
     const delay = Math.min(1000 * 2 ** Math.min(runtime.reconnectAttempts - 1, 5), 30000)
-    runtime.terminal.writeln(`\r\n连接已断开，${delay / 1000} 秒后重连...`)
     runtime.reconnectTimer = setTimeout(() => {
-      if (runtimes.get(session.key) === runtime && sessions.value.some(item => item.key === session.key)) {
+      if (!runtime.connectionExpired && runtimes.get(session.key) === runtime && sessions.value.some(item => item.key === session.key)) {
         connectTerminalSocket(session, runtime)
       }
     }, delay)
@@ -218,7 +230,7 @@ async function initializeSession(session: Session) {
     const socket = runtimes.get(session.key)?.socket
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'heartbeat' }))
   }, 25000)
-  const runtime: Runtime = { terminal, fitAddon, resizeObserver, heartbeatTimer, reconnectAttempts: 0 }
+  const runtime: Runtime = { terminal, fitAddon, resizeObserver, heartbeatTimer, reconnectAttempts: 0, connectionExpired: false }
   runtimes.set(session.key, runtime)
   terminal.onData(data => runtime.socket?.readyState === WebSocket.OPEN && runtime.socket.send(data))
   connectTerminalSocket(session, runtime)
@@ -612,6 +624,7 @@ async function reconnectSession() {
   if (!runtime) return
   clearTimeout(runtime.connectTimer)
   clearTimeout(runtime.reconnectTimer)
+  clearTimeout(runtime.disconnectTimer)
   clearInterval(runtime.heartbeatTimer)
   runtime.resizeObserver.disconnect()
   runtime.socket?.close()
@@ -623,6 +636,7 @@ function disposeSession(key: string) {
   const runtime = runtimes.get(key)
   if (runtime) clearTimeout(runtime.connectTimer)
   if (runtime) clearTimeout(runtime.reconnectTimer)
+  if (runtime) clearTimeout(runtime.disconnectTimer)
   if (runtime) clearInterval(runtime.heartbeatTimer)
   runtime?.resizeObserver.disconnect()
   runtime?.socket?.close()
