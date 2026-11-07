@@ -64,6 +64,8 @@ type SSHConnection struct {
 	output       io.Reader
 	recording    string
 	commandCount int64
+	keepAliveStop chan struct{}
+	stopKeepAlive sync.Once
 	mu           sync.Mutex
 }
 
@@ -525,7 +527,25 @@ func (b *AssetBiz) StartSSH(hostID, userID int64, cols, rows int) (*SSHConnectio
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
 	startedAt := time.Now()
-	return &SSHConnection{hostID: host.ID, userID: userID, startedAt: startedAt, client: client, session: session, input: input, output: output, recording: newAsciinemaRecording(startedAt, cols, rows)}, nil
+	connection := &SSHConnection{hostID: host.ID, userID: userID, startedAt: startedAt, client: client, session: session, input: input, output: output, recording: newAsciinemaRecording(startedAt, cols, rows), keepAliveStop: make(chan struct{})}
+	go maintainSSHKeepAlive(client, connection.keepAliveStop)
+	return connection, nil
+}
+
+func maintainSSHKeepAlive(client *ssh.Client, stop <-chan struct{}) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			if _, _, err := client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
+				_ = client.Close()
+				return
+			}
+		}
+	}
 }
 
 func (b *AssetBiz) dialHostSSH(hostID int64) (*model.Host, *ssh.Client, error) {
@@ -632,6 +652,7 @@ func (b *AssetBiz) CloseSSH(c *SSHConnection) {
 	if c == nil {
 		return
 	}
+	c.stopKeepAlive.Do(func() { close(c.keepAliveStop) })
 	_ = c.input.Close()
 	_ = c.session.Close()
 	_ = c.client.Close()
