@@ -36,7 +36,15 @@ func parseDNSProviderConfig(provider, raw string) (map[string]string, []string, 
 		return nil, nil, fmt.Errorf("不支持的 DNS 服务商 %q", provider)
 	}
 	values := make(map[string]string)
-	if err := json.Unmarshal([]byte(raw), &values); err != nil {
+	configJSON := []byte(strings.TrimSpace(raw))
+	if len(configJSON) > 0 && configJSON[0] == '"' {
+		var encoded string
+		if err := json.Unmarshal(configJSON, &encoded); err != nil {
+			return nil, nil, errors.New("DNS 配置必须是有效 JSON")
+		}
+		configJSON = []byte(encoded)
+	}
+	if err := json.Unmarshal(configJSON, &values); err != nil {
 		return nil, nil, errors.New("DNS 配置必须是有效 JSON")
 	}
 	return values, fields, nil

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -174,10 +175,10 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 		return nil, err
 	}
 	var resolverConfig struct {
-		Nameservers               string `json:"nameservers"`
-		DNSTimeoutSeconds         int64  `json:"dns_timeout_seconds"`
-		PropagationTimeoutSeconds int64  `json:"propagation_timeout_seconds"`
-		PollingIntervalSeconds    int64  `json:"polling_interval_seconds"`
+		Nameservers               string          `json:"nameservers"`
+		DNSTimeoutSeconds         json.RawMessage `json:"dns_timeout_seconds"`
+		PropagationTimeoutSeconds json.RawMessage `json:"propagation_timeout_seconds"`
+		PollingIntervalSeconds    json.RawMessage `json:"polling_interval_seconds"`
 	}
 	if err = json.Unmarshal([]byte(plainConfig), &resolverConfig); err != nil {
 		return nil, fmt.Errorf("解析 DNS 配置: %w", err)
@@ -186,7 +187,7 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 		previousClient := dns01.DefaultClient()
 		options := dns01.NewOptions()
 		options.RecursiveNameservers = nameservers
-		options.Timeout = parseACMEDNSTimeout(resolverConfig.DNSTimeoutSeconds)
+		options.Timeout = parseACMEDNSTimeout(parseDNSConfigSeconds(resolverConfig.DNSTimeoutSeconds))
 		dns01.SetDefaultClient(dns01.NewClient(options))
 		defer dns01.SetDefaultClient(previousClient)
 	}
@@ -194,7 +195,7 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 	if err != nil {
 		return nil, err
 	}
-	propagationTimeout, pollingInterval := parseACMEDNSTimeouts(resolverConfig.PropagationTimeoutSeconds, resolverConfig.PollingIntervalSeconds)
+	propagationTimeout, pollingInterval := parseACMEDNSTimeouts(parseDNSConfigSeconds(resolverConfig.PropagationTimeoutSeconds), parseDNSConfigSeconds(resolverConfig.PollingIntervalSeconds))
 	if propagationTimeout > 0 || pollingInterval > 0 {
 		dnsProvider = &acmeDNSProviderTimeout{
 			Provider:           dnsProvider,
@@ -248,6 +249,25 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 		return nil, fmt.Errorf("申请 ACME 证书: %w", err)
 	}
 	return resource, nil
+}
+
+func parseDNSConfigSeconds(raw json.RawMessage) int64 {
+	if len(raw) == 0 {
+		return 0
+	}
+	var text string
+	if raw[0] == '"' {
+		if err := json.Unmarshal(raw, &text); err == nil {
+			parsed, _ := strconv.ParseInt(text, 10, 64)
+			return parsed
+		}
+		return 0
+	}
+	var number int64
+	if err := json.Unmarshal(raw, &number); err == nil {
+		return number
+	}
+	return 0
 }
 
 func parseACMEDNSTimeout(seconds int64) time.Duration {

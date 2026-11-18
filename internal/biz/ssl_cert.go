@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -276,7 +277,9 @@ func (b *SSLCertBiz) GetDNSProvider(ctx context.Context, id int64) (*api.SSLDNSP
 		return nil, err
 	}
 	response := dnsResponse(row, false)
-	response.Config = maskedConfig
+	if err := applyMaskedDNSProviderConfig(response, maskedConfig); err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 func (b *SSLCertBiz) SaveDNSProvider(ctx context.Context, req *api.SSLDNSProviderRequest) (*api.SSLDNSProviderResponse, error) {
@@ -292,7 +295,11 @@ func (b *SSLCertBiz) SaveDNSProvider(ctx context.Context, req *api.SSLDNSProvide
 	if old != nil && strings.EqualFold(old.Provider, req.Provider) {
 		oldConfig = old.Config
 	}
-	encryptedConfig, err := encryptDNSProviderConfig(b.aesKey, req.Provider, req.Config, oldConfig)
+	rawConfig, err := dnsProviderRequestJSON(req)
+	if err != nil {
+		return nil, err
+	}
+	encryptedConfig, err := encryptDNSProviderConfig(b.aesKey, req.Provider, rawConfig, oldConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +317,9 @@ func (b *SSLCertBiz) SaveDNSProvider(ctx context.Context, req *api.SSLDNSProvide
 		return nil, err
 	}
 	response := dnsResponse(row, false)
-	response.Config = maskedConfig
+	if err := applyMaskedDNSProviderConfig(response, maskedConfig); err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 func (b *SSLCertBiz) DeleteDNSProvider(ctx context.Context, id int64) error {
@@ -651,12 +660,62 @@ func certificateExtKeyUsages(usages []x509.ExtKeyUsage) []string {
 	}
 	return values
 }
-func dnsResponse(x *model.SslDNSProvider, detail bool) *api.SSLDNSProviderResponse {
-	config := ""
-	if detail {
-		config = x.Config
+func dnsProviderRequestJSON(req *api.SSLDNSProviderRequest) (string, error) {
+	values := map[string]any{
+		"access_key_id": req.AccessKeyID, "access_key_secret": req.AccessKeySecret,
+		"security_token": req.SecurityToken, "secret_id": req.SecretID, "secret_key": req.SecretKey,
+		"session_token": req.SessionToken, "api_token": req.APIToken, "zone_token": req.ZoneToken,
+		"email": req.CloudflareEmail, "api_key": req.APIKey, "secret_access_key": req.SecretAccessKey,
+		"region": req.Region, "nameservers": req.Nameservers,
+		"dns_timeout_seconds":         strconv.FormatInt(req.DNSTimeoutSeconds, 10),
+		"propagation_timeout_seconds": strconv.FormatInt(req.PropagationTimeoutSeconds, 10),
+		"polling_interval_seconds":    strconv.FormatInt(req.PollingIntervalSeconds, 10),
 	}
-	return &api.SSLDNSProviderResponse{ID: x.ID, Name: x.Name, Provider: x.Provider, Config: config, Email: x.Email, Phone: x.Phone, Enabled: x.Enabled, LastTestAt: nonZeroTime(x.LastTestAt), LastTestOk: x.LastTestOk, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
+	encoded, err := json.Marshal(values)
+	return string(encoded), err
+}
+
+func applyMaskedDNSProviderConfig(response *api.SSLDNSProviderResponse, masked string) error {
+	values := make(map[string]any)
+	if err := json.Unmarshal([]byte(masked), &values); err != nil {
+		return err
+	}
+	response.AccessKeyID, _ = values["access_key_id"].(string)
+	response.AccessKeySecret, _ = values["access_key_secret"].(string)
+	response.SecurityToken, _ = values["security_token"].(string)
+	response.SecretID, _ = values["secret_id"].(string)
+	response.SecretKey, _ = values["secret_key"].(string)
+	response.SessionToken, _ = values["session_token"].(string)
+	response.APIToken, _ = values["api_token"].(string)
+	response.ZoneToken, _ = values["zone_token"].(string)
+	response.CloudflareEmail, _ = values["email"].(string)
+	response.APIKey, _ = values["api_key"].(string)
+	response.SecretAccessKey, _ = values["secret_access_key"].(string)
+	response.Region, _ = values["region"].(string)
+	response.Nameservers, _ = values["nameservers"].(string)
+	response.DNSTimeoutSeconds = dnsConfigInt64(values["dns_timeout_seconds"])
+	response.PropagationTimeoutSeconds = dnsConfigInt64(values["propagation_timeout_seconds"])
+	response.PollingIntervalSeconds = dnsConfigInt64(values["polling_interval_seconds"])
+	return nil
+}
+
+func dnsConfigInt64(value any) int64 {
+	switch number := value.(type) {
+	case float64:
+		return int64(number)
+	case string:
+		parsed, _ := strconv.ParseInt(number, 10, 64)
+		return parsed
+	case json.Number:
+		parsed, _ := number.Int64()
+		return parsed
+	default:
+		return 0
+	}
+}
+
+func dnsResponse(x *model.SslDNSProvider, detail bool) *api.SSLDNSProviderResponse {
+	return &api.SSLDNSProviderResponse{ID: x.ID, Name: x.Name, Provider: x.Provider, Email: x.Email, Phone: x.Phone, Enabled: x.Enabled, LastTestAt: nonZeroTime(x.LastTestAt), LastTestOk: x.LastTestOk, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
 }
 func deployResponse(x *model.SslDeployConfig, certName string) *api.SSLDeployConfigResponse {
 	return &api.SSLDeployConfigResponse{ID: x.ID, CertificateID: x.CertificateID, CertificateName: certName, Name: x.Name, DeployType: x.DeployType, TargetConfig: x.TargetConfig, AutoDeploy: x.AutoDeploy, Enabled: x.Enabled, LastDeployAt: nonZeroTime(x.LastDeployAt), LastDeployOk: x.LastDeployOk, LastError: x.LastError, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
