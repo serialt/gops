@@ -24,6 +24,7 @@ func (h *MonitorHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/monitor/domains/delete", h.DeleteDomain)
 	g.POST("/monitor/domains/check", h.CheckDomain)
 	g.POST("/monitor/domains/history", h.ListCheckHistory)
+	g.POST("/monitor/domains/certificate-chain", h.CertificateChain)
 	g.POST("/monitor/domains/stats", h.DomainStats)
 	g.POST("/monitor/domains/export", h.ExportDomains)
 	g.POST("/monitor/domains/template", h.DomainImportTemplate)
@@ -39,6 +40,15 @@ func (h *MonitorHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/monitor/receivers/delete", h.DeleteReceiver)
 
 	g.POST("/monitor/logs/list", h.ListLogs)
+}
+
+// CertificateChain POST /api/v1/monitor/domains/certificate-chain 查询域名当前证书链。
+func (h *MonitorHandler) CertificateChain(c *gin.Context) {
+	req := new(api.MonitorDomainIDRequest)
+	if monitorBind(c, req) {
+		data, err := h.biz.CertificateChain(req)
+		monitorResult(c, data, err)
+	}
 }
 
 // ListDomainOption POST /api/v1/monitor/domains/list-option 查询域名监控筛选选项。

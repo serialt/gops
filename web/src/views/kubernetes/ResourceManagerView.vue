@@ -71,7 +71,7 @@ const accessCards = computed(() => [
 const displayedRows = computed(() => rows.value)
 function kubernetesRowID(row: unknown) { const item = row as KubernetesObject; return `${item.namespace || '_cluster'}/${item.kind || resource.value}/${item.name}` }
 function switchResource(key: string) { if (resource.value === key) return; rows.value = []; selected.value = []; serviceType.value = ''; resource.value = key }
-async function loadClusters() { const { data } = await listKubernetesClusters('', 1, 1000); clusters.value = data.data.list; const id = Number(route.query.cluster_id || 0); clusterID.value = id && clusters.value.some(x => x.id === id) ? id : (clusters.value[0]?.id || 0) }
+async function loadClusters() { const { data } = await listKubernetesClusters('', 1, 1000); clusters.value = data.data.list; const id = Number(route.query.cluster_id || 0); clusterID.value = id && clusters.value.some(x => x.id === id && x.status === 1) ? id : (clusters.value.find(x => x.status === 1)?.id || 0) }
 async function loadNamespaces() { if (!clusterID.value || (!isWorkload.value && !isNetwork.value && !isConfig.value && !isStorage.value && !isAccess.value)) return; const { data } = await listKubernetesNamespaces(clusterID.value, '', '', 1, 1000); namespaces.value = data.data.list }
 async function loadNetworkStats(forceRefresh = false) { if (!isNetwork.value || !clusterID.value) return; const values = await Promise.all(group.value.resources.map(item => listKubernetesObjects({ cluster_id: clusterID.value, resource: item.key, namespace: namespace.value, refresh: forceRefresh, page: 1, limit: 1000 }))); networkStats.value = Object.fromEntries(group.value.resources.map((item, index) => [item.key, values[index].data.data.total])) }
 async function loadConfigStats(forceRefresh = false) { if (!isConfig.value || !clusterID.value) return; const values = await Promise.all(group.value.resources.map(item => listKubernetesObjects({ cluster_id: clusterID.value, resource: item.key, namespace: namespace.value, refresh: forceRefresh, page: 1, limit: 1000 }))); configStats.value = Object.fromEntries(group.value.resources.map((item, index) => [item.key, values[index].data.data.total])) }
@@ -127,31 +127,31 @@ loadClusters().then(async () => { await loadNamespaces(); initialized = true; aw
         :class="['type-card', item.tone, { active: resource === item.key }]" @click="switchResource(item.key)"><span>{{
           item.label }}</span><strong>{{ item.count }}</strong></button><el-select v-model="clusterID"
         class="stats-cluster-select" placeholder="选择集群"><el-option v-for="item in clusters" :key="item.id"
-          :label="item.alias || item.name" :value="item.id" /></el-select></div>
+          :label="item.alias || item.name" :value="item.id" :disabled="item.status !== 1" /></el-select></div>
     <div v-if="isNetwork" class="network-types"><button v-for="item in networkCards" :key="item.key"
         :class="['network-card', { active: resource === item.key }]" @click="switchResource(item.key)"><span>{{
           item.label }}</span><strong>{{ item.count }}</strong></button><el-select v-model="clusterID"
         class="stats-cluster-select" placeholder="选择集群"><el-option v-for="item in clusters" :key="item.id"
-          :label="item.alias || item.name" :value="item.id" /></el-select></div>
+          :label="item.alias || item.name" :value="item.id" :disabled="item.status !== 1" /></el-select></div>
     <div v-if="isConfig" class="network-types config-types"><button v-for="item in configCards" :key="item.key"
         :class="['network-card', 'config-card', { active: resource === item.key }]"
         @click="switchResource(item.key)"><span>{{ item.label }}</span><strong>{{ item.count
         }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
-          v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" /></el-select></div>
+          v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" :disabled="item.status !== 1" /></el-select></div>
     <div v-if="isStorage" class="network-types storage-types"><button v-for="item in storageCards" :key="item.key"
         :class="['network-card', 'storage-card', { active: resource === item.key }]"
         @click="switchResource(item.key)"><span>{{ item.label }}</span><strong>{{ item.count
         }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
-          v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" /></el-select></div>
+          v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" :disabled="item.status !== 1" /></el-select></div>
     <div v-if="isAccess" class="network-types access-types"><button v-for="item in accessCards" :key="item.key"
         :class="['network-card', 'access-card', { active: resource === item.key }]"
         @click="switchResource(item.key)"><span>{{ item.label }}</span><strong>{{ item.count
         }}</strong></button><el-select v-model="clusterID" class="stats-cluster-select" placeholder="选择集群"><el-option
-          v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" /></el-select></div>
+          v-for="item in clusters" :key="item.id" :label="item.alias || item.name" :value="item.id" :disabled="item.status !== 1" /></el-select></div>
     <div class="toolbar">
       <div class="filters"><el-select v-if="!isNetwork && !isWorkload && !isConfig && !isStorage && !isAccess"
           v-model="clusterID" placeholder="选择集群"><el-option v-for="item in clusters" :key="item.id"
-            :label="item.alias || item.name" :value="item.id" /></el-select><el-input v-model="keyword"
+            :label="item.alias || item.name" :value="item.id" :disabled="item.status !== 1" /></el-select><el-input v-model="keyword"
           :placeholder="isWorkload ? '搜索工作负载名称…' : isNetwork || isConfig || isStorage || isAccess ? '关键字搜索' : '输入即搜索'"
           :clearable="!isNetwork" /><el-select
           v-if="isWorkload || isNetwork || isConfig || (isStorage && current.namespaced) || (isAccess && current.namespaced)"

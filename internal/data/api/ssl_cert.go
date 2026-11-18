@@ -1,6 +1,8 @@
 package api
 
-import "time"
+import (
+	"time"
+)
 
 type SSLCertificateListRequest struct {
 	PageRequest
@@ -62,6 +64,7 @@ type SSLCertificateResponse struct {
 	NotAfter        *time.Time `json:"not_after"`
 	LastRenewAt     *time.Time `json:"last_renew_at"`
 	LastError       string     `json:"last_error"`
+	HasCertificate  bool       `json:"has_certificate"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
@@ -111,26 +114,57 @@ type SSLDNSProviderListRequest struct {
 	Provider string `json:"provider"`
 }
 type SSLDNSProviderRequest struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name" binding:"required"`
-	Provider string `json:"provider" binding:"required"`
-	Config   string `json:"config" binding:"required"`
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	Enabled  bool   `json:"enabled"`
+	ID                        int64  `json:"id"`
+	Name                      string `json:"name" binding:"required"`
+	Provider                  string `json:"provider" binding:"required"`
+	AccessKeyID               string `json:"access_key_id"`
+	AccessKeySecret           string `json:"access_key_secret"`
+	SecurityToken             string `json:"security_token"`
+	SecretID                  string `json:"secret_id"`
+	SecretKey                 string `json:"secret_key"`
+	SessionToken              string `json:"session_token"`
+	APIToken                  string `json:"api_token"`
+	ZoneToken                 string `json:"zone_token"`
+	CloudflareEmail           string `json:"cloudflare_email"`
+	APIKey                    string `json:"api_key"`
+	SecretAccessKey           string `json:"secret_access_key"`
+	Region                    string `json:"region"`
+	Nameservers               string `json:"nameservers"`
+	DNSTimeoutSeconds         int64  `json:"dns_timeout_seconds"`
+	PropagationTimeoutSeconds int64  `json:"propagation_timeout_seconds"`
+	PollingIntervalSeconds    int64  `json:"polling_interval_seconds"`
+	Email                     string `json:"email"`
+	Phone                     string `json:"phone"`
+	Enabled                   bool   `json:"enabled"`
 }
 type SSLDNSProviderResponse struct {
-	ID         int64      `json:"id"`
-	Name       string     `json:"name"`
-	Provider   string     `json:"provider"`
-	Config     string     `json:"config,omitempty"`
-	Email      string     `json:"email"`
-	Phone      string     `json:"phone"`
-	Enabled    bool       `json:"enabled"`
-	LastTestAt *time.Time `json:"last_test_at"`
-	LastTestOk bool       `json:"last_test_ok"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID                        int64      `json:"id"`
+	Name                      string     `json:"name"`
+	Provider                  string     `json:"provider"`
+	AccessKeyID               string     `json:"access_key_id,omitempty"`
+	AccessKeySecret           string     `json:"access_key_secret,omitempty"`
+	SecurityToken             string     `json:"security_token,omitempty"`
+	SecretID                  string     `json:"secret_id,omitempty"`
+	SecretKey                 string     `json:"secret_key,omitempty"`
+	SessionToken              string     `json:"session_token,omitempty"`
+	APIToken                  string     `json:"api_token,omitempty"`
+	ZoneToken                 string     `json:"zone_token,omitempty"`
+	CloudflareEmail           string     `json:"cloudflare_email,omitempty"`
+	APIKey                    string     `json:"api_key,omitempty"`
+	SecretAccessKey           string     `json:"secret_access_key,omitempty"`
+	Region                    string     `json:"region,omitempty"`
+	Nameservers               string     `json:"nameservers,omitempty"`
+	DNSTimeoutSeconds         int64      `json:"dns_timeout_seconds,omitempty"`
+	PropagationTimeoutSeconds int64      `json:"propagation_timeout_seconds,omitempty"`
+	PollingIntervalSeconds    int64      `json:"polling_interval_seconds,omitempty"`
+	Email                     string     `json:"email"`
+	Phone                     string     `json:"phone"`
+	Enabled                   bool       `json:"enabled"`
+	LastTestAt                *time.Time `json:"last_test_at"`
+	LastTestOk                bool       `json:"last_test_ok"`
+	CreatedAt                 time.Time  `json:"created_at"`
+	UpdatedAt                 time.Time  `json:"updated_at"`
+	Config                    string     `json:"config"`
 }
 
 type SSLDeployConfigListRequest struct {

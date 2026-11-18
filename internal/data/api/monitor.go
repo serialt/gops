@@ -47,6 +47,9 @@ type MonitorCheckHistoryResponse struct {
 	ErrorMessage string    `json:"error_message"`
 	CheckedAt    time.Time `json:"checked_at"`
 }
+type MonitorCertificateChainResponse struct {
+	ChainCertificates []*SSLCertificateChainResponse `json:"chain_certificates"`
+}
 type MonitorDomainResponse struct {
 	ID                int64     `json:"id"`
 	Domain            string    `json:"domain"`

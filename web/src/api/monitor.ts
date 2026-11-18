@@ -4,6 +4,8 @@ export type MonitorRequestClient = 'chrome' | 'firefox' | 'edge' | 'safari' | 'c
 export interface MonitorDomain { id: number; domain: string; port: number; request_client: MonitorRequestClient; status: string; response_time: number; ssl_valid: boolean; ssl_expiry: string; ssl_root_ca: string; check_interval: number; check_jitter: number; enable_ssl: boolean; verify_certificate: boolean; enable_alert: boolean; response_threshold: number; ssl_expiry_days: number; last_check: string; last_error: string; created_at: string; updated_at: string }
 export interface MonitorDomainRequest { id?: number; domain: string; port: number; request_client: MonitorRequestClient; check_interval: number; check_jitter: number; enable_ssl: boolean; verify_certificate: boolean; enable_alert: boolean; response_threshold: number; ssl_expiry_days: number }
 export interface MonitorCheckHistory { id: number; domain_id: number; status: string; response_time: number; ssl_valid: boolean; ssl_expiry: string; status_code: number; error_message: string; checked_at: string }
+export interface MonitorCertificateChainItem { position: number; version: number; common_name: string; subject: string; issuer: string; serial_number: string; dns_names: string[]; email_addresses: string[]; ip_addresses: string[]; uris: string[]; not_before?: string; not_after?: string; fingerprint: string; is_ca: boolean; basic_constraints_valid: boolean; max_path_len: number; max_path_len_zero: boolean; signature_algorithm: string; public_key_algorithm: string; public_key_bits: number; key_usage: string[]; ext_key_usage: string[]; subject_key_id: string; authority_key_id: string; ocsp_servers: string[]; issuer_urls: string[]; crl_points: string[]; policies: string[] }
+export interface MonitorCertificateChain { chain_certificates: MonitorCertificateChainItem[] }
 export interface MonitorStats { total: number; normal: number; abnormal: number; paused: number }
 export interface MonitorDomainExcelImportResult { created: number; updated: number }
 export type MonitorAlertChannelType = 'email' | 'dingtalk' | 'feishu' | 'wechat' | 'webhook'
@@ -23,6 +25,7 @@ export const updateMonitorDomain = (data: MonitorDomainRequest & { id: number })
 export const deleteMonitorDomain = (id: number) => request.post<null>('/monitor/domains/delete', { id })
 export const checkMonitorDomain = (id: number) => request.post<MonitorDomain>('/monitor/domains/check', { id })
 export const listMonitorCheckHistory = (domain_id: number, page = 1, limit = 30) => request.post<PageResponse<MonitorCheckHistory>>('/monitor/domains/history', { domain_id, page, limit })
+export const getMonitorCertificateChain = (id: number) => request.post<MonitorCertificateChain>('/monitor/domains/certificate-chain', { id })
 export const monitorStats = (filters: MonitorDomainFilters = {}) => request.post<MonitorStats>('/monitor/domains/stats', filters)
 export const exportMonitorDomains = (keyword = '', ids: number[] = []) => request.post<Blob>('/monitor/domains/export', { keyword, status: '', ids }, { responseType: 'blob' })
 export const downloadMonitorDomainImportTemplate = () => request.post<Blob>('/monitor/domains/template', {}, { responseType: 'blob' })

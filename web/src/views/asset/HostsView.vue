@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Cpu, Delete, Download, Edit, Monitor, Refresh, Search, Upload } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectHostInfo, createCredential, createHost, deleteHost, downloadHostImportTemplate, exportHosts, importHosts, listAssetGroups, listCloudAccounts, listCredentials, listHosts, testHostConnection, type AssetGroup, type CloudAccount, type Credential, type Host, updateHost } from '@/api/asset'
+import { computed, h, onMounted, reactive, ref, render, watch, type Component } from 'vue'; import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'; import { ArrowLeft, ArrowRight, CollectionTag, Cpu, Delete, Download, Edit, Monitor, Refresh, Search, Upload } from '@element-plus/icons-vue'; import type { ColDef } from 'ag-grid-community'; import AppDataGrid from '@/components/AppDataGrid.vue'; import { collectHostInfo, createCredential, createHost, deleteHost, downloadHostImportTemplate, exportHosts, importCloudHosts, importHosts, listAssetGroups, listCloudAccounts, listCredentials, listHosts, previewCloudHosts, testHostConnection, type AssetGroup, type CloudAccount, type CloudHostPreview, type Credential, type Host, updateHost } from '@/api/asset'
 import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
 interface AssetTreeNode { id: number; label: string; count: number; children: AssetTreeNode[] }
@@ -8,6 +8,13 @@ const auth = useAuthStore()
 const excelInput = ref<HTMLInputElement>()
 const excelBusy = ref(false)
 const selectedHosts = ref<Host[]>([])
+const createTab = ref<'manual' | 'cloud'>('manual')
+const cloudImportRows = ref<CloudHostPreview[]>([])
+const cloudImportAccountID = ref<number | null>(null)
+const cloudImportGroupID = ref<number | null>(null)
+const cloudImportCredentialID = ref<number | null>(null)
+const cloudImportLoading = ref(false)
+const cloudImportSaving = ref(false)
 const tagItems = computed(() => form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
 const vncCredentials = computed(() => credentials.value.filter(credential => credential.credential_type === 'password'))
 const hostTypeLabels: Record<string, string> = { self: '自建主机', cloud: '云主机' }
@@ -26,6 +33,13 @@ function formatBytes(value: number) { if (!value) return '-'; const units = ['B'
 function metricRenderer(kind: 'cpu' | 'memory' | 'disk') { return (p: any) => { const row = p.data as Host; const usage = kind === 'cpu' ? row.cpu_usage : kind === 'memory' ? row.memory_usage : row.disk_usage; const headline = kind === 'cpu' ? (row.cpu_cores ? `${row.cpu_cores}核` : '-') : `${formatBytes(kind === 'memory' ? row.memory_used : row.disk_used)} / ${formatBytes(kind === 'memory' ? row.memory_total : row.disk_total)}`; const wrap = document.createElement('div'); wrap.className = `host-metric${usage >= 70 ? ' is-warning' : ''}`; const text = document.createElement('span'); text.textContent = headline; const details = document.createElement('div'); const bar = document.createElement('i'); const fill = document.createElement('b'); fill.style.width = `${Math.max(0, Math.min(100, usage || 0))}%`; bar.append(fill); const percent = document.createElement('small'); percent.textContent = usage ? `${usage.toFixed(1)}%` : '-'; details.append(bar, percent); wrap.append(text, details); return wrap } }
 function systemRenderer(p: any) { const wrap = document.createElement('div'); wrap.className = 'host-system'; const os = document.createElement('span'); os.append(componentIcon(Monitor)); const osText = document.createElement('em'); osText.textContent = p.data.os || '-'; os.append(osText); const arch = document.createElement('small'); arch.append(componentIcon(Cpu)); const archText = document.createElement('em'); archText.textContent = p.data.arch || '-'; arch.append(archText); wrap.append(os, arch); return wrap }
 const columns = computed<ColDef[]>(() => [{ headerName: '序号', valueGetter: p => String((page.value - 1) * pageSize.value + (p.node?.rowIndex ?? 0) + 1), width: 58 }, { field: 'name', headerName: '主机', minWidth: 190, cellRenderer: hostRenderer }, { field: 'status', headerName: '状态', width: 86, cellRenderer: statusRenderer }, { field: 'host_type', headerName: '类型', width: 90, cellRenderer: typeRenderer }, { headerName: 'CPU', width: 132, cellRenderer: metricRenderer('cpu') }, { headerName: '内存', width: 160, cellRenderer: metricRenderer('memory') }, { headerName: '磁盘', width: 160, cellRenderer: metricRenderer('disk') }, { field: 'tags', headerName: '标签', width: 115, cellClass: 'host-tags-cell', cellRenderer: tagsRenderer }, { headerName: '系统信息', minWidth: 170, flex: 1, cellRenderer: systemRenderer }, { headerName: '操作', pinned: 'right', width: 150, cellRenderer: actionRenderer }])
+const cloudImportColumns = computed<ColDef[]>(() => [
+    { headerName: '序号', valueGetter: p => String((p.node?.rowIndex ?? 0) + 1), width: 58 },
+    { field: 'name', headerName: '主机名称', minWidth: 150 },
+    { field: 'ip', headerName: '主机地址', editable: true, cellClass: 'cloud-import-editable', minWidth: 150 },
+    { field: 'port', headerName: '端口', editable: true, cellClass: 'cloud-import-editable', width: 90, valueParser: p => Number(p.newValue) },
+    { field: 'description', headerName: '备注', editable: true, cellClass: 'cloud-import-editable', minWidth: 180, flex: 1 },
+])
 async function load(reset = false) { if (reset) page.value = 1; const { data } = await listHosts(keyword.value, selectedGroupID.value || 0, page.value, pageSize.value, statusFilter.value); rows.value = data.data.list; total.value = data.data.total }
 function changePage(value: number) { page.value = value; void load() }
 function changePageSize(value: number) { pageSize.value = value; page.value = 1; void load() }
@@ -36,7 +50,7 @@ function startTreePaneDrag(event: PointerEvent) { if (event.button !== 0) return
 function moveTreePane(event: PointerEvent) { if (treePaneDragging.value) treePaneWidth.value = Math.max(0, Math.min(360, treePaneStartWidth.value + event.clientX - treePaneStartX.value)) }
 function stopTreePaneDrag() { if (!treePaneDragging.value) return; treePaneDragging.value = false; if (treePaneWidth.value < 90) treePaneWidth.value = 0; document.removeEventListener('pointermove', moveTreePane); document.removeEventListener('pointerup', stopTreePaneDrag) }
 function toggleTreePane() { treePaneWidth.value = treePaneWidth.value === 0 ? 200 : 0 }
-function create() { editingID.value = null; tagDraft.value = ''; Object.assign(form, { name: '', group_id: selectedGroupID.value, host_type: '', ip: '', port: null, credential_id: null, vnc_credential_id: null, vnc_port: null, cloud_account_id: null, tags: '', description: '', status: -1 }); dialogVisible.value = true }
+function create() { editingID.value = null; createTab.value = 'manual'; cloudImportRows.value = []; cloudImportAccountID.value = null; cloudImportGroupID.value = selectedGroupID.value; cloudImportCredentialID.value = null; tagDraft.value = ''; Object.assign(form, { name: '', group_id: selectedGroupID.value, host_type: '', ip: '', port: null, credential_id: null, vnc_credential_id: null, vnc_port: null, cloud_account_id: null, tags: '', description: '', status: -1 }); dialogVisible.value = true }
 function edit(row: Host) { editingID.value = row.id; tagDraft.value = ''; Object.assign(form, { ...row, group_id: row.group_id || null, port: row.port || null, credential_id: row.credential_id || null, vnc_credential_id: row.vnc_credential_id || null, vnc_port: row.vnc_port || null, cloud_account_id: row.cloud_account_id || null }); dialogVisible.value = true }
 function addTag() { const tag = tagDraft.value.trim(); if (tag && !tagItems.value.includes(tag)) form.tags = [...tagItems.value, tag].join(','); tagDraft.value = '' }
 function removeTag(tag: string) { form.tags = tagItems.value.filter(item => item !== tag).join(',') }
@@ -44,6 +58,22 @@ function openCredentialCreate(target: 'ssh' | 'vnc') { credentialTarget.value = 
 async function saveCredential() { if (!credentialForm.name.trim()) return ElMessage.warning('请填写凭证名称'); if (credentialForm.credential_type === 'password' && !credentialForm.password) return ElMessage.warning('请填写密码'); if (credentialForm.credential_type === 'key' && !credentialForm.private_key.trim()) return ElMessage.warning('请填写私钥'); const { data } = await createCredential(credentialForm); await loadFormOptions(); if (credentialTarget.value === 'vnc') form.vnc_credential_id = data.data.id; else form.credential_id = data.data.id; credentialDialogVisible.value = false; ElMessage.success('凭证创建成功') }
 async function testConnection() { if (!form.ip || !form.port || !form.credential_id) return ElMessage.warning('请填写主机地址、端口并选择凭据'); testingConnection.value = true; try { await testHostConnection({ ip: form.ip, port: form.port, credential_id: form.credential_id }); ElMessage.success('SSH 连接成功') } finally { testingConnection.value = false } }
 async function save() { if (!form.name || !form.ip || !form.host_type) return ElMessage.warning('请填写主机名称、类型和地址'); if (Boolean(form.port) !== Boolean(form.credential_id)) return ElMessage.warning('SSH 端口和 SSH 凭据需同时填写'); if (Boolean(form.vnc_port) !== Boolean(form.vnc_credential_id)) return ElMessage.warning('VNC 端口和 VNC 凭据需同时填写'); const payload = { ...form, group_id: form.group_id ?? 0, port: form.port, credential_id: form.credential_id, vnc_credential_id: form.vnc_credential_id, vnc_port: form.vnc_port, cloud_account_id: form.cloud_account_id ?? 0 }; if (editingID.value) await updateHost({ ...payload, id: editingID.value }); else await createHost(payload); dialogVisible.value = false; ElMessage.success('保存成功'); await load() }
+async function loadCloudHosts() { if (!cloudImportAccountID.value) return ElMessage.warning('请选择云账号'); cloudImportLoading.value = true; try { const { data } = await previewCloudHosts(cloudImportAccountID.value); cloudImportRows.value = data.data; if (!data.data.length) ElMessage.info('该云账号当前区域没有可导入的云主机') } finally { cloudImportLoading.value = false } }
+async function saveCloudHosts(confirmUpdate = false) {
+    if (!cloudImportAccountID.value || !cloudImportCredentialID.value) return ElMessage.warning('请选择云账号和 SSH 凭据')
+    if (!cloudImportRows.value.length) return ElMessage.warning('请先拉取云主机')
+    if (cloudImportRows.value.some(row => !row.name.trim() || !row.ip.trim() || row.port < 1 || row.port > 65535)) return ElMessage.warning('请检查主机名称、地址和端口')
+    cloudImportSaving.value = true
+    try {
+        const payload = { cloud_account_id: cloudImportAccountID.value, group_id: cloudImportGroupID.value ?? 0, credential_id: cloudImportCredentialID.value, confirm_update: confirmUpdate, list: cloudImportRows.value }
+        const { data } = await importCloudHosts(payload)
+        if (data.data.needs_confirm) {
+            await ElMessageBox.confirm(`发现 ${data.data.duplicate_count} 台主机的“主机名 + 云账号 + 主机地址 + 主机端口”与现有记录相同，继续后将更新这些主机，是否继续？`, '确认更新云主机', { type: 'warning', confirmButtonText: '继续', cancelButtonText: '取消' })
+            return await saveCloudHosts(true)
+        }
+        dialogVisible.value = false; ElMessage.success(`导入完成：新增 ${data.data.created} 台，更新 ${data.data.updated} 台`); await load()
+    } finally { cloudImportSaving.value = false }
+}
 async function remove(row: Host) { await ElMessageBox.confirm(`确定删除主机 ${row.name}？`, '删除确认', { type: 'warning' }); await deleteHost(row.id); ElMessage.success('删除成功'); await load() }
 async function batchRemove(selectedRows: unknown[]) {
     const selectedHosts = selectedRows as Host[]
@@ -161,8 +191,9 @@ onMounted(() => { void load(); void loadFormOptions() })
                     @page-change="changePage" @page-size-change="changePageSize"
                     @selection-changed="selectedHosts = $event as Host[]" />
             </section>
-        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑主机' : '新增主机'" width="60%">
-            <el-form :model="form" label-width="92px" class="host-form">
+        </div><el-dialog v-model="dialogVisible" :title="editingID ? '编辑主机' : '新增主机'" :width="editingID ? '60%' : '72%'" class="host-dialog">
+            <el-tabs v-if="!editingID" v-model="createTab" class="host-create-tabs"><el-tab-pane label="手动新增" name="manual" /><el-tab-pane label="导入云主机" name="cloud" /></el-tabs>
+            <el-form v-show="editingID || createTab === 'manual'" :model="form" label-width="92px" class="host-form">
                 <el-row :gutter="16">
                     <el-col :xs="24" :sm="12"><el-form-item label="主机名称" required><el-input v-model="form.name"
                                 placeholder="请输入主机名称" /></el-form-item></el-col>
@@ -219,10 +250,20 @@ onMounted(() => { void load(); void loadFormOptions() })
                 <el-form-item label="备注"><el-input v-model="form.description" type="textarea" :rows="3"
                         placeholder="请输入备注信息" /></el-form-item>
             </el-form>
-            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button
+            <section v-if="!editingID && createTab === 'cloud'" class="cloud-import-panel">
+                <div class="cloud-import-options">
+                    <label><span>云账号</span><el-select v-model="cloudImportAccountID" placeholder="请选择云账号" @change="cloudImportRows = []"><el-option v-for="account in cloudAccounts.filter(item => item.status)" :key="account.id" :label="account.name" :value="account.id" /></el-select></label>
+                    <label><span>所属分组</span><el-select v-model="cloudImportGroupID" placeholder="请选择分组" clearable><el-option v-for="group in groups" :key="group.id" :label="group.name" :value="group.id" /></el-select></label>
+                    <label><span>SSH 凭据</span><el-select v-model="cloudImportCredentialID" placeholder="请选择 SSH 凭据"><el-option v-for="credential in credentials" :key="credential.id" :label="credential.name" :value="credential.id" /></el-select></label>
+                    <el-button v-permission="'POST /api/v1/assets/hosts/cloud/preview'" type="primary" plain :loading="cloudImportLoading" @click="loadCloudHosts">拉取云主机</el-button>
+                </div>
+                <p class="cloud-import-tip">双击单元格可编辑主机地址、端口和备注。</p>
+                <AppDataGrid v-loading="cloudImportLoading" class="cloud-import-grid" :row-data="cloudImportRows" :column-defs="cloudImportColumns" />
+            </section>
+            <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button v-if="editingID || createTab === 'manual'"
                     v-permission="'POST /api/v1/assets/hosts/test'" :loading="testingConnection"
-                    @click="testConnection">测试连接</el-button><el-button type="primary"
-                    @click="save">保存</el-button></template>
+                    @click="testConnection">测试连接</el-button><el-button v-if="editingID || createTab === 'manual'" type="primary"
+                    @click="save">保存</el-button><el-button v-else v-permission="'POST /api/v1/assets/hosts/cloud/import'" type="primary" :loading="cloudImportSaving" @click="saveCloudHosts()">保存导入</el-button></template>
         </el-dialog>
         <el-dialog v-model="credentialDialogVisible" :title="`新建${credentialTarget === 'vnc' ? 'VNC' : 'SSH'}凭据`" width="460px" append-to-body>
             <el-form :model="credentialForm" label-width="82px" class="credential-form">
@@ -807,6 +848,58 @@ onMounted(() => { void load(); void loadFormOptions() })
     color: #ef6262;
 }
 
+.host-create-tabs {
+    margin-top: -10px;
+}
+
+.cloud-import-panel {
+    display: flex;
+    min-height: 420px;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 11px;
+}
+
+.cloud-import-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+    align-items: end;
+    gap: 10px;
+}
+
+.cloud-import-options label {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 5px;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.cloud-import-options :deep(.el-select) {
+    width: 100%;
+}
+
+.cloud-import-tip {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.cloud-import-grid {
+    min-height: 330px;
+    flex: 1;
+}
+
+.cloud-import-grid :deep(.cloud-import-editable) {
+    background: #fbfcff;
+    color: var(--text);
+}
+
+.cloud-import-grid :deep(.cloud-import-editable:hover) {
+    background: #f2f4ff;
+}
+
 @media (max-width: 900px) {
     .host-layout {
         grid-template-columns: 1fr !important;
@@ -823,6 +916,10 @@ onMounted(() => { void load(); void loadFormOptions() })
 
     .search-input {
         width: min(260px, 60vw);
+    }
+
+    .cloud-import-options {
+        grid-template-columns: 1fr;
     }
 }
 </style>

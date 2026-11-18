@@ -9,7 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"gops/docs"
 	"gops/internal/config"
@@ -31,6 +33,7 @@ var (
 	CheckCfg    bool
 	GenModel    bool
 	GenTable    bool
+	AutoMigrate bool
 	UserCommand string
 	GenTableDir = "sql"
 	Args        []string
@@ -43,6 +46,7 @@ func init() {
 	flag.StringVar(&ConfigFile, "c", "config.yaml", "Config file")
 	flag.StringVar(&UserCommand, "u", "", "user command: list, create, reset")
 	flag.BoolVar(&GenTable, "t", false, "goose cmd")
+	flag.BoolVar(&AutoMigrate, "m", true, "apply database migrations before startup")
 	flag.Parse()
 	Args = flag.Args()
 }
@@ -78,6 +82,15 @@ func seedDatabase(cfg *config.Config) error {
 	return nil
 }
 
+func migrateAndSeed(cfg *config.Config) {
+	if err := data.GenTable(cfg, docs.Migrations, []string{"up"}, GenTableDir); err != nil {
+		log.Fatalf("failed to migrate database: %v", err)
+	}
+	if err := seedDatabase(cfg); err != nil {
+		log.Fatalf("failed to initialize database: %v", err)
+	}
+}
+
 func main() {
 	cfg := config.NewConfig(ConfigFile)
 	if appVersion {
@@ -108,14 +121,12 @@ func main() {
 		}
 		return
 	}
-	if sqliteDatabaseMissing(cfg.Dsn) {
+	if AutoMigrate {
+		slog.Info("applying database migrations before startup", "dsn", cfg.Dsn)
+		migrateAndSeed(cfg)
+	} else if sqliteDatabaseMissing(cfg.Dsn) {
 		slog.Info("SQLite database does not exist; applying migrations", "dsn", cfg.Dsn)
-		if err := data.GenTable(cfg, docs.Migrations, []string{"up"}, GenTableDir); err != nil {
-			log.Fatalf("failed to migrate database: %v", err)
-		}
-		if err := seedDatabase(cfg); err != nil {
-			log.Fatalf("failed to initialize database: %v", err)
-		}
+		migrateAndSeed(cfg)
 	}
 	loggger := sugar.New(
 		sugar.WithShort(true),
@@ -134,10 +145,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize: %v", err)
 	}
-	defer cleanup()
+	stopSignals := make(chan os.Signal, 1)
+	signal.Notify(stopSignals, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-stopSignals
+		log.Printf("Shutting down server")
+		cleanup()
+	}()
+	defer signal.Stop(stopSignals)
 
 	log.Printf("Running server at :%v", cfg.Server.HttpPort)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		cleanup()
 		log.Fatalf("server failed: %v", err)
 	}
+	cleanup()
 }

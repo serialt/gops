@@ -4,10 +4,10 @@ import type { ColDef } from 'ag-grid-community'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Download, Filter, Upload } from '@element-plus/icons-vue'
 import AppDataGrid from '@/components/AppDataGrid.vue'
-import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, downloadMonitorDomainImportTemplate, exportMonitorDomains, importMonitorDomains, listMonitorCheckHistory, listMonitorDomainOption, listMonitorDomains, monitorStats, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorFilterOption, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
+import { checkMonitorDomain, createMonitorDomain, deleteMonitorDomain, downloadMonitorDomainImportTemplate, exportMonitorDomains, getMonitorCertificateChain, importMonitorDomains, listMonitorCheckHistory, listMonitorDomainOption, listMonitorDomains, monitorStats, type MonitorCertificateChainItem, type MonitorCheckHistory, type MonitorDomain, type MonitorDomainRequest, type MonitorFilterOption, type MonitorRequestClient, type MonitorStats, updateMonitorDomain } from '@/api/monitor'
 import { useAuthStore } from '@/stores/auth'
 import { downloadAttachment } from '@/utils/download'
-const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const domainFilter = ref(''); const portFilter = ref<number>(); const statusFilter = ref(''); const sslStatusFilter = ref(''); const rootCAFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const lastCheckRange = ref<[string, string] | null>(null); const filtersExpanded = ref(false); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
+const rows = ref<MonitorDomain[]>([]); const total = ref(0); const page = ref(1); const pageSize = ref(20); const selectedRows = ref<MonitorDomain[]>([]); const historyRows = ref<MonitorCheckHistory[]>([]); const certificateChain = ref<MonitorCertificateChainItem[]>([]); const detailTab = ref('history'); const stats = ref<MonitorStats>({ total: 0, normal: 0, abnormal: 0, paused: 0 }); const keyword = ref(''); const domainFilter = ref(''); const portFilter = ref<number>(); const statusFilter = ref(''); const sslStatusFilter = ref(''); const rootCAFilter = ref(''); const sslExpiryRange = ref<[string, string] | null>(null); const lastCheckRange = ref<[string, string] | null>(null); const filtersExpanded = ref(false); const dialog = ref(false); const detailDialog = ref(false); const detailMonitor = ref<MonitorDomain | null>(null); const editing = ref<MonitorDomain | null>(null)
 const domainOptions = ref<string[]>([]); const portOptions = ref<number[]>([]); const statusOptions = ref<MonitorFilterOption[]>([]); const sslStatusOptions = ref<MonitorFilterOption[]>([]); const rootCAOptions = ref<string[]>([])
 const activeFilterCount = () => [domainFilter.value, portFilter.value, statusFilter.value, sslStatusFilter.value, rootCAFilter.value, sslExpiryRange.value, lastCheckRange.value].filter(Boolean).length
 const filterPanelRef = ref<HTMLElement>()
@@ -97,7 +97,14 @@ async function remove(row: MonitorDomain) { await ElMessageBox.confirm(`删除�
 async function batchRemove(selectedRows: unknown[]) { const selected = selectedRows as MonitorDomain[]; if (!selected.length) return; await ElMessageBox.confirm(`确定删除选中的 ${selected.length} 条监控？`, '批量删除确认', { type: 'warning' }); await Promise.all(selected.map(row => deleteMonitorDomain(row.id))); ElMessage.success('批量删除成功'); await load() }
 async function batchCollect(selectedRows: unknown[]) { const selected = selectedRows as MonitorDomain[]; if (!selected.length) return; await Promise.all(selected.map(row => checkMonitorDomain(row.id))); ElMessage.success(`已完成 ${selected.length} 条域名监控采集`); await load() }
 async function check(row: MonitorDomain) { await checkMonitorDomain(row.id); ElMessage.success('检测完成'); await load() }
-async function detail(row: MonitorDomain) { const { data } = await listMonitorCheckHistory(row.id); historyRows.value = data.data.list; detailMonitor.value = row; detailDialog.value = true }
+async function detail(row: MonitorDomain) {
+    const [historyResponse, chainResponse] = await Promise.all([listMonitorCheckHistory(row.id), getMonitorCertificateChain(row.id)])
+    historyRows.value = historyResponse.data.data.list
+    certificateChain.value = chainResponse.data.data.chain_certificates
+    detailTab.value = 'history'
+    detailMonitor.value = row
+    detailDialog.value = true
+}
 async function exportExcel() {
     exporting.value = true
     try {
@@ -277,23 +284,48 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
                     <div class="detail-item"><span>更新时间：</span><strong>{{ formatDate(detailMonitor.updated_at)
                     }}</strong></div>
                 </div>
-                <div class="history-panel">
-                    <h3>检查历史 <small>最近 {{ historyRows.length }} 条</small></h3>
-                    <div v-if="historyRows.length" class="history-timeline">
-                        <div v-for="item in historyRows" :key="item.id" class="history-entry">
-                            <span class="history-dot"></span>
-                            <div class="history-time">{{ formatDate(item.checked_at) }}</div>
-                            <div class="history-result">
-                                <span class="detail-status" :class="`is-${item.status}`">{{ statusText(item.status)
-                                }}</span>
-                                <strong>{{ item.response_time }}ms</strong>
-                                <span v-if="item.status_code" class="history-code">HTTP {{ item.status_code }}</span>
+                <el-tabs v-model="detailTab" class="detail-tabs">
+                    <el-tab-pane name="history">
+                        <template #label>检查历史 <small>({{ historyRows.length }})</small></template>
+                        <div class="history-panel">
+                            <div v-if="historyRows.length" class="history-timeline">
+                                <div v-for="item in historyRows" :key="item.id" class="history-entry">
+                                    <span class="history-dot"></span>
+                                    <div class="history-time">{{ formatDate(item.checked_at) }}</div>
+                                    <div class="history-result">
+                                        <span class="detail-status" :class="`is-${item.status}`">{{ statusText(item.status) }}</span>
+                                        <strong>{{ item.response_time }}ms</strong>
+                                        <span v-if="item.status_code" class="history-code">HTTP {{ item.status_code }}</span>
+                                    </div>
+                                    <div v-if="item.error_message" class="history-error">{{ item.error_message }}</div>
+                                </div>
                             </div>
-                            <div v-if="item.error_message" class="history-error">{{ item.error_message }}</div>
+                            <el-empty v-else description="暂无检查记录" :image-size="64" />
                         </div>
-                    </div>
-                    <el-empty v-else description="暂无检查记录" :image-size="64" />
-                </div>
+                    </el-tab-pane>
+                    <el-tab-pane name="certificate-chain">
+                        <template #label>证书链信息 <small>({{ certificateChain.length }} 级)</small></template>
+                        <div class="certificate-chain-panel">
+                            <div v-if="certificateChain.length" class="monitor-chain-list">
+                                <article v-for="item in certificateChain" :key="`${item.position}-${item.fingerprint}`">
+                                    <header><strong>第 {{ certificateChain.length - item.position + 1 }} 级 · {{ item.common_name || '未命名证书' }}</strong><span>{{ item.is_ca ? 'CA 证书' : '终端证书' }}</span></header>
+                                    <dl>
+                                        <dt>CN</dt><dd>{{ item.common_name || '—' }}</dd>
+                                        <dt>主体</dt><dd>{{ item.subject || '—' }}</dd>
+                                        <dt>签发者</dt><dd>{{ item.issuer || '—' }}</dd>
+                                        <dt>有效期</dt><dd>{{ formatDate(item.not_before) }} 至 {{ formatDate(item.not_after) }}</dd>
+                                        <dt>公钥</dt><dd>{{ item.public_key_algorithm || '—' }}{{ item.public_key_bits ? ` / ${item.public_key_bits} bit` : '' }}</dd>
+                                        <dt>签名算法</dt><dd>{{ item.signature_algorithm || '—' }}</dd>
+                                        <dt>DNS 名称</dt><dd>{{ item.dns_names?.join('、') || '—' }}</dd>
+                                        <dt>序列号</dt><dd class="chain-code">{{ item.serial_number || '—' }}</dd>
+                                        <dt>SHA-256</dt><dd class="chain-code">{{ item.fingerprint || '—' }}</dd>
+                                    </dl>
+                                </article>
+                            </div>
+                            <el-empty v-else :description="detailMonitor.enable_ssl ? '暂无已采集的证书链信息' : '该监控未启用 HTTPS'" :image-size="64" />
+                        </div>
+                    </el-tab-pane>
+                </el-tabs>
             </template>
         </el-dialog>
     </section>
@@ -479,6 +511,14 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
     max-height: 72vh;
     padding: 12px 16px 16px;
     overflow-y: auto;
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+:deep(.monitor-detail-dialog .el-dialog__body *) {
+    font-family: inherit;
+    font-size: inherit;
 }
 
 .detail-overview {
@@ -546,27 +586,90 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
     color: var(--text-muted);
 }
 
-.history-panel {
-    margin-top: 16px;
+.detail-tabs {
+    margin-top: 12px;
+}
+
+.detail-tabs :deep(.el-tabs__header) {
+    margin-bottom: 10px;
+}
+
+.detail-tabs :deep(.el-tabs__item) {
+    font-size: 11px;
+}
+
+.detail-tabs small {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.history-panel,
+.certificate-chain-panel {
     padding: 16px 20px;
     border: 1px solid var(--line);
     border-radius: 9px;
     background: #fafbfc;
 }
 
-.history-panel h3 {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin: 0 0 14px;
-    font-size: 15px;
-    color: var(--text);
+.certificate-chain-panel {
+    min-height: 120px;
 }
 
-.history-panel h3 small {
-    color: var(--text-muted);
-    font-size: 10px;
-    font-weight: 400;
+.monitor-chain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.monitor-chain-list article {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-card);
+}
+
+.monitor-chain-list article>header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    background: #f7f8fb;
+}
+
+.monitor-chain-list article>header span {
+    color: var(--primary);
+}
+
+.monitor-chain-list dl {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    margin: 0;
+}
+
+.monitor-chain-list dt,
+.monitor-chain-list dd {
+    min-width: 0;
+    margin: 0;
+    padding: 6px 9px;
+    border-bottom: 1px solid var(--line);
+    overflow-wrap: anywhere;
+}
+
+.monitor-chain-list dt {
+    background: #fafbfc;
+    color: var(--text-soft);
+    font-weight: 600;
+}
+
+.monitor-chain-list dt:last-of-type,
+.monitor-chain-list dd:last-of-type {
+    border-bottom: 0;
+}
+
+.chain-code {
+    font-family: inherit;
 }
 
 .history-timeline {
@@ -599,7 +702,6 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
 .history-time {
     margin-bottom: 7px;
     color: var(--text-muted);
-    font-size: 12px;
 }
 
 .history-result {
@@ -615,13 +717,11 @@ onMounted(() => { void Promise.all([load(), loadFilterOptions()]) })
 
 .history-code {
     color: var(--text-muted);
-    font-size: 10px;
 }
 
 .history-error {
     margin-top: 6px;
     color: #ef6262;
-    font-size: 10px;
     overflow-wrap: anywhere;
 }
 

@@ -52,6 +52,11 @@ func (r *AssetRepo) ListCloudAccounts(ctx context.Context, db *gorm.DB, cond *de
 	return do.Order(q.ID.Desc()).FindByPage(offset, limit)
 }
 
+func (r *AssetRepo) GetCloudAccount(ctx context.Context, db *gorm.DB, id int64) (*model.CloudAccount, error) {
+	q := query.Use(db).CloudAccount
+	return q.WithContext(ctx).Where(q.ID.Eq(id)).First()
+}
+
 func (r *AssetRepo) ListHosts(ctx context.Context, db *gorm.DB, cond *define.HostListCond) ([]*model.Host, int64, error) {
 	offset, limit := utils.PageBounds(cond.Page, cond.Limit)
 	q := query.Use(db).Host
@@ -77,9 +82,35 @@ func (r *AssetRepo) GetHostByIP(ctx context.Context, db *gorm.DB, ip string) (*m
 	return q.WithContext(ctx).Where(q.IP.Eq(ip)).First()
 }
 
+func (r *AssetRepo) GetCloudHostByIdentity(ctx context.Context, db *gorm.DB, name string, cloudAccountID int64, ip string, port int64) (*model.Host, error) {
+	q := query.Use(db).Host
+	return q.WithContext(ctx).Where(q.Name.Eq(name), q.CloudAccountID.Eq(cloudAccountID), q.IP.Eq(ip), q.Port.Eq(port)).First()
+}
+
 func (r *AssetRepo) GetHost(ctx context.Context, db *gorm.DB, id int64) (*model.Host, error) {
 	q := query.Use(db).Host
 	return q.WithContext(ctx).Where(q.ID.Eq(id)).First()
+}
+
+func (r *AssetRepo) UpdateHostCollectedInfo(ctx context.Context, db *gorm.DB, id int64, info *define.HostCollectedInfo) (*model.Host, error) {
+	q := query.Use(db).Host
+	_, err := q.WithContext(ctx).Where(q.ID.Eq(id)).Updates(map[string]any{
+		"status": 1, "last_seen_at": info.LastSeenAt, "os": info.OS, "kernel": info.Kernel, "arch": info.Arch,
+		"cpu_info": info.CPUInfo, "cpu_cores": info.CPUCores, "cpu_usage": info.CPUUsage,
+		"memory_total": info.MemoryTotal, "memory_used": info.MemoryUsed, "memory_usage": info.MemoryUsage,
+		"disk_total": info.DiskTotal, "disk_used": info.DiskUsed, "disk_usage": info.DiskUsage,
+		"uptime": info.Uptime, "hostname": info.Hostname,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return q.WithContext(ctx).Where(q.ID.Eq(id)).First()
+}
+
+func (r *AssetRepo) UpdateHostStatus(ctx context.Context, db *gorm.DB, id, status int64) error {
+	q := query.Use(db).Host
+	_, err := q.WithContext(ctx).Where(q.ID.Eq(id)).Update(q.Status, status)
+	return err
 }
 
 func (r *AssetRepo) GetHostAndVNCCredential(ctx context.Context, db *gorm.DB, id int64) (*model.Host, *model.Credential, error) {
@@ -146,6 +177,10 @@ func (r *AssetRepo) GetCredential(ctx context.Context, db *gorm.DB, id int64) (*
 	return q.Credential.WithContext(ctx).Where(q.Credential.ID.Eq(id)).First()
 }
 
+func (r *AssetRepo) CreateCredential(ctx context.Context, db *gorm.DB, credential *model.Credential) error {
+	return query.Use(db).Credential.WithContext(ctx).Create(credential)
+}
+
 func (r *AssetRepo) GetDBInstanceAndCredential(ctx context.Context, db *gorm.DB, id int64) (*model.DbInstance, *model.Credential, error) {
 	q := query.Use(db)
 	instance, err := q.DbInstance.WithContext(ctx).Where(q.DbInstance.ID.Eq(id)).First()
@@ -169,4 +204,10 @@ func (r *AssetRepo) UpdateDBInstanceCollectedInfo(ctx context.Context, db *gorm.
 		return nil, err
 	}
 	return q.DbInstance.WithContext(ctx).Where(q.DbInstance.ID.Eq(id)).First()
+}
+
+func (r *AssetRepo) UpdateDBInstanceStatus(ctx context.Context, db *gorm.DB, id int64, status bool) error {
+	q := query.Use(db).DbInstance
+	_, err := q.WithContext(ctx).Where(q.ID.Eq(id)).Update(q.Status, status)
+	return err
 }

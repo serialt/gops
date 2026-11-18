@@ -10,12 +10,12 @@ import (
 )
 
 var dnsProviderFields = map[string][]string{
-	"alidns":       {"access_key_id", "access_key_secret", "security_token", "region"},
-	"aliyun":       {"access_key_id", "access_key_secret", "security_token", "region"},
-	"tencentcloud": {"secret_id", "secret_key", "session_token", "region"},
-	"cloudflare":   {"api_token", "zone_token", "email", "api_key"},
-	"huaweicloud":  {"access_key_id", "secret_access_key", "region"},
-	"huawei":       {"access_key_id", "secret_access_key", "region"},
+	"alidns":       {"access_key_id", "access_key_secret", "security_token", "region", "nameservers", "dns_timeout_seconds", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"aliyun":       {"access_key_id", "access_key_secret", "security_token", "region", "nameservers", "dns_timeout_seconds", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"tencentcloud": {"secret_id", "secret_key", "session_token", "region", "nameservers", "dns_timeout_seconds", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"cloudflare":   {"api_token", "zone_token", "email", "api_key", "nameservers", "dns_timeout_seconds", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"huaweicloud":  {"access_key_id", "secret_access_key", "region", "nameservers", "dns_timeout_seconds", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"huawei":       {"access_key_id", "secret_access_key", "region", "nameservers", "dns_timeout_seconds", "propagation_timeout_seconds", "polling_interval_seconds"},
 }
 
 var dnsSecretFields = map[string]struct{}{
@@ -36,7 +36,15 @@ func parseDNSProviderConfig(provider, raw string) (map[string]string, []string, 
 		return nil, nil, fmt.Errorf("不支持的 DNS 服务商 %q", provider)
 	}
 	values := make(map[string]string)
-	if err := json.Unmarshal([]byte(raw), &values); err != nil {
+	configJSON := []byte(strings.TrimSpace(raw))
+	if len(configJSON) > 0 && configJSON[0] == '"' {
+		var encoded string
+		if err := json.Unmarshal(configJSON, &encoded); err != nil {
+			return nil, nil, errors.New("DNS 配置必须是有效 JSON")
+		}
+		configJSON = []byte(encoded)
+	}
+	if err := json.Unmarshal(configJSON, &values); err != nil {
 		return nil, nil, errors.New("DNS 配置必须是有效 JSON")
 	}
 	return values, fields, nil

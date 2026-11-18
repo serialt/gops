@@ -18,10 +18,19 @@ LDFLAGS := -s -w \
 	-X 'main.BuildTime=$(BUILD_TIME)' \
 	-X 'main.GitCommit=$(GIT_COMMIT)'
 
-PLATFORMS := linux/amd64 darwin/arm64
+PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 
-IMAGE ?= gin-vue:$(VERSION)
-IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
+IMAGE ?= registry.cn-hangzhou.aliyuncs.com/serialt/gops:$(VERSION)
+GOPS_BASE_DOCKERFILE ?= container/docker/Dockerfile.base
+GOPS_DOCKERFILE ?= container/Dockerfile
+GOPS_BASE_DEPENDENCY_FILES := go.mod go.sum web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml
+GOPS_BASE_DEPENDENCY_SHA := $(shell sha256sum $(GOPS_BASE_DEPENDENCY_FILES) 2>/dev/null | awk '{print $$1}' | sha256sum 2>/dev/null | awk '{print $$1}')
+GOPS_BASE_IMAGE_TAG ?= $(shell printf '%.12s' '$(GOPS_BASE_DEPENDENCY_SHA)')
+GOPS_BASE_IMAGE_REPOSITORY ?= registry.cn-hangzhou.aliyuncs.com/serialt/gops-base
+GOPS_BASE_IMAGE ?= $(GOPS_BASE_IMAGE_REPOSITORY):$(GOPS_BASE_IMAGE_TAG)
+#IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
+IMAGE_PLATFORMS ?= linux/amd64
+MULTIARCH_DOCKERFILE ?= container/Dockerfile
 BUILDX_BUILDER ?=
 BUILDX := docker buildx build
 ifneq ($(strip $(BUILDX_BUILDER)),)
@@ -30,7 +39,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help all deps frontend frontend-check backend build release image image-multiarch run test check wire migrate-up migrate-down migrate-status migration-create generate clean
+.PHONY: help all deps frontend frontend-check backend build release img image image-multiarch image-linux-multiarch run test check wire migrate-up migrate-down migrate-status migration-create generate clean
 
 help:
 	@echo "Gops build targets:"
@@ -39,8 +48,10 @@ help:
 	@echo "  make backend                Build backend with the current embedded resources"
 	@echo "  make build                  Build frontend and one self-contained backend binary"
 	@echo "  make release                Build self-contained binaries for all platforms"
+	@echo "  make img                    Prepare the base image and build with Docker"
 	@echo "  make image                  Build a container image for the current architecture"
-	@echo "  make image-multiarch        Build and push a linux/amd64,linux/arm64 image"
+	@echo "  make image-linux-multiarch  Build and push a multi-architecture Linux image"
+	@echo "  make image-multiarch        Alias for image-linux-multiarch"
 	@echo "  make run                    Run the backend in development mode"
 	@echo "  make test                   Run backend tests"
 	@echo "  make check                  Run backend tests and frontend type checking"
@@ -124,12 +135,61 @@ release: clean frontend
 image:
 	docker build --file container/Dockerfile --tag $(IMAGE) .
 
+# Follow the base-image preparation used by .gitea/workflows/deploy.yml. Reuse
+# the remote base image when it exists; otherwise build it before the app image.
+img:
+	@test -n "$(IMAGE)" || (echo "IMAGE is required"; exit 1)
+	@test -n "$(GOPS_BASE_IMAGE_TAG)" || (echo "Failed to calculate GOPS_BASE_IMAGE_TAG"; exit 1)
+	@test -n "$(GOPS_BASE_IMAGE)" || (echo "GOPS_BASE_IMAGE is required"; exit 1)
+	@test -f "$(GOPS_BASE_DOCKERFILE)" || (echo "Base Dockerfile not found: $(GOPS_BASE_DOCKERFILE)"; exit 1)
+	@test -f "$(GOPS_DOCKERFILE)" || (echo "Dockerfile not found: $(GOPS_DOCKERFILE)"; exit 1)
+	@set -eu; \
+	if docker manifest inspect "$(GOPS_BASE_IMAGE)" >/dev/null 2>&1; then \
+		echo "Base image exists, pulling: $(GOPS_BASE_IMAGE)"; \
+		docker pull "$(GOPS_BASE_IMAGE)"; \
+	else \
+		echo "Base image not found, building: $(GOPS_BASE_IMAGE)"; \
+		docker build --pull \
+			--tag "$(GOPS_BASE_IMAGE)" \
+			--file "$(GOPS_BASE_DOCKERFILE)" .; \
+	fi; \
+	docker build \
+		--build-arg "GOPS_BASE_IMAGE=$(GOPS_BASE_IMAGE)" \
+		--tag "$(IMAGE)" \
+		--file "$(GOPS_DOCKERFILE)" .
+
 # A multi-platform image cannot be loaded into Docker's classic local image
 # store. Publish the manifest and architecture-specific images to the registry.
-# Example: make image-multiarch IMAGE=registry.example.com/team/gops:v1.0.0
-image-multiarch:
+# Example: make image-linux-multiarch IMAGE=ghcr.io/team/gops:v1.0.0
+image-linux-multiarch:
 	@test -n "$(IMAGE)" || (echo "IMAGE is required"; exit 1)
-	$(BUILDX) --file container/Dockerfile --platform $(IMAGE_PLATFORMS) --tag $(IMAGE) --push .
+	@test -n "$(GOPS_BASE_IMAGE_TAG)" || (echo "Failed to calculate GOPS_BASE_IMAGE_TAG"; exit 1)
+	@test -n "$(GOPS_BASE_IMAGE)" || (echo "GOPS_BASE_IMAGE is required"; exit 1)
+	@test -f "$(GOPS_BASE_DOCKERFILE)" || (echo "Base Dockerfile not found: $(GOPS_BASE_DOCKERFILE)"; exit 1)
+	@test -f "$(MULTIARCH_DOCKERFILE)" || (echo "Dockerfile not found: $(MULTIARCH_DOCKERFILE)"; exit 1)
+	@set -eu; \
+	if docker manifest inspect "$(GOPS_BASE_IMAGE)" >/dev/null 2>&1; then \
+		echo "Multi-architecture base image exists: $(GOPS_BASE_IMAGE)"; \
+	else \
+		echo "Multi-architecture base image not found, building and pushing: $(GOPS_BASE_IMAGE)"; \
+		$(BUILDX) \
+			--file "$(GOPS_BASE_DOCKERFILE)" \
+			--platform "$(IMAGE_PLATFORMS)" \
+			--tag "$(GOPS_BASE_IMAGE)" \
+			--provenance=false \
+			--sbom=false \
+			--push .; \
+	fi
+	$(BUILDX) \
+		--file "$(MULTIARCH_DOCKERFILE)" \
+		--platform "$(IMAGE_PLATFORMS)" \
+		--build-arg "GOPS_BASE_IMAGE=$(GOPS_BASE_IMAGE)" \
+		--tag "$(IMAGE)" \
+		--provenance=false \
+		--sbom=false \
+		--push .
+
+image-multiarch: image-linux-multiarch
 
 run:
 	go run $(CMD_PATH)

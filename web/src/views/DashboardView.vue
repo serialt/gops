@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { getDashboardStats } from '@/api/dashboard'
 
-const stats = ref({ hosts_total: 0, hosts_online: 0, hosts_offline: 0, clusters_total: 0, nodes_total: 0, pods_total: 0, today_operations: 0, active_alerts: 0 })
+const router = useRouter()
+const stats = ref({ hosts_total: 0, hosts_online: 0, hosts_offline: 0, clusters_total: 0, clusters_offline: 0, nodes_total: 0, nodes_offline: 0, pods_total: 0, pods_abnormal: 0, domains_total: 0, domains_normal: 0, domains_abnormal: 0, domains_paused: 0, domain_certificates: [] as Array<{ domain: string; ssl_expiry: string }>, today_operations: 0, active_alerts: 0 })
 
 const topCards = computed(() => [
   {
@@ -15,7 +17,7 @@ const topCards = computed(() => [
   {
     title: 'K8s 集群',
     value: stats.value.clusters_total,
-    secondary: `节点 ${stats.value.nodes_total} · Pod ${stats.value.pods_total}`,
+    secondary: `离线 ${stats.value.clusters_offline} · 节点 ${stats.value.nodes_total} · Pod ${stats.value.pods_total}`,
     accent: 'green',
     tone: 'green',
   },
@@ -45,6 +47,16 @@ const donutStyle = computed(() => ({
 }))
 
 const dotValue = computed(() => Math.max(stats.value.hosts_online || 0, 0))
+const clustersOnline = computed(() => Math.max(stats.value.clusters_total - stats.value.clusters_offline, 0))
+const clusterOnlineRate = computed(() => stats.value.clusters_total ? Math.round((clustersOnline.value / stats.value.clusters_total) * 100) : 0)
+const nodesOnline = computed(() => Math.max(stats.value.nodes_total - stats.value.nodes_offline, 0))
+const podsNormal = computed(() => Math.max(stats.value.pods_total - stats.value.pods_abnormal, 0))
+const openHosts = () => router.push({ name: 'hosts' })
+const openClusters = () => router.push({ name: 'kubernetes-clusters' })
+const openDomains = () => router.push({ name: 'monitor-domains' })
+const expiryDays = (value: string) => Math.ceil((new Date(value).getTime() - Date.now()) / 86400000)
+const expiryText = (value: string) => { const days = expiryDays(value); return days < 0 ? `已过期 ${Math.abs(days)} 天` : days === 0 ? '今天到期' : `${days} 天后到期` }
+const expiryDate = (value: string) => value ? new Date(value).toLocaleDateString('zh-CN') : '—'
 
 onMounted(async () => {
   const { data } = await getDashboardStats()
@@ -71,7 +83,7 @@ onMounted(async () => {
       <section class="panel panel-left">
         <div class="panel-header">
           <h3>主机状态分布</h3>
-          <button class="link-btn">查看全部</button>
+          <button class="link-btn" type="button" @click="openHosts">查看全部</button>
         </div>
 
         <div class="donut-wrap">
@@ -96,25 +108,49 @@ onMounted(async () => {
       <section class="panel panel-right">
         <div class="panel-header">
           <h3>K8s 集群资源概览</h3>
-          <button class="link-btn">查看全部</button>
+          <button class="link-btn" type="button" @click="openClusters">查看全部</button>
         </div>
 
         <div class="resource-summary">
-          <div class="summary-box">
-            <div class="summary-value">{{ stats.nodes_total }}</div>
-            <div class="summary-label">节点总数</div>
+          <div class="summary-box cluster-summary">
+            <div class="cluster-total-line"><span>集群总数</span><strong>{{ stats.clusters_total }}</strong></div>
+            <div class="cluster-status-line"><span>在线 {{ clustersOnline }}</span><i>·</i><span>离线 {{ stats.clusters_offline }}</span></div>
           </div>
-          <div class="summary-box">
-            <div class="summary-value">{{ stats.pods_total }}</div>
-            <div class="summary-label">Pod 总数</div>
+          <div class="summary-box status-summary">
+            <div class="cluster-total-line"><span>节点总数</span><strong>{{ stats.nodes_total }}</strong></div>
+            <div class="cluster-status-line"><span>在线 {{ nodesOnline }}</span><i>·</i><span>离线 {{ stats.nodes_offline }}</span></div>
           </div>
-          <div class="summary-box">
-            <div class="summary-value">{{ stats.clusters_total }}</div>
-            <div class="summary-label">集群数量</div>
+          <div class="summary-box status-summary">
+            <div class="cluster-total-line"><span>Pod 总数</span><strong>{{ stats.pods_total }}</strong></div>
+            <div class="cluster-status-line"><span>正常 {{ podsNormal }}</span><i>·</i><span>异常 {{ stats.pods_abnormal }}</span></div>
           </div>
         </div>
 
-        <div class="resource-details"><div><span>平均节点数</span><strong>{{ stats.clusters_total ? (stats.nodes_total / stats.clusters_total).toFixed(1) : '0' }}</strong></div><div><span>平均 Pod 数</span><strong>{{ stats.clusters_total ? (stats.pods_total / stats.clusters_total).toFixed(1) : '0' }}</strong></div></div>
+        <div class="resource-details"><div><span>集群在线率</span><strong :class="{ 'offline-value': stats.clusters_offline > 0 }">{{ clusterOnlineRate }}%</strong></div><div><span>平均节点数</span><strong>{{ stats.clusters_total ? (stats.nodes_total / stats.clusters_total).toFixed(1) : '0' }}</strong></div><div><span>平均 Pod 数</span><strong>{{ stats.clusters_total ? (stats.pods_total / stats.clusters_total).toFixed(1) : '0' }}</strong></div></div>
+      </section>
+
+      <section class="panel domain-panel">
+        <div class="panel-header">
+          <h3>域名监控概览</h3>
+          <button class="link-btn" type="button" @click="openDomains">查看全部</button>
+        </div>
+        <div class="domain-summary">
+          <div class="domain-status-summary">
+            <div class="cluster-total-line"><span>监控总数</span><strong>{{ stats.domains_total }}</strong></div>
+            <div class="domain-status-line"><span class="normal">正常 {{ stats.domains_normal }}</span><i>·</i><span class="abnormal">异常 {{ stats.domains_abnormal }}</span><i>·</i><span class="paused">暂停 {{ stats.domains_paused }}</span></div>
+          </div>
+        </div>
+        <div class="certificate-expiry">
+          <div class="certificate-expiry-head"><strong>证书到期时间</strong><span>按到期时间正序</span></div>
+          <div v-if="stats.domain_certificates.length" class="certificate-expiry-list">
+            <div v-for="item in stats.domain_certificates" :key="`${item.domain}-${item.ssl_expiry}`" class="certificate-expiry-row">
+              <span class="certificate-domain">{{ item.domain }}</span>
+              <time>{{ expiryDate(item.ssl_expiry) }}</time>
+              <strong :class="{ danger: expiryDays(item.ssl_expiry) <= 10, warning: expiryDays(item.ssl_expiry) > 10 && expiryDays(item.ssl_expiry) <= 30 }">{{ expiryText(item.ssl_expiry) }}</strong>
+            </div>
+          </div>
+          <div v-else class="certificate-expiry-empty">暂无已采集证书到期时间的域名</div>
+        </div>
       </section>
     </div>
   </div>
@@ -227,6 +263,123 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 16px;
   box-shadow: var(--shadow);
+}
+
+.domain-panel {
+  grid-column: 1 / -1;
+}
+
+.domain-summary {
+  display: block;
+}
+
+.domain-status-summary {
+  display: flex;
+  min-width: 0;
+  min-height: 78px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.domain-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 7px;
+  font-size: 11px;
+}
+
+.domain-status-line .normal {
+  color: var(--success);
+}
+
+.domain-status-line .abnormal {
+  color: var(--danger);
+}
+
+.domain-status-line .paused,
+.domain-status-line i {
+  color: var(--text-muted);
+}
+
+.domain-status-line i {
+  font-style: normal;
+}
+
+.certificate-expiry {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.certificate-expiry-head,
+.certificate-expiry-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 140px 120px;
+  align-items: center;
+  gap: 12px;
+}
+
+.certificate-expiry-head {
+  padding: 9px 12px;
+  background: var(--bg-soft);
+}
+
+.certificate-expiry-head strong {
+  font-size: 12px;
+}
+
+.certificate-expiry-head span {
+  grid-column: 2 / -1;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: right;
+}
+
+.certificate-expiry-row {
+  min-height: 38px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.certificate-domain {
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.certificate-expiry-row time {
+  color: var(--text-secondary);
+}
+
+.certificate-expiry-row strong {
+  color: var(--success);
+  text-align: right;
+}
+
+.certificate-expiry-row strong.warning {
+  color: var(--warning);
+}
+
+.certificate-expiry-row strong.danger {
+  color: var(--danger);
+}
+
+.certificate-expiry-empty {
+  padding: 18px 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
 }
 
 .panel-header {
@@ -366,6 +519,52 @@ onMounted(async () => {
   text-align: center;
 }
 
+.cluster-summary,
+.status-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.cluster-total-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.cluster-total-line strong {
+  color: var(--text);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.cluster-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 7px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.cluster-status-line span:first-child {
+  color: var(--success);
+}
+
+.cluster-status-line span:last-child {
+  color: var(--danger);
+}
+
+.cluster-status-line i {
+  color: var(--text-muted);
+  font-style: normal;
+}
+
 .summary-value {
   font-size: 34px;
   font-weight: 800;
@@ -378,9 +577,17 @@ onMounted(async () => {
   color: #5c6978;
 }
 
+.summary-value--online {
+  color: var(--success);
+}
+
+.summary-value--offline {
+  color: var(--danger);
+}
+
 .resource-details {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-top: 22px;
 }
@@ -400,6 +607,10 @@ onMounted(async () => {
 .resource-details strong {
   color: var(--text);
   font-size: 24px;
+}
+
+.resource-details strong.offline-value {
+  color: var(--danger);
 }
 
 .chart-area {
@@ -509,6 +720,28 @@ onMounted(async () => {
 
   .summary-value {
     font-size: 26px;
+  }
+
+  .resource-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cluster-summary {
+    grid-column: 1 / -1;
+  }
+
+  .resource-details {
+    grid-template-columns: 1fr;
+  }
+
+  .certificate-expiry-head,
+  .certificate-expiry-row {
+    grid-template-columns: minmax(0, 1fr) 92px;
+  }
+
+  .certificate-expiry-head span,
+  .certificate-expiry-row strong {
+    display: none;
   }
 }
 </style>

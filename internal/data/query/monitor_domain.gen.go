@@ -49,6 +49,8 @@ func newMonitorDomain(db *gorm.DB, opts ...gen.DOOption) monitorDomain {
 	_monitorDomain.CreatedAt = field.NewTime(tableName, "created_at")
 	_monitorDomain.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_monitorDomain.DeletedAt = field.NewField(tableName, "deleted_at")
+	_monitorDomain.SslCertificateChain = field.NewString(tableName, "ssl_certificate_chain")
+	_monitorDomain.SslCertificateChainHash = field.NewString(tableName, "ssl_certificate_chain_hash")
 
 	_monitorDomain.fillFieldMap()
 
@@ -58,29 +60,31 @@ func newMonitorDomain(db *gorm.DB, opts ...gen.DOOption) monitorDomain {
 type monitorDomain struct {
 	monitorDomainDo monitorDomainDo
 
-	ALL               field.Asterisk
-	ID                field.Int64
-	Domain            field.String
-	Port              field.Int64
-	RequestClient     field.String
-	Status            field.String
-	ResponseTime      field.Int64
-	SslValid          field.Bool
-	SslExpiry         field.Time
-	SslRootCa         field.String
-	CheckInterval     field.Int64
-	CheckJitter       field.Int64
-	EnableSsl         field.Bool
-	VerifyCertificate field.Bool
-	EnableAlert       field.Bool
-	ResponseThreshold field.Int64
-	SslExpiryDays     field.Int64
-	LastCheck         field.Time
-	NextCheck         field.Time
-	LastError         field.String
-	CreatedAt         field.Time
-	UpdatedAt         field.Time
-	DeletedAt         field.Field
+	ALL                     field.Asterisk
+	ID                      field.Int64
+	Domain                  field.String
+	Port                    field.Int64
+	RequestClient           field.String
+	Status                  field.String
+	ResponseTime            field.Int64
+	SslValid                field.Bool
+	SslExpiry               field.Time
+	SslRootCa               field.String
+	CheckInterval           field.Int64
+	CheckJitter             field.Int64
+	EnableSsl               field.Bool
+	VerifyCertificate       field.Bool
+	EnableAlert             field.Bool
+	ResponseThreshold       field.Int64
+	SslExpiryDays           field.Int64
+	LastCheck               field.Time
+	NextCheck               field.Time
+	LastError               field.String
+	CreatedAt               field.Time
+	UpdatedAt               field.Time
+	DeletedAt               field.Field
+	SslCertificateChain     field.String
+	SslCertificateChainHash field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -119,6 +123,8 @@ func (m *monitorDomain) updateTableName(table string) *monitorDomain {
 	m.CreatedAt = field.NewTime(table, "created_at")
 	m.UpdatedAt = field.NewTime(table, "updated_at")
 	m.DeletedAt = field.NewField(table, "deleted_at")
+	m.SslCertificateChain = field.NewString(table, "ssl_certificate_chain")
+	m.SslCertificateChainHash = field.NewString(table, "ssl_certificate_chain_hash")
 
 	m.fillFieldMap()
 
@@ -147,7 +153,7 @@ func (m *monitorDomain) GetFieldByName(fieldName string) (field.OrderExpr, bool)
 }
 
 func (m *monitorDomain) fillFieldMap() {
-	m.fieldMap = make(map[string]field.Expr, 22)
+	m.fieldMap = make(map[string]field.Expr, 24)
 	m.fieldMap["id"] = m.ID
 	m.fieldMap["domain"] = m.Domain
 	m.fieldMap["port"] = m.Port
@@ -170,6 +176,8 @@ func (m *monitorDomain) fillFieldMap() {
 	m.fieldMap["created_at"] = m.CreatedAt
 	m.fieldMap["updated_at"] = m.UpdatedAt
 	m.fieldMap["deleted_at"] = m.DeletedAt
+	m.fieldMap["ssl_certificate_chain"] = m.SslCertificateChain
+	m.fieldMap["ssl_certificate_chain_hash"] = m.SslCertificateChainHash
 }
 
 func (m monitorDomain) clone(db *gorm.DB) monitorDomain {

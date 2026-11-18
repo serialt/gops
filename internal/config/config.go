@@ -49,11 +49,17 @@ func (c IOTListener) IsEnabled() bool { return c.Enabled != nil && *c.Enabled }
 
 type Server struct {
 	HttpPort            int64         `json:"http_port" yaml:"http_port"`
+	Metrics             Metrics       `json:"metrics" yaml:"metrics"`
 	JwtSecret           string        `json:"jwt_secret" yaml:"jwt_secret"`
 	AESKey              string        `json:"aes_key" yaml:"aes_key"`
 	JwtTimeout          time.Duration `json:"jwt_timeout" yaml:"jwt_timeout"`
 	AccessTokenTimeout  time.Duration `json:"access_token_timeout" yaml:"access_token_timeout"`
 	RefreshTokenTimeout time.Duration `json:"refresh_token_timeout" yaml:"refresh_token_timeout"`
+}
+
+type Metrics struct {
+	Enabled  bool  `json:"enabled" yaml:"enabled"`
+	HTTPPort int64 `json:"http_port" yaml:"http_port"`
 }
 
 type Log struct {
@@ -67,6 +73,9 @@ func NewConfig(cfgPath string) (cfg *Config) {
 
 	if cfg.Log.Level == "" {
 		cfg.Log.Level = "info"
+	}
+	if cfg.Server.Metrics.HTTPPort <= 0 {
+		cfg.Server.Metrics.HTTPPort = 9877
 	}
 	if cfg.Server.AccessTokenTimeout <= 0 {
 		cfg.Server.AccessTokenTimeout = 15 * time.Minute

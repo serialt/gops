@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"gops/internal/data/model"
@@ -17,6 +19,7 @@ import (
 	"github.com/go-acme/lego/v5/certcrypto"
 	"github.com/go-acme/lego/v5/certificate"
 	"github.com/go-acme/lego/v5/challenge"
+	"github.com/go-acme/lego/v5/challenge/dns01"
 	"github.com/go-acme/lego/v5/lego"
 	"github.com/go-acme/lego/v5/providers/dns/alidns"
 	"github.com/go-acme/lego/v5/providers/dns/cloudflare"
@@ -24,6 +27,8 @@ import (
 	"github.com/go-acme/lego/v5/providers/dns/tencentcloud"
 	"github.com/go-acme/lego/v5/registration"
 )
+
+var acmeDNSResolverMu sync.Mutex
 
 type legoUser struct {
 	email        string
@@ -60,6 +65,16 @@ type huaweiCloudDNSConfig struct {
 	AccessKeyID     string `json:"access_key_id"`
 	SecretAccessKey string `json:"secret_access_key"`
 	Region          string `json:"region"`
+}
+
+type acmeDNSProviderTimeout struct {
+	challenge.Provider
+	propagationTimeout time.Duration
+	pollingInterval    time.Duration
+}
+
+func (p *acmeDNSProviderTimeout) Timeout() (time.Duration, time.Duration) {
+	return p.propagationTimeout, p.pollingInterval
 }
 
 func newLegoDNSProvider(aesKey string, row *model.SslDNSProvider) (challenge.Provider, error) {
@@ -142,6 +157,9 @@ func (b *SSLCertBiz) runACMETask(taskID, certificateID int64) {
 }
 
 func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCertificate) (*certificate.Resource, error) {
+	acmeDNSResolverMu.Lock()
+	defer acmeDNSResolverMu.Unlock()
+
 	if strings.TrimSpace(cert.AcmeEmail) == "" {
 		return nil, errors.New("ACME 邮箱不能为空")
 	}
@@ -152,9 +170,38 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 	if !providerRow.Enabled {
 		return nil, errors.New("DNS 配置未启用")
 	}
+	plainConfig, err := decryptDNSProviderConfig(b.aesKey, providerRow.Provider, providerRow.Config)
+	if err != nil {
+		return nil, err
+	}
+	var resolverConfig struct {
+		Nameservers               string          `json:"nameservers"`
+		DNSTimeoutSeconds         json.RawMessage `json:"dns_timeout_seconds"`
+		PropagationTimeoutSeconds json.RawMessage `json:"propagation_timeout_seconds"`
+		PollingIntervalSeconds    json.RawMessage `json:"polling_interval_seconds"`
+	}
+	if err = json.Unmarshal([]byte(plainConfig), &resolverConfig); err != nil {
+		return nil, fmt.Errorf("解析 DNS 配置: %w", err)
+	}
+	if nameservers := parseDNSNameservers(resolverConfig.Nameservers); len(nameservers) > 0 {
+		previousClient := dns01.DefaultClient()
+		options := dns01.NewOptions()
+		options.RecursiveNameservers = nameservers
+		options.Timeout = parseACMEDNSTimeout(parseDNSConfigSeconds(resolverConfig.DNSTimeoutSeconds))
+		dns01.SetDefaultClient(dns01.NewClient(options))
+		defer dns01.SetDefaultClient(previousClient)
+	}
 	dnsProvider, err := newLegoDNSProvider(b.aesKey, providerRow)
 	if err != nil {
 		return nil, err
+	}
+	propagationTimeout, pollingInterval := parseACMEDNSTimeouts(parseDNSConfigSeconds(resolverConfig.PropagationTimeoutSeconds), parseDNSConfigSeconds(resolverConfig.PollingIntervalSeconds))
+	if propagationTimeout > 0 || pollingInterval > 0 {
+		dnsProvider = &acmeDNSProviderTimeout{
+			Provider:           dnsProvider,
+			propagationTimeout: propagationTimeout,
+			pollingInterval:    pollingInterval,
+		}
 	}
 	accountKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -202,6 +249,48 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 		return nil, fmt.Errorf("申请 ACME 证书: %w", err)
 	}
 	return resource, nil
+}
+
+func parseDNSConfigSeconds(raw json.RawMessage) int64 {
+	if len(raw) == 0 {
+		return 0
+	}
+	var text string
+	if raw[0] == '"' {
+		if err := json.Unmarshal(raw, &text); err == nil {
+			parsed, _ := strconv.ParseInt(text, 10, 64)
+			return parsed
+		}
+		return 0
+	}
+	var number int64
+	if err := json.Unmarshal(raw, &number); err == nil {
+		return number
+	}
+	return 0
+}
+
+func parseACMEDNSTimeout(seconds int64) time.Duration {
+	if seconds <= 0 || seconds > 60 {
+		seconds = 10
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func parseACMEDNSTimeouts(propagationSeconds, pollingSeconds int64) (time.Duration, time.Duration) {
+	if propagationSeconds <= 0 || propagationSeconds > 3600 {
+		propagationSeconds = 180
+	}
+	if pollingSeconds <= 0 || pollingSeconds > 300 {
+		pollingSeconds = int64(dns01.DefaultPollingInterval / time.Second)
+	}
+	return time.Duration(propagationSeconds) * time.Second, time.Duration(pollingSeconds) * time.Second
+}
+
+func parseDNSNameservers(value string) []string {
+	return strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\r' || r == '\t' || r == ' '
+	})
 }
 
 func (b *SSLCertBiz) finishACMETask(ctx context.Context, task *model.SslTask, cert *model.SslCertificate, resource *certificate.Resource, taskErr error) {
