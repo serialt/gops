@@ -9,7 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"gops/docs"
 	"gops/internal/config"
@@ -143,10 +145,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize: %v", err)
 	}
-	defer cleanup()
+	stopSignals := make(chan os.Signal, 1)
+	signal.Notify(stopSignals, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-stopSignals
+		log.Printf("Shutting down server")
+		cleanup()
+	}()
+	defer signal.Stop(stopSignals)
 
 	log.Printf("Running server at :%v", cfg.Server.HttpPort)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		cleanup()
 		log.Fatalf("server failed: %v", err)
 	}
+	cleanup()
 }
