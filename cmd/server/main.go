@@ -31,6 +31,7 @@ var (
 	CheckCfg    bool
 	GenModel    bool
 	GenTable    bool
+	AutoMigrate bool
 	UserCommand string
 	GenTableDir = "sql"
 	Args        []string
@@ -43,6 +44,7 @@ func init() {
 	flag.StringVar(&ConfigFile, "c", "config.yaml", "Config file")
 	flag.StringVar(&UserCommand, "u", "", "user command: list, create, reset")
 	flag.BoolVar(&GenTable, "t", false, "goose cmd")
+	flag.BoolVar(&AutoMigrate, "m", true, "apply database migrations before startup")
 	flag.Parse()
 	Args = flag.Args()
 }
@@ -78,6 +80,15 @@ func seedDatabase(cfg *config.Config) error {
 	return nil
 }
 
+func migrateAndSeed(cfg *config.Config) {
+	if err := data.GenTable(cfg, docs.Migrations, []string{"up"}, GenTableDir); err != nil {
+		log.Fatalf("failed to migrate database: %v", err)
+	}
+	if err := seedDatabase(cfg); err != nil {
+		log.Fatalf("failed to initialize database: %v", err)
+	}
+}
+
 func main() {
 	cfg := config.NewConfig(ConfigFile)
 	if appVersion {
@@ -108,14 +119,12 @@ func main() {
 		}
 		return
 	}
-	if sqliteDatabaseMissing(cfg.Dsn) {
+	if AutoMigrate {
+		slog.Info("applying database migrations before startup", "dsn", cfg.Dsn)
+		migrateAndSeed(cfg)
+	} else if sqliteDatabaseMissing(cfg.Dsn) {
 		slog.Info("SQLite database does not exist; applying migrations", "dsn", cfg.Dsn)
-		if err := data.GenTable(cfg, docs.Migrations, []string{"up"}, GenTableDir); err != nil {
-			log.Fatalf("failed to migrate database: %v", err)
-		}
-		if err := seedDatabase(cfg); err != nil {
-			log.Fatalf("failed to initialize database: %v", err)
-		}
+		migrateAndSeed(cfg)
 	}
 	loggger := sugar.New(
 		sugar.WithShort(true),

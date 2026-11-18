@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -200,10 +201,18 @@ func (b *SSLCertBiz) RenewCertificate(ctx context.Context, id int64) (*api.SSLTa
 		return nil, err
 	}
 	if cert.SourceType != "acme" {
-		return nil, errors.New("仅 ACME 证书支持自动续期")
+		return nil, errors.New("仅 ACME 证书支持续签或签发")
+	}
+	taskType := "issue"
+	if hasIssuedCertificate(cert) {
+		taskType = "renew"
 	}
 	now := time.Now()
-	task := &model.SslTask{CertificateID: id, TaskType: "renew", Status: "pending", TriggerType: "manual", CreatedAt: now, UpdatedAt: now}
+	cert.Status, cert.LastError, cert.UpdatedAt = "pending", "", now
+	if err := b.repo.SaveCertificate(ctx, b.db, cert); err != nil {
+		return nil, err
+	}
+	task := &model.SslTask{CertificateID: id, TaskType: taskType, Status: "pending", TriggerType: "manual", CreatedAt: now, UpdatedAt: now}
 	if err := b.repo.CreateTask(ctx, b.db, task); err != nil {
 		return nil, err
 	}
@@ -268,7 +277,9 @@ func (b *SSLCertBiz) GetDNSProvider(ctx context.Context, id int64) (*api.SSLDNSP
 		return nil, err
 	}
 	response := dnsResponse(row, false)
-	response.Config = maskedConfig
+	if err := applyMaskedDNSProviderConfig(response, maskedConfig); err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 func (b *SSLCertBiz) SaveDNSProvider(ctx context.Context, req *api.SSLDNSProviderRequest) (*api.SSLDNSProviderResponse, error) {
@@ -284,7 +295,11 @@ func (b *SSLCertBiz) SaveDNSProvider(ctx context.Context, req *api.SSLDNSProvide
 	if old != nil && strings.EqualFold(old.Provider, req.Provider) {
 		oldConfig = old.Config
 	}
-	encryptedConfig, err := encryptDNSProviderConfig(b.aesKey, req.Provider, req.Config, oldConfig)
+	rawConfig, err := dnsProviderRequestJSON(req)
+	if err != nil {
+		return nil, err
+	}
+	encryptedConfig, err := encryptDNSProviderConfig(b.aesKey, req.Provider, rawConfig, oldConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +317,9 @@ func (b *SSLCertBiz) SaveDNSProvider(ctx context.Context, req *api.SSLDNSProvide
 		return nil, err
 	}
 	response := dnsResponse(row, false)
-	response.Config = maskedConfig
+	if err := applyMaskedDNSProviderConfig(response, maskedConfig); err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 func (b *SSLCertBiz) DeleteDNSProvider(ctx context.Context, id int64) error {
@@ -482,8 +499,12 @@ func certificateKeyAlgorithm(cert *x509.Certificate) string {
 		return strings.ToLower(cert.PublicKeyAlgorithm.String())
 	}
 }
+func hasIssuedCertificate(cert *model.SslCertificate) bool {
+	return cert != nil && strings.TrimSpace(cert.Certificate) != "" && strings.TrimSpace(cert.PrivateKey) != ""
+}
+
 func certificateResponse(x *model.SslCertificate) *api.SSLCertificateResponse {
-	return &api.SSLCertificateResponse{ID: x.ID, Name: x.Name, Domain: x.Domain, SanDomains: x.SanDomains, AcmeEmail: x.AcmeEmail, CaProvider: x.CaProvider, KeyAlgorithm: x.KeyAlgorithm, SourceType: x.SourceType, CloudAccountID: x.CloudAccountID, DNSProviderID: x.DNSProviderID, Issuer: x.Issuer, Fingerprint: x.Fingerprint, Status: x.Status, AutoRenew: x.AutoRenew, RenewDaysBefore: x.RenewDaysBefore, NotBefore: nonZeroTime(x.NotBefore), NotAfter: nonZeroTime(x.NotAfter), LastRenewAt: nonZeroTime(x.LastRenewAt), LastError: x.LastError, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
+	return &api.SSLCertificateResponse{ID: x.ID, Name: x.Name, Domain: x.Domain, SanDomains: x.SanDomains, AcmeEmail: x.AcmeEmail, CaProvider: x.CaProvider, KeyAlgorithm: x.KeyAlgorithm, SourceType: x.SourceType, CloudAccountID: x.CloudAccountID, DNSProviderID: x.DNSProviderID, Issuer: x.Issuer, Fingerprint: x.Fingerprint, Status: x.Status, AutoRenew: x.AutoRenew, RenewDaysBefore: x.RenewDaysBefore, NotBefore: nonZeroTime(x.NotBefore), NotAfter: nonZeroTime(x.NotAfter), LastRenewAt: nonZeroTime(x.LastRenewAt), LastError: x.LastError, HasCertificate: hasIssuedCertificate(x), CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
 }
 func certificateDetailResponse(x *model.SslCertificate) *api.SSLCertificateDetailResponse {
 	_, bundledChain := splitCertificateBundle(x.Certificate)
@@ -550,19 +571,30 @@ func parseCertificateChain(value string) ([]*api.SSLCertificateChainResponse, er
 			continue
 		}
 		seen[fingerprint] = struct{}{}
-		result = append(result, &api.SSLCertificateChainResponse{
-			Position:     len(result) + 1,
-			Version:      cert.Version,
-			CommonName:   cert.Subject.CommonName,
-			Subject:      cert.Subject.String(),
-			Issuer:       cert.Issuer.String(),
-			SerialNumber: strings.ToUpper(cert.SerialNumber.Text(16)),
-			DNSNames:     cert.DNSNames, EmailAddresses: cert.EmailAddresses, IPAddresses: certificateIPAddresses(cert), URIs: certificateURIs(cert), NotBefore: nonZeroTime(cert.NotBefore), NotAfter: nonZeroTime(cert.NotAfter), Fingerprint: fingerprint, IsCA: cert.IsCA, BasicConstraints: cert.BasicConstraintsValid, MaxPathLen: cert.MaxPathLen, MaxPathLenZero: cert.MaxPathLenZero, SignatureAlgorithm: cert.SignatureAlgorithm.String(), PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(), PublicKeyBits: certificatePublicKeyBits(cert), KeyUsage: certificateKeyUsages(cert.KeyUsage), ExtKeyUsage: certificateExtKeyUsages(cert.ExtKeyUsage), SubjectKeyID: strings.ToUpper(hex.EncodeToString(cert.SubjectKeyId)), AuthorityKeyID: strings.ToUpper(hex.EncodeToString(cert.AuthorityKeyId)), OCSPServers: cert.OCSPServer, IssuerURLs: cert.IssuingCertificateURL, CRLPoints: cert.CRLDistributionPoints, Policies: certificatePolicies(cert)})
+		result = append(result, certificateChainResponse(cert, len(result)+1, fingerprint))
 	}
 	if strings.TrimSpace(value) != "" && len(result) == 0 {
 		return result, errors.New("证书链中未找到 X.509 证书")
 	}
 	return result, nil
+}
+
+func certificateChainResponse(cert *x509.Certificate, position int, fingerprint string) *api.SSLCertificateChainResponse {
+	if fingerprint == "" {
+		sum := sha256.Sum256(cert.Raw)
+		fingerprint = strings.ToUpper(hex.EncodeToString(sum[:]))
+	}
+	return &api.SSLCertificateChainResponse{
+		Position: position, Version: cert.Version, CommonName: cert.Subject.CommonName, Subject: cert.Subject.String(),
+		Issuer: cert.Issuer.String(), SerialNumber: strings.ToUpper(cert.SerialNumber.Text(16)), DNSNames: cert.DNSNames,
+		EmailAddresses: cert.EmailAddresses, IPAddresses: certificateIPAddresses(cert), URIs: certificateURIs(cert),
+		NotBefore: nonZeroTime(cert.NotBefore), NotAfter: nonZeroTime(cert.NotAfter), Fingerprint: fingerprint,
+		IsCA: cert.IsCA, BasicConstraints: cert.BasicConstraintsValid, MaxPathLen: cert.MaxPathLen, MaxPathLenZero: cert.MaxPathLenZero,
+		SignatureAlgorithm: cert.SignatureAlgorithm.String(), PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
+		PublicKeyBits: certificatePublicKeyBits(cert), KeyUsage: certificateKeyUsages(cert.KeyUsage), ExtKeyUsage: certificateExtKeyUsages(cert.ExtKeyUsage),
+		SubjectKeyID: strings.ToUpper(hex.EncodeToString(cert.SubjectKeyId)), AuthorityKeyID: strings.ToUpper(hex.EncodeToString(cert.AuthorityKeyId)),
+		OCSPServers: cert.OCSPServer, IssuerURLs: cert.IssuingCertificateURL, CRLPoints: cert.CRLDistributionPoints, Policies: certificatePolicies(cert),
+	}
 }
 
 func certificatePublicKeyBits(cert *x509.Certificate) int {
@@ -628,12 +660,62 @@ func certificateExtKeyUsages(usages []x509.ExtKeyUsage) []string {
 	}
 	return values
 }
-func dnsResponse(x *model.SslDNSProvider, detail bool) *api.SSLDNSProviderResponse {
-	config := ""
-	if detail {
-		config = x.Config
+func dnsProviderRequestJSON(req *api.SSLDNSProviderRequest) (string, error) {
+	values := map[string]any{
+		"access_key_id": req.AccessKeyID, "access_key_secret": req.AccessKeySecret,
+		"security_token": req.SecurityToken, "secret_id": req.SecretID, "secret_key": req.SecretKey,
+		"session_token": req.SessionToken, "api_token": req.APIToken, "zone_token": req.ZoneToken,
+		"email": req.CloudflareEmail, "api_key": req.APIKey, "secret_access_key": req.SecretAccessKey,
+		"region": req.Region, "nameservers": req.Nameservers,
+		"dns_timeout_seconds":         strconv.FormatInt(req.DNSTimeoutSeconds, 10),
+		"propagation_timeout_seconds": strconv.FormatInt(req.PropagationTimeoutSeconds, 10),
+		"polling_interval_seconds":    strconv.FormatInt(req.PollingIntervalSeconds, 10),
 	}
-	return &api.SSLDNSProviderResponse{ID: x.ID, Name: x.Name, Provider: x.Provider, Config: config, Email: x.Email, Phone: x.Phone, Enabled: x.Enabled, LastTestAt: nonZeroTime(x.LastTestAt), LastTestOk: x.LastTestOk, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
+	encoded, err := json.Marshal(values)
+	return string(encoded), err
+}
+
+func applyMaskedDNSProviderConfig(response *api.SSLDNSProviderResponse, masked string) error {
+	values := make(map[string]any)
+	if err := json.Unmarshal([]byte(masked), &values); err != nil {
+		return err
+	}
+	response.AccessKeyID, _ = values["access_key_id"].(string)
+	response.AccessKeySecret, _ = values["access_key_secret"].(string)
+	response.SecurityToken, _ = values["security_token"].(string)
+	response.SecretID, _ = values["secret_id"].(string)
+	response.SecretKey, _ = values["secret_key"].(string)
+	response.SessionToken, _ = values["session_token"].(string)
+	response.APIToken, _ = values["api_token"].(string)
+	response.ZoneToken, _ = values["zone_token"].(string)
+	response.CloudflareEmail, _ = values["email"].(string)
+	response.APIKey, _ = values["api_key"].(string)
+	response.SecretAccessKey, _ = values["secret_access_key"].(string)
+	response.Region, _ = values["region"].(string)
+	response.Nameservers, _ = values["nameservers"].(string)
+	response.DNSTimeoutSeconds = dnsConfigInt64(values["dns_timeout_seconds"])
+	response.PropagationTimeoutSeconds = dnsConfigInt64(values["propagation_timeout_seconds"])
+	response.PollingIntervalSeconds = dnsConfigInt64(values["polling_interval_seconds"])
+	return nil
+}
+
+func dnsConfigInt64(value any) int64 {
+	switch number := value.(type) {
+	case float64:
+		return int64(number)
+	case string:
+		parsed, _ := strconv.ParseInt(number, 10, 64)
+		return parsed
+	case json.Number:
+		parsed, _ := number.Int64()
+		return parsed
+	default:
+		return 0
+	}
+}
+
+func dnsResponse(x *model.SslDNSProvider, detail bool) *api.SSLDNSProviderResponse {
+	return &api.SSLDNSProviderResponse{ID: x.ID, Name: x.Name, Provider: x.Provider, Email: x.Email, Phone: x.Phone, Enabled: x.Enabled, LastTestAt: nonZeroTime(x.LastTestAt), LastTestOk: x.LastTestOk, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
 }
 func deployResponse(x *model.SslDeployConfig, certName string) *api.SSLDeployConfigResponse {
 	return &api.SSLDeployConfigResponse{ID: x.ID, CertificateID: x.CertificateID, CertificateName: certName, Name: x.Name, DeployType: x.DeployType, TargetConfig: x.TargetConfig, AutoDeploy: x.AutoDeploy, Enabled: x.Enabled, LastDeployAt: nonZeroTime(x.LastDeployAt), LastDeployOk: x.LastDeployOk, LastError: x.LastError, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}

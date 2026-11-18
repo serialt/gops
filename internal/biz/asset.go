@@ -33,6 +33,7 @@ type AssetBiz struct {
 	log              *slog.Logger
 	sftpTransferMu   sync.RWMutex
 	sftpTransfers    map[string]*api.SFTPTransferProgressResponse
+	sftpCancels      map[string]context.CancelFunc
 	collectionMu     sync.Mutex
 	hostFailures     map[int64]int
 	databaseFailures map[int64]int
@@ -75,7 +76,7 @@ func cloudRegions(values ...string) []*api.CloudRegionOptionResponse {
 }
 
 func NewAssetBiz(db *gorm.DB, assetRepo *repo.AssetRepo, cfg *config.Config, log *slog.Logger) *AssetBiz {
-	return &AssetBiz{db: db, repo: assetRepo, aesKey: cfg.Server.AESKey, log: log, sftpTransfers: make(map[string]*api.SFTPTransferProgressResponse), hostFailures: make(map[int64]int), databaseFailures: make(map[int64]int)}
+	return &AssetBiz{db: db, repo: assetRepo, aesKey: cfg.Server.AESKey, log: log, sftpTransfers: make(map[string]*api.SFTPTransferProgressResponse), sftpCancels: make(map[string]context.CancelFunc), hostFailures: make(map[int64]int), databaseFailures: make(map[int64]int)}
 }
 
 // CloudProviderOptions 返回后端定义的云服务商与区域枚举。
@@ -298,6 +299,20 @@ func (b *AssetBiz) ListCredentials(ctx context.Context, req *api.CredentialListR
 		result = append(result, credentialResponse(*r))
 	}
 	return &api.PageResponse[*api.CredentialResponse]{List: result, Total: total}, nil
+}
+func (b *AssetBiz) CopyCredential(ctx context.Context, req *api.CredentialIDRequest) (*api.CredentialResponse, error) {
+	row, err := b.repo.GetCredential(ctx, b.db, req.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	copy := &model.Credential{Name: row.Name + " 副本", CredentialType: row.CredentialType, Username: row.Username, Password: row.Password, PrivateKey: row.PrivateKey, Passphrase: row.Passphrase, Description: row.Description}
+	if err = b.repo.CreateCredential(ctx, b.db, copy); err != nil {
+		return nil, err
+	}
+	return credentialResponse(*copy), nil
 }
 func (b *AssetBiz) CreateCredential(req *api.CredentialRequest) (*api.CredentialResponse, error) {
 	row, err := b.credentialModel(req)

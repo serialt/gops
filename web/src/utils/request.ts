@@ -77,6 +77,7 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   (response) => response,
   async (error) => {
+    if (axios.isCancel(error)) return Promise.reject(error)
     const status = error.response?.status
     const message = error.response?.data?.message || error.message || '请求失败'
     if (status === 401) {

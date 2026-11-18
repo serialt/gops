@@ -64,11 +64,13 @@ type SSHConnection struct {
 	output       io.Reader
 	recording    string
 	commandCount int64
+	keepAliveStop chan struct{}
+	stopKeepAlive sync.Once
 	mu           sync.Mutex
 }
 
 // ListSFTP lists the entries in a remote directory over the host's SSH connection.
-func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) (*api.PageResponse[*api.SFTPEntryResponse], error) {
+func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) (*api.SFTPListResponse, error) {
 	_, client, err := b.dialHostSSH(req.HostID)
 	if err != nil {
 		return nil, err
@@ -79,9 +81,14 @@ func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) (*api.PageResponse[*api.SF
 		return nil, fmt.Errorf("create SFTP client: %w", err)
 	}
 	defer sftpClient.Close()
-	directory := path.Clean(req.Path)
-	if directory == "." || directory == "" {
-		directory = "/"
+	directory := strings.TrimSpace(req.Path)
+	if directory == "" {
+		directory, err = sftpClient.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("read SFTP home directory: %w", err)
+		}
+	} else {
+		directory = path.Clean(directory)
 	}
 	entries, err := sftpClient.ReadDir(directory)
 	if err != nil {
@@ -99,7 +106,7 @@ func (b *AssetBiz) ListSFTP(req *api.SFTPListRequest) (*api.PageResponse[*api.SF
 		})
 	}
 	page, total := slicePage(result, req.Page, req.Limit)
-	return &api.PageResponse[*api.SFTPEntryResponse]{List: page, Total: total}, nil
+	return &api.SFTPListResponse{List: page, Total: total, Path: directory}, nil
 }
 
 // UploadSFTP uploads files into a remote directory over the host's SSH connection.
@@ -108,9 +115,11 @@ func (b *AssetBiz) UploadSFTP(hostID int64, directory, transferID string, files 
 	for _, header := range files {
 		total += header.Size
 	}
-	b.setSFTPTransferProgress(transferID, 0, total, "processing", "")
+	ctx := b.beginSFTPTransfer(transferID, total)
 	defer func() {
-		if err != nil {
+		if errors.Is(err, context.Canceled) {
+			b.finishSFTPTransfer(transferID, "canceled", "文件传输已取消")
+		} else if err != nil {
 			b.finishSFTPTransfer(transferID, "failed", err.Error())
 		} else {
 			b.finishSFTPTransfer(transferID, "success", "")
@@ -130,6 +139,9 @@ func (b *AssetBiz) UploadSFTP(hostID int64, directory, transferID string, files 
 	uploadPaths := make([]string, len(files))
 	directoryRoots := make(map[string]string)
 	for index, header := range files {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
 		relativeName := header.Filename
 		if index < len(relativePaths) && relativePaths[index] != "" {
 			relativeName = relativePaths[index]
@@ -168,11 +180,14 @@ func (b *AssetBiz) UploadSFTP(hostID int64, directory, transferID string, files 
 			var destination *sftp.File
 			destination, err = sftpClient.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL)
 			if err == nil {
-				_, err = io.Copy(sftpProgressWriter{writer: destination, onProgress: func(written int64) {
+				_, err = io.Copy(sftpProgressWriter{ctx: ctx, writer: destination, onProgress: func(written int64) {
 					transferred += written
 					b.setSFTPTransferProgress(transferID, transferred, total, "processing", "")
 				}}, source)
 				_ = destination.Close()
+				if err != nil {
+					_ = sftpClient.Remove(target)
+				}
 			}
 		}
 		_ = source.Close()
@@ -181,6 +196,32 @@ func (b *AssetBiz) UploadSFTP(hostID int64, directory, transferID string, files 
 		}
 	}
 	return nil
+}
+
+func (b *AssetBiz) beginSFTPTransfer(transferID string, total int64) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	b.sftpTransferMu.Lock()
+	if previous := b.sftpCancels[transferID]; previous != nil {
+		previous()
+	}
+	b.sftpCancels[transferID] = cancel
+	b.sftpTransfers[transferID] = &api.SFTPTransferProgressResponse{Total: total, Status: "processing"}
+	b.sftpTransferMu.Unlock()
+	return ctx
+}
+
+// CancelSFTPTransfer cancels an active upload or download by its transfer ID.
+func (b *AssetBiz) CancelSFTPTransfer(transferID string) {
+	b.sftpTransferMu.Lock()
+	cancel := b.sftpCancels[transferID]
+	if progress := b.sftpTransfers[transferID]; progress != nil && progress.Status == "processing" {
+		progress.Status = "canceled"
+		progress.Message = "文件传输已取消"
+	}
+	b.sftpTransferMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 }
 
 // SFTPTransferProgress returns the current server-side SFTP byte progress.
@@ -200,6 +241,10 @@ func (b *AssetBiz) setSFTPTransferProgress(transferID string, transferred, total
 		return
 	}
 	b.sftpTransferMu.Lock()
+	if progress := b.sftpTransfers[transferID]; progress != nil && progress.Status == "canceled" {
+		b.sftpTransferMu.Unlock()
+		return
+	}
 	b.sftpTransfers[transferID] = &api.SFTPTransferProgressResponse{Transferred: transferred, Total: total, Status: status, Message: message}
 	b.sftpTransferMu.Unlock()
 }
@@ -210,12 +255,17 @@ func (b *AssetBiz) finishSFTPTransfer(transferID, status, message string) {
 	}
 	b.sftpTransferMu.Lock()
 	if progress := b.sftpTransfers[transferID]; progress != nil {
+		if progress.Status == "canceled" {
+			status = "canceled"
+			message = "文件传输已取消"
+		}
 		if status == "success" {
 			progress.Transferred = progress.Total
 		}
 		progress.Status = status
 		progress.Message = message
 	}
+	delete(b.sftpCancels, transferID)
 	b.sftpTransferMu.Unlock()
 	time.AfterFunc(5*time.Minute, func() {
 		b.sftpTransferMu.Lock()
@@ -225,11 +275,17 @@ func (b *AssetBiz) finishSFTPTransfer(transferID, status, message string) {
 }
 
 type sftpProgressWriter struct {
+	ctx        context.Context
 	writer     io.Writer
 	onProgress func(int64)
 }
 
 func (writer sftpProgressWriter) Write(data []byte) (int, error) {
+	if writer.ctx != nil {
+		if err := writer.ctx.Err(); err != nil {
+			return 0, err
+		}
+	}
 	written, err := writer.writer.Write(data)
 	if written > 0 && writer.onProgress != nil {
 		writer.onProgress(int64(written))
@@ -281,6 +337,16 @@ func suffixedFilename(filename string, index int) string {
 
 // DownloadSFTP writes selected remote files as a ZIP archive.
 func (b *AssetBiz) DownloadSFTP(req *api.SFTPDownloadRequest, output io.Writer) (err error) {
+	ctx := b.beginSFTPTransfer(req.TransferID, 0)
+	defer func() {
+		if errors.Is(err, context.Canceled) {
+			b.finishSFTPTransfer(req.TransferID, "canceled", "文件传输已取消")
+		} else if err != nil {
+			b.finishSFTPTransfer(req.TransferID, "failed", err.Error())
+		} else {
+			b.finishSFTPTransfer(req.TransferID, "success", "")
+		}
+	}()
 	_, client, err := b.dialHostSSH(req.HostID)
 	if err != nil {
 		return err
@@ -301,32 +367,31 @@ func (b *AssetBiz) DownloadSFTP(req *api.SFTPDownloadRequest, output io.Writer) 
 	directory := cleanSFTPPath(req.Path)
 	total := int64(0)
 	for _, name := range req.Names {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
 		name = filepath.ToSlash(filepath.Clean(name))
 		if name == "." || strings.HasPrefix(name, "../") || path.IsAbs(name) {
 			return fmt.Errorf("invalid download path")
 		}
-		size, sizeErr := sftpRemoteSize(sftpClient, path.Join(directory, name))
+		size, sizeErr := sftpRemoteSize(ctx, sftpClient, path.Join(directory, name))
 		if sizeErr != nil {
 			return sizeErr
 		}
 		total += size
 	}
 	b.setSFTPTransferProgress(req.TransferID, 0, total, "processing", "")
-	defer func() {
-		if err != nil {
-			b.finishSFTPTransfer(req.TransferID, "failed", err.Error())
-		} else {
-			b.finishSFTPTransfer(req.TransferID, "success", "")
-		}
-	}()
 	var transferred int64
 	for _, name := range req.Names {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
 		name = filepath.ToSlash(filepath.Clean(name))
 		if name == "." || strings.HasPrefix(name, "../") || path.IsAbs(name) {
 			return fmt.Errorf("invalid download path")
 		}
 		remotePath := path.Join(directory, name)
-		if err = addSFTPPathToArchive(sftpClient, archive, remotePath, name, func(written int64) {
+		if err = addSFTPPathToArchive(ctx, sftpClient, archive, remotePath, name, func(written int64) {
 			transferred += written
 			b.setSFTPTransferProgress(req.TransferID, transferred, total, "processing", "")
 		}); err != nil {
@@ -340,7 +405,10 @@ func (b *AssetBiz) DownloadSFTP(req *api.SFTPDownloadRequest, output io.Writer) 
 	return nil
 }
 
-func sftpRemoteSize(client *sftp.Client, remotePath string) (int64, error) {
+func sftpRemoteSize(ctx context.Context, client *sftp.Client, remotePath string) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	info, err := client.Lstat(remotePath)
 	if err != nil {
 		return 0, fmt.Errorf("read remote path %s: %w", remotePath, err)
@@ -357,7 +425,7 @@ func sftpRemoteSize(client *sftp.Client, remotePath string) (int64, error) {
 	}
 	var total int64
 	for _, child := range children {
-		size, sizeErr := sftpRemoteSize(client, path.Join(remotePath, child.Name()))
+		size, sizeErr := sftpRemoteSize(ctx, client, path.Join(remotePath, child.Name()))
 		if sizeErr != nil {
 			return 0, sizeErr
 		}
@@ -366,7 +434,10 @@ func sftpRemoteSize(client *sftp.Client, remotePath string) (int64, error) {
 	return total, nil
 }
 
-func addSFTPPathToArchive(client *sftp.Client, archive *zip.Writer, remotePath, archivePath string, onProgress func(int64)) error {
+func addSFTPPathToArchive(ctx context.Context, client *sftp.Client, archive *zip.Writer, remotePath, archivePath string, onProgress func(int64)) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	info, err := client.Lstat(remotePath)
 	if err != nil {
 		return fmt.Errorf("read remote path %s: %w", remotePath, err)
@@ -382,7 +453,7 @@ func addSFTPPathToArchive(client *sftp.Client, archive *zip.Writer, remotePath, 
 			}
 		}
 		for _, child := range children {
-			if err = addSFTPPathToArchive(client, archive, path.Join(remotePath, child.Name()), path.Join(archivePath, child.Name()), onProgress); err != nil {
+			if err = addSFTPPathToArchive(ctx, client, archive, path.Join(remotePath, child.Name()), path.Join(archivePath, child.Name()), onProgress); err != nil {
 				return err
 			}
 		}
@@ -400,7 +471,7 @@ func addSFTPPathToArchive(client *sftp.Client, archive *zip.Writer, remotePath, 
 	if err != nil {
 		return err
 	}
-	if _, err = io.Copy(sftpProgressWriter{writer: entry, onProgress: onProgress}, file); err != nil {
+	if _, err = io.Copy(sftpProgressWriter{ctx: ctx, writer: entry, onProgress: onProgress}, file); err != nil {
 		return fmt.Errorf("download %s: %w", remotePath, err)
 	}
 	return nil
@@ -456,7 +527,25 @@ func (b *AssetBiz) StartSSH(hostID, userID int64, cols, rows int) (*SSHConnectio
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
 	startedAt := time.Now()
-	return &SSHConnection{hostID: host.ID, userID: userID, startedAt: startedAt, client: client, session: session, input: input, output: output, recording: newAsciinemaRecording(startedAt, cols, rows)}, nil
+	connection := &SSHConnection{hostID: host.ID, userID: userID, startedAt: startedAt, client: client, session: session, input: input, output: output, recording: newAsciinemaRecording(startedAt, cols, rows), keepAliveStop: make(chan struct{})}
+	go maintainSSHKeepAlive(client, connection.keepAliveStop)
+	return connection, nil
+}
+
+func maintainSSHKeepAlive(client *ssh.Client, stop <-chan struct{}) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			if _, _, err := client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
+				_ = client.Close()
+				return
+			}
+		}
+	}
 }
 
 func (b *AssetBiz) dialHostSSH(hostID int64) (*model.Host, *ssh.Client, error) {
@@ -563,6 +652,7 @@ func (b *AssetBiz) CloseSSH(c *SSHConnection) {
 	if c == nil {
 		return
 	}
+	c.stopKeepAlive.Do(func() { close(c.keepAliveStop) })
 	_ = c.input.Close()
 	_ = c.session.Close()
 	_ = c.client.Close()

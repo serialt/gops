@@ -48,6 +48,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/groups/delete", h.DeleteGroup)
 
 	g.POST("/assets/credentials/list", h.ListCredentials)
+	g.POST("/assets/credentials/copy", h.CopyCredential)
 	g.POST("/assets/credentials/create", h.CreateCredential)
 	g.POST("/assets/credentials/update", h.UpdateCredential)
 	g.POST("/assets/credentials/delete", h.DeleteCredential)
@@ -62,6 +63,8 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/hosts/export", h.ExportHosts)
 	g.POST("/assets/hosts/template", h.HostImportTemplate)
 	g.POST("/assets/hosts/import", h.ImportHosts)
+	g.POST("/assets/hosts/cloud/preview", h.PreviewCloudHosts)
+	g.POST("/assets/hosts/cloud/import", h.ImportCloudHosts)
 	g.POST("/assets/terminal/tree", h.AssetTree)
 	g.POST("/assets/hosts/create", h.CreateHost)
 	g.POST("/assets/hosts/update", h.UpdateHost)
@@ -72,6 +75,7 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal/sftp/upload", h.UploadSFTP)
 	g.POST("/assets/terminal/sftp/download", h.DownloadSFTP)
 	g.POST("/assets/terminal/sftp/progress", h.SFTPTransferProgress)
+	g.POST("/assets/terminal/sftp/cancel", h.CancelSFTPTransfer)
 
 	g.POST("/assets/db-instances/options", h.DatabaseTypeOptions)
 	g.POST("/assets/db-instances/list", h.ListDBInstances)
@@ -87,6 +91,62 @@ func (h *AssetHandler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/assets/terminal-sessions/list", h.ListTerminalSessions)
 	g.POST("/assets/terminal-sessions/recording", h.GetTerminalSessionRecording)
 	g.POST("/assets/terminal-sessions/delete", h.DeleteTerminalSession)
+}
+
+// PreviewCloudHosts POST /api/v1/assets/hosts/cloud/preview 从云账号拉取云主机列表。
+func (h *AssetHandler) PreviewCloudHosts(c *gin.Context) {
+	req := new(api.CloudHostPreviewRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid cloud account")
+		return
+	}
+	result, err := h.biz.PreviewCloudHosts(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// ImportCloudHosts POST /api/v1/assets/hosts/cloud/import 导入或更新云主机。
+func (h *AssetHandler) ImportCloudHosts(c *gin.Context) {
+	req := new(api.CloudHostImportRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid cloud host data")
+		return
+	}
+	result, err := h.biz.ImportCloudHosts(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// CopyCredential POST /api/v1/assets/credentials/copy 复制资产凭证。
+func (h *AssetHandler) CopyCredential(c *gin.Context) {
+	req := new(api.CredentialIDRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid credential id")
+		return
+	}
+	result, err := h.biz.CopyCredential(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.OK(c, result)
+}
+
+// CancelSFTPTransfer POST /api/v1/assets/terminal/sftp/cancel 取消正在进行的文件传输。
+func (h *AssetHandler) CancelSFTPTransfer(c *gin.Context) {
+	req := new(api.SFTPTransferCancelRequest)
+	if c.ShouldBindJSON(req) != nil {
+		response.Error(c, 400, "invalid SFTP transfer cancel request")
+		return
+	}
+	h.biz.CancelSFTPTransfer(req.TransferID)
+	response.OK(c, nil)
 }
 
 // AssetTree POST /api/v1/assets/terminal/tree returns groups and their host/database nodes.
@@ -200,6 +260,23 @@ func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
 	defer ws.Close()
 	defer h.biz.CloseSSH(connection)
 	_ = ws.SetReadDeadline(time.Now().Add(terminalHeartbeatTimeout))
+	stopPings := make(chan struct{})
+	defer close(stopPings)
+	go func() {
+		ticker := time.NewTicker(20 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopPings:
+				return
+			case <-ticker.C:
+				if err := ws.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second)); err != nil {
+					_ = ws.Close()
+					return
+				}
+			}
+		}
+	}()
 
 	done := make(chan struct{})
 	go func() {
