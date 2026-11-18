@@ -200,10 +200,18 @@ func (b *SSLCertBiz) RenewCertificate(ctx context.Context, id int64) (*api.SSLTa
 		return nil, err
 	}
 	if cert.SourceType != "acme" {
-		return nil, errors.New("仅 ACME 证书支持自动续期")
+		return nil, errors.New("仅 ACME 证书支持续签或签发")
+	}
+	taskType := "issue"
+	if hasIssuedCertificate(cert) {
+		taskType = "renew"
 	}
 	now := time.Now()
-	task := &model.SslTask{CertificateID: id, TaskType: "renew", Status: "pending", TriggerType: "manual", CreatedAt: now, UpdatedAt: now}
+	cert.Status, cert.LastError, cert.UpdatedAt = "pending", "", now
+	if err := b.repo.SaveCertificate(ctx, b.db, cert); err != nil {
+		return nil, err
+	}
+	task := &model.SslTask{CertificateID: id, TaskType: taskType, Status: "pending", TriggerType: "manual", CreatedAt: now, UpdatedAt: now}
 	if err := b.repo.CreateTask(ctx, b.db, task); err != nil {
 		return nil, err
 	}
@@ -482,8 +490,12 @@ func certificateKeyAlgorithm(cert *x509.Certificate) string {
 		return strings.ToLower(cert.PublicKeyAlgorithm.String())
 	}
 }
+func hasIssuedCertificate(cert *model.SslCertificate) bool {
+	return cert != nil && strings.TrimSpace(cert.Certificate) != "" && strings.TrimSpace(cert.PrivateKey) != ""
+}
+
 func certificateResponse(x *model.SslCertificate) *api.SSLCertificateResponse {
-	return &api.SSLCertificateResponse{ID: x.ID, Name: x.Name, Domain: x.Domain, SanDomains: x.SanDomains, AcmeEmail: x.AcmeEmail, CaProvider: x.CaProvider, KeyAlgorithm: x.KeyAlgorithm, SourceType: x.SourceType, CloudAccountID: x.CloudAccountID, DNSProviderID: x.DNSProviderID, Issuer: x.Issuer, Fingerprint: x.Fingerprint, Status: x.Status, AutoRenew: x.AutoRenew, RenewDaysBefore: x.RenewDaysBefore, NotBefore: nonZeroTime(x.NotBefore), NotAfter: nonZeroTime(x.NotAfter), LastRenewAt: nonZeroTime(x.LastRenewAt), LastError: x.LastError, CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
+	return &api.SSLCertificateResponse{ID: x.ID, Name: x.Name, Domain: x.Domain, SanDomains: x.SanDomains, AcmeEmail: x.AcmeEmail, CaProvider: x.CaProvider, KeyAlgorithm: x.KeyAlgorithm, SourceType: x.SourceType, CloudAccountID: x.CloudAccountID, DNSProviderID: x.DNSProviderID, Issuer: x.Issuer, Fingerprint: x.Fingerprint, Status: x.Status, AutoRenew: x.AutoRenew, RenewDaysBefore: x.RenewDaysBefore, NotBefore: nonZeroTime(x.NotBefore), NotAfter: nonZeroTime(x.NotAfter), LastRenewAt: nonZeroTime(x.LastRenewAt), LastError: x.LastError, HasCertificate: hasIssuedCertificate(x), CreatedAt: x.CreatedAt, UpdatedAt: x.UpdatedAt}
 }
 func certificateDetailResponse(x *model.SslCertificate) *api.SSLCertificateDetailResponse {
 	_, bundledChain := splitCertificateBundle(x.Certificate)

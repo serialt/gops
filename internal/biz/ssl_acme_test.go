@@ -35,13 +35,22 @@ func TestParseDNSNameservers(t *testing.T) {
 	}
 }
 
+func TestParseACMEDNSTimeout(t *testing.T) {
+	if got := parseACMEDNSTimeout(20); got != 20*time.Second {
+		t.Fatalf("parseACMEDNSTimeout() = %v, want 20s", got)
+	}
+	if got := parseACMEDNSTimeout(0); got != 10*time.Second {
+		t.Fatalf("parseACMEDNSTimeout default = %v, want 10s", got)
+	}
+}
+
 func TestParseACMEDNSTimeouts(t *testing.T) {
 	propagation, polling := parseACMEDNSTimeouts(180, 5)
 	if propagation != 180*time.Second || polling != 5*time.Second {
 		t.Fatalf("parseACMEDNSTimeouts() = %v, %v", propagation, polling)
 	}
 	propagation, polling = parseACMEDNSTimeouts(0, 0)
-	if propagation <= 0 || polling <= 0 {
+	if propagation != 180*time.Second || polling != 2*time.Second {
 		t.Fatalf("parseACMEDNSTimeouts defaults = %v, %v", propagation, polling)
 	}
 }

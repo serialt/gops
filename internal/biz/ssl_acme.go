@@ -175,6 +175,7 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 	}
 	var resolverConfig struct {
 		Nameservers               string `json:"nameservers"`
+		DNSTimeoutSeconds         int64  `json:"dns_timeout_seconds"`
 		PropagationTimeoutSeconds int64  `json:"propagation_timeout_seconds"`
 		PollingIntervalSeconds    int64  `json:"polling_interval_seconds"`
 	}
@@ -185,6 +186,7 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 		previousClient := dns01.DefaultClient()
 		options := dns01.NewOptions()
 		options.RecursiveNameservers = nameservers
+		options.Timeout = parseACMEDNSTimeout(resolverConfig.DNSTimeoutSeconds)
 		dns01.SetDefaultClient(dns01.NewClient(options))
 		defer dns01.SetDefaultClient(previousClient)
 	}
@@ -248,9 +250,16 @@ func (b *SSLCertBiz) obtainCertificate(ctx context.Context, cert *model.SslCerti
 	return resource, nil
 }
 
+func parseACMEDNSTimeout(seconds int64) time.Duration {
+	if seconds <= 0 || seconds > 60 {
+		seconds = 10
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 func parseACMEDNSTimeouts(propagationSeconds, pollingSeconds int64) (time.Duration, time.Duration) {
 	if propagationSeconds <= 0 || propagationSeconds > 3600 {
-		propagationSeconds = int64(dns01.DefaultPropagationTimeout / time.Second)
+		propagationSeconds = 180
 	}
 	if pollingSeconds <= 0 || pollingSeconds > 300 {
 		pollingSeconds = int64(dns01.DefaultPollingInterval / time.Second)

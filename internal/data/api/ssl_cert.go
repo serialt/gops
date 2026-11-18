@@ -62,6 +62,7 @@ type SSLCertificateResponse struct {
 	NotAfter        *time.Time `json:"not_after"`
 	LastRenewAt     *time.Time `json:"last_renew_at"`
 	LastError       string     `json:"last_error"`
+	HasCertificate  bool       `json:"has_certificate"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
