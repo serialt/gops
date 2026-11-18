@@ -9,7 +9,7 @@ import (
 const testDNSAESKey = "0123456789abcdef0123456789abcdef"
 
 func TestDNSProviderConfigEncryptDecryptAndMask(t *testing.T) {
-	raw := `{"access_key_id":"ak-id","access_key_secret":"secret-value","security_token":"token-value","region":"cn-hangzhou"}`
+	raw := `{"access_key_id":"ak-id","access_key_secret":"secret-value","security_token":"token-value","region":"cn-hangzhou","nameservers":"223.5.5.5, 119.29.29.29"}`
 	encrypted, err := encryptDNSProviderConfig(testDNSAESKey, "alidns", raw, "")
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +38,7 @@ func TestDNSProviderConfigEncryptDecryptAndMask(t *testing.T) {
 	if err = json.Unmarshal([]byte(masked), &maskedValues); err != nil {
 		t.Fatal(err)
 	}
-	if maskedValues["access_key_id"] != "ak-id" || maskedValues["access_key_secret"] != "" || maskedValues["security_token"] != "" {
+	if maskedValues["access_key_id"] != "ak-id" || maskedValues["access_key_secret"] != "" || maskedValues["security_token"] != "" || maskedValues["nameservers"] != "223.5.5.5, 119.29.29.29" {
 		t.Fatalf("DNS response was not masked correctly: %#v", maskedValues)
 	}
 }

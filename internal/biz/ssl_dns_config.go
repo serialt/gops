@@ -10,12 +10,12 @@ import (
 )
 
 var dnsProviderFields = map[string][]string{
-	"alidns":       {"access_key_id", "access_key_secret", "security_token", "region"},
-	"aliyun":       {"access_key_id", "access_key_secret", "security_token", "region"},
-	"tencentcloud": {"secret_id", "secret_key", "session_token", "region"},
-	"cloudflare":   {"api_token", "zone_token", "email", "api_key"},
-	"huaweicloud":  {"access_key_id", "secret_access_key", "region"},
-	"huawei":       {"access_key_id", "secret_access_key", "region"},
+	"alidns":       {"access_key_id", "access_key_secret", "security_token", "region", "nameservers", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"aliyun":       {"access_key_id", "access_key_secret", "security_token", "region", "nameservers", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"tencentcloud": {"secret_id", "secret_key", "session_token", "region", "nameservers", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"cloudflare":   {"api_token", "zone_token", "email", "api_key", "nameservers", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"huaweicloud":  {"access_key_id", "secret_access_key", "region", "nameservers", "propagation_timeout_seconds", "polling_interval_seconds"},
+	"huawei":       {"access_key_id", "secret_access_key", "region", "nameservers", "propagation_timeout_seconds", "polling_interval_seconds"},
 }
 
 var dnsSecretFields = map[string]struct{}{
