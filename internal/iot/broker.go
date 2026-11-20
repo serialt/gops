@@ -24,6 +24,8 @@ type Broker struct {
 	server          *mqtt.Server
 	enabled         bool
 	mutex           sync.RWMutex
+	closeOnce       sync.Once
+	closeErr        error
 	externalClients map[string]*externalBrokerClient
 }
 
@@ -113,12 +115,15 @@ func (b *Broker) Run() error {
 	return b.server.Serve()
 }
 func (b *Broker) Close() error {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	for _, external := range b.externalClients {
-		external.client.Disconnect(250)
-	}
-	return b.server.Close()
+	b.closeOnce.Do(func() {
+		b.mutex.Lock()
+		defer b.mutex.Unlock()
+		for _, external := range b.externalClients {
+			external.client.Disconnect(250)
+		}
+		b.closeErr = b.server.Close()
+	})
+	return b.closeErr
 }
 func (b *Broker) Publish(topic string, payload []byte, retain bool, qos byte) error {
 	return b.PublishTo("internal", topic, payload, retain, qos)

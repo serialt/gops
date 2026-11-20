@@ -5,6 +5,8 @@ import (
 
 	"gops/internal/config"
 	"gops/internal/data/model"
+
+	mqtt "github.com/mochi-mqtt/server/v2"
 )
 
 func boolPointer(value bool) *bool { return &value }
@@ -26,6 +28,16 @@ func TestNewListenersRequiresTLSFiles(t *testing.T) {
 	_, err := newListeners(config.IOTListeners{TLS: config.IOTListener{Enabled: boolPointer(true), Address: ":8883"}})
 	if err == nil {
 		t.Fatal("expected missing TLS certificate error")
+	}
+}
+
+func TestBrokerCloseIsIdempotent(t *testing.T) {
+	broker := &Broker{server: mqtt.New(&mqtt.Options{InlineClient: true}), externalClients: map[string]*externalBrokerClient{}}
+	if err := broker.Close(); err != nil {
+		t.Fatalf("first Close() error = %v", err)
+	}
+	if err := broker.Close(); err != nil {
+		t.Fatalf("second Close() error = %v", err)
 	}
 }
 
