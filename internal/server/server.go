@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
+	"gops/internal/biz"
 	"gops/internal/config"
 	"gops/internal/handler"
 	iotbroker "gops/internal/iot"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 )
@@ -72,6 +75,7 @@ func NewGinEngine(
 	kubernetesHandler *handler.KubernetesHandler,
 	auditHandler *handler.AuditHandler,
 	iotHandler *handler.IOTHandler,
+	metricsBiz *biz.MetricsBiz,
 	iotBroker *iotbroker.Broker,
 ) (r *gin.Engine, cleanup func()) {
 
@@ -102,6 +106,28 @@ func NewGinEngine(
 	}()
 
 	r.Use(gin.Logger(), gin.Recovery())
+
+	var metricsServer *http.Server
+	if cfg.Server.Metrics.Enabled {
+		metricsRegistry := metricsBiz.NewPrometheusRegistry(biz.NewMetricsCollector(metricsBiz))
+
+		metricsEngine := gin.New()
+		metricsEngine.Use(gin.Recovery())
+		metricsEngine.GET("/metrics", gin.WrapH(promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{})))
+		metricsEngine.GET("/health", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		})
+		metricsServer = &http.Server{
+			Addr:    fmt.Sprintf(":%d", cfg.Server.Metrics.HTTPPort),
+			Handler: metricsEngine,
+		}
+		go func() {
+			log.Printf("Running metrics server at :%d", cfg.Server.Metrics.HTTPPort)
+			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("metrics server failed: %v", err)
+			}
+		}()
+	}
 
 	r.POST("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -136,7 +162,15 @@ func NewGinEngine(
 	iotHandler.RegisterRoutes(authorized)
 
 	registerFrontend(r, db)
-	cleanup = func() { cancelSchedulers(); _ = iotBroker.Close() }
+	cleanup = func() {
+		cancelSchedulers()
+		_ = iotBroker.Close()
+		if metricsServer != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = metricsServer.Shutdown(ctx)
+		}
+	}
 	return
 }
 
@@ -145,6 +179,10 @@ func NewHTTPServer(engine *gin.Engine, cfg *config.Config) (*http.Server, func()
 		Addr:    fmt.Sprintf(":%d", cfg.Server.HttpPort),
 		Handler: engine,
 	}
-	cleanup := func() {}
+	cleanup := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	}
 	return srv, cleanup, nil
 }

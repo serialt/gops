@@ -185,11 +185,13 @@ func buildInspectionReport(clusterID int64, clusterName string, s *inspectionSna
 		nodeStatus = "warning"
 	}
 	add("nodes", "节点健康", check("节点", "节点就绪状态", nodeStatus, fmt.Sprintf("%d/%d", ready, len(s.nodes.Items)), "全部 Ready", fmt.Sprintf("资源压力节点：%d", pressure), "检查异常节点状态、资源和 kubelet 日志"))
-	running, pending, failed, restarts, noLimits := 0, 0, 0, 0, 0
+	running, completed, pending, failed, restarts, noLimits := 0, 0, 0, 0, 0, 0
 	for _, pod := range s.pods.Items {
 		switch pod.Status.Phase {
 		case corev1.PodRunning:
 			running++
+		case corev1.PodSucceeded:
+			completed++
 		case corev1.PodPending:
 			pending++
 		case corev1.PodFailed:
@@ -216,14 +218,14 @@ func buildInspectionReport(clusterID int64, clusterName string, s *inspectionSna
 	} else if pending > 0 || restarts > 0 {
 		workloadStatus = "warning"
 	}
-	add("workloads", "工作负载", check("工作负载", "Pod 运行状态", workloadStatus, fmt.Sprintf("运行 %d / 总数 %d", running, len(s.pods.Items)), "无失败或长期 Pending", fmt.Sprintf("Pending %d，Failed %d，高重启容器 %d", pending, failed, restarts), "检查 Pod 事件、镜像、探针与资源配额"), check("工作负载", "控制器数量", "success", fmt.Sprintf("Deployment %d / DaemonSet %d / StatefulSet %d", len(s.deployments.Items), len(s.daemonSets.Items), len(s.statefulSets.Items)), "控制器状态正常", "", ""))
+	add("workloads", "工作负载", check("工作负载", "Pod 运行状态", workloadStatus, fmt.Sprintf("健康 %d / 总数 %d", running+completed, len(s.pods.Items)), "无失败或长期 Pending", fmt.Sprintf("Running %d，Completed %d，Pending %d，Failed %d，高重启容器 %d", running, completed, pending, failed, restarts), "检查 Pod 事件、镜像、探针与资源配额"), check("工作负载", "控制器数量", "success", fmt.Sprintf("Deployment %d / DaemonSet %d / StatefulSet %d", len(s.deployments.Items), len(s.daemonSets.Items), len(s.statefulSets.Items)), "控制器状态正常", "", ""))
 	componentTotal, componentUnhealthy := 0, 0
 	for _, pod := range s.pods.Items {
 		if pod.Namespace != "kube-system" {
 			continue
 		}
 		componentTotal++
-		if pod.Status.Phase != corev1.PodRunning {
+		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodSucceeded {
 			componentUnhealthy++
 		}
 	}
@@ -350,7 +352,7 @@ func buildInspectionReport(clusterID int64, clusterName string, s *inspectionSna
 	}
 	sectionByKey["nodes"].Metrics = []*api.KubernetesInspectionMetric{metric("节点总数", fmt.Sprint(len(s.nodes.Items)), ""), metric("Ready 节点", fmt.Sprint(ready), "success"), metric("NotReady 节点", fmt.Sprint(len(s.nodes.Items)-ready), nodeStatus), metric("有资源压力", fmt.Sprint(pressure), nodeStatus)}
 	sectionByKey["nodes"].Details = nodeDetails
-	sectionByKey["workloads"].Metrics = []*api.KubernetesInspectionMetric{metric("Deployment", fmt.Sprint(len(s.deployments.Items)), ""), metric("DaemonSet", fmt.Sprint(len(s.daemonSets.Items)), ""), metric("StatefulSet", fmt.Sprint(len(s.statefulSets.Items)), ""), metric("Pod总数", fmt.Sprintf("%d/%d", running, len(s.pods.Items)), workloadStatus)}
+	sectionByKey["workloads"].Metrics = []*api.KubernetesInspectionMetric{metric("Deployment", fmt.Sprint(len(s.deployments.Items)), ""), metric("DaemonSet", fmt.Sprint(len(s.daemonSets.Items)), ""), metric("StatefulSet", fmt.Sprint(len(s.statefulSets.Items)), ""), metric("Pod健康", fmt.Sprintf("%d/%d", running+completed, len(s.pods.Items)), workloadStatus)}
 	sectionByKey["network"].Metrics = []*api.KubernetesInspectionMetric{metric("Service总数", fmt.Sprint(len(s.services.Items)), ""), metric("Endpoint总数", fmt.Sprint(len(s.endpoints.Items)), ""), metric("无Endpoint的Service", fmt.Sprint(missingEndpoints), networkStatus)}
 	sectionByKey["storage"].Metrics = []*api.KubernetesInspectionMetric{metric("PV总数", fmt.Sprint(len(s.pvs.Items)), ""), metric("PVC总数", fmt.Sprint(len(s.pvcs.Items)), ""), metric("Pending PVC", fmt.Sprint(pendingPVC), storageStatus)}
 	sectionByKey["security"].Metrics = []*api.KubernetesInspectionMetric{metric("Pod总数", fmt.Sprint(len(s.pods.Items)), ""), metric("特权容器", fmt.Sprint(privileged), securityStatus), metric("hostNetwork Pod", fmt.Sprint(hostNetwork), securityStatus)}

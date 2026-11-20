@@ -13,7 +13,7 @@ import { downloadAttachment } from '@/utils/download'
 
 type TreeNode = AssetTreeNode
 interface Session { key: string; kind: 'ssh' | 'vnc' | 'database'; label: string; host?: Host; database?: DbInstance }
-interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket: WebSocket; resizeObserver: ResizeObserver; connectTimer: ReturnType<typeof setTimeout>; heartbeatTimer: ReturnType<typeof setInterval> }
+interface Runtime { terminal: Terminal; fitAddon: FitAddon; socket?: WebSocket; resizeObserver: ResizeObserver; connectTimer?: ReturnType<typeof setTimeout>; reconnectTimer?: ReturnType<typeof setTimeout>; disconnectTimer?: ReturnType<typeof setTimeout>; reconnectAttempts: number; connectionExpired: boolean; heartbeatTimer: ReturnType<typeof setInterval> }
 interface VNCRuntime { rfb: RFB }
 interface SftpTransferRecord {
   id: number
@@ -90,6 +90,11 @@ function filterTree(value: string, data: TreeNode) {
   const assetType = data.type === 'host' ? '主机' : data.database ? databaseTypeLabel(data.database.db_type) : ''
   return `${data.label} ${assetType} ${data.host?.ip || ''} ${data.database?.host || ''} ${data.database?.db_type || ''}`.toLowerCase().includes(value.trim().toLowerCase())
 }
+function assetEndpointTooltip(data: TreeNode) {
+  if (data.type === 'host' && data.host) return data.host.port ? `${data.host.ip}:${data.host.port}` : data.host.ip
+  if (data.type === 'database' && data.database) return `${data.database.host}:${data.database.port}`
+  return undefined
+}
 function databaseTypeLabel(type: string) {
   const normalized = type.trim().toLowerCase().replace(/[\s_-]+/g, '')
   const labels: Record<string, string> = {
@@ -138,13 +143,55 @@ function vncSocketURL(host: Host) {
   return `${protocol}//${window.location.host}/api/v1/assets/terminal/vnc/connect/${host.id}?token=${encodeURIComponent(token)}`
 }
 function sendResize(runtime: Runtime) {
-  if (runtime.socket.readyState === WebSocket.OPEN) runtime.socket.send(JSON.stringify({ type: 'resize', cols: runtime.terminal.cols, rows: runtime.terminal.rows }))
+  if (runtime.socket?.readyState === WebSocket.OPEN) runtime.socket.send(JSON.stringify({ type: 'resize', cols: runtime.terminal.cols, rows: runtime.terminal.rows }))
 }
 function fitTerminal(fitAddon: FitAddon, runtime?: Runtime) {
   requestAnimationFrame(() => {
     fitAddon.fit()
     if (runtime) sendResize(runtime)
   })
+}
+function connectTerminalSocket(session: Session, runtime: Runtime) {
+  const socket = new WebSocket(socketURL(session, runtime.terminal))
+  socket.binaryType = 'arraybuffer'
+  runtime.socket = socket
+  runtime.connectTimer = setTimeout(() => {
+    if (runtime.socket === socket && socket.readyState !== WebSocket.OPEN) socket.close()
+  }, 15000)
+  socket.onopen = () => {
+    if (runtime.socket !== socket) return
+    clearTimeout(runtime.connectTimer)
+    clearTimeout(runtime.disconnectTimer)
+    runtime.disconnectTimer = undefined
+    runtime.connectionExpired = false
+    runtime.reconnectAttempts = 0
+    fitTerminal(runtime.fitAddon, runtime)
+    runtime.terminal.focus()
+  }
+  socket.onmessage = event => {
+    if (runtime.socket === socket) runtime.terminal.write(event.data instanceof ArrayBuffer ? new Uint8Array(event.data) : String(event.data))
+  }
+  socket.onclose = () => {
+    clearTimeout(runtime.connectTimer)
+    if (runtime.socket !== socket || runtimes.get(session.key) !== runtime || !sessions.value.some(item => item.key === session.key)) return
+    if (runtime.connectionExpired) return
+    if (runtime.disconnectTimer === undefined) {
+      runtime.disconnectTimer = setTimeout(() => {
+        if (runtimes.get(session.key) !== runtime || !sessions.value.some(item => item.key === session.key)) return
+        runtime.connectionExpired = true
+        clearTimeout(runtime.reconnectTimer)
+        runtime.socket?.close()
+        runtime.terminal.writeln('\r\n连接已断开')
+      }, 120000)
+    }
+    runtime.reconnectAttempts += 1
+    const delay = Math.min(1000 * 2 ** Math.min(runtime.reconnectAttempts - 1, 5), 30000)
+    runtime.reconnectTimer = setTimeout(() => {
+      if (!runtime.connectionExpired && runtimes.get(session.key) === runtime && sessions.value.some(item => item.key === session.key)) {
+        connectTerminalSocket(session, runtime)
+      }
+    }, delay)
+  }
 }
 async function initializeSession(session: Session) {
   await nextTick()
@@ -178,25 +225,15 @@ async function initializeSession(session: Session) {
     ? `${session.host.name}（${session.host.ip}:${session.host.port}）`
     : `${session.database?.name}（${session.database?.host}:${session.database?.port}）`
   terminal.writeln(`正在连接 ${target}...`)
-  const socket = new WebSocket(socketURL(session, terminal))
-  socket.binaryType = 'arraybuffer'
   const resizeObserver = new ResizeObserver(() => fitTerminal(fitAddon, runtimes.get(session.key)))
-  const connectTimer = setTimeout(() => {
-    if (socket.readyState !== WebSocket.OPEN) {
-      terminal.writeln('\r\n连接超时，请检查后端服务、代理和网络。')
-      socket.close()
-    }
-  }, 15000)
   const heartbeatTimer = setInterval(() => {
-    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'heartbeat' }))
+    const socket = runtimes.get(session.key)?.socket
+    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'heartbeat' }))
   }, 25000)
-  const runtime = { terminal, fitAddon, socket, resizeObserver, connectTimer, heartbeatTimer }
+  const runtime: Runtime = { terminal, fitAddon, resizeObserver, heartbeatTimer, reconnectAttempts: 0, connectionExpired: false }
   runtimes.set(session.key, runtime)
-  terminal.onData(data => socket.readyState === WebSocket.OPEN && socket.send(data))
-  socket.onopen = () => { clearTimeout(connectTimer); fitTerminal(fitAddon, runtime); terminal.focus() }
-  socket.onmessage = event => terminal.write(event.data instanceof ArrayBuffer ? new Uint8Array(event.data) : String(event.data))
-  socket.onerror = () => terminal.writeln('\r\n连接失败，请检查主机、凭证和网络。')
-  socket.onclose = () => terminal.writeln('\r\n连接已关闭。')
+  terminal.onData(data => runtime.socket?.readyState === WebSocket.OPEN && runtime.socket.send(data))
+  connectTerminalSocket(session, runtime)
   resizeObserver.observe(element)
 }
 async function openTerminal(host?: Host) {
@@ -586,9 +623,11 @@ async function reconnectSession() {
   const runtime = runtimes.get(activeKey.value)
   if (!runtime) return
   clearTimeout(runtime.connectTimer)
+  clearTimeout(runtime.reconnectTimer)
+  clearTimeout(runtime.disconnectTimer)
   clearInterval(runtime.heartbeatTimer)
   runtime.resizeObserver.disconnect()
-  runtime.socket.close()
+  runtime.socket?.close()
   runtime.terminal.dispose()
   runtimes.delete(activeKey.value)
   await initializeSession(session)
@@ -596,9 +635,11 @@ async function reconnectSession() {
 function disposeSession(key: string) {
   const runtime = runtimes.get(key)
   if (runtime) clearTimeout(runtime.connectTimer)
+  if (runtime) clearTimeout(runtime.reconnectTimer)
+  if (runtime) clearTimeout(runtime.disconnectTimer)
   if (runtime) clearInterval(runtime.heartbeatTimer)
   runtime?.resizeObserver.disconnect()
-  runtime?.socket.close()
+  runtime?.socket?.close()
   runtime?.terminal.dispose()
   runtimes.delete(key)
   terminalElements.delete(key)
@@ -651,7 +692,9 @@ onBeforeUnmount(() => {
                 :title="databaseTypeLabel(data.database?.db_type || '')"
                 :aria-label="databaseTypeLabel(data.database?.db_type || '')">
                 <Coin />
-              </el-icon><span class="tree-label">{{ data.label }}</span><small v-if="data.type === 'database'"
+                </el-icon><el-tooltip :content="assetEndpointTooltip(data)" :disabled="!assetEndpointTooltip(data)"
+                :show-after="0" placement="top"><span class="tree-label">{{ data.label }}</span></el-tooltip><small
+                v-if="data.type === 'database'"
                 class="database-type-badge">{{ databaseTypeLabel(data.database?.db_type || '') }}</small><small
                 v-else-if="data.type === 'host' && data.host?.port && data.host?.credential_id" class="database-type-badge terminal-kind-action"
                 title="打开 SSH 终端" @click.stop="void openTerminal(data.host)">SSH</small><small

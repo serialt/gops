@@ -2,7 +2,7 @@
 
 # Build on the runner architecture and cross-compile Go for the target image.
 # This avoids emulating the complete frontend/backend build for arm64.
-FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 
 WORKDIR /src
 

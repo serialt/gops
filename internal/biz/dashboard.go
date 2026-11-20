@@ -26,9 +26,18 @@ func (b *DashboardBiz) Stats(ctx context.Context) (*api.DashboardStatsResponse, 
 	if err != nil {
 		return nil, err
 	}
+	certificates := make([]*api.DashboardDomainCertificateResponse, 0, len(stats.DomainCertificates))
+	for _, certificate := range stats.DomainCertificates {
+		certificates = append(certificates, &api.DashboardDomainCertificateResponse{Domain: certificate.Domain, SSLExpiry: certificate.SSLExpiry})
+	}
 	return &api.DashboardStatsResponse{
 		HostsTotal: stats.HostsTotal, HostsOnline: stats.HostsOnline, HostsOffline: stats.HostsTotal - stats.HostsOnline,
-		ClustersTotal: stats.ClustersTotal, NodesTotal: stats.NodesTotal, PodsTotal: stats.PodsTotal,
-		TodayOperations: stats.TodayOperations, ActiveAlerts: stats.ActiveAlerts,
+		ClustersTotal: stats.ClustersTotal, ClustersOffline: stats.ClustersOffline,
+		NodesTotal: stats.NodesTotal, NodesOffline: stats.NodesOffline,
+		PodsTotal: stats.PodsTotal, PodsAbnormal: stats.PodsAbnormal,
+		DomainsTotal: stats.DomainsTotal, DomainsNormal: stats.DomainsNormal,
+		DomainsAbnormal: stats.DomainsAbnormal, DomainsPaused: stats.DomainsPaused,
+		DomainCertificates: certificates,
+		TodayOperations:    stats.TodayOperations, ActiveAlerts: stats.ActiveAlerts,
 	}, nil
 }

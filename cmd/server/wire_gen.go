@@ -72,7 +72,9 @@ func InitializeServer(cfg *config.Config, log *slog.Logger) (*http.Server, func(
 	}
 	iotBiz := biz.NewIOTBiz(db, iotRepo, broker, cfg)
 	iotHandler := handler.NewIOTHandler(iotBiz)
-	engine, cleanup2 := server.NewGinEngine(cfg, db, service, jwtManager, authHandler, dashboardHandler, userHandler, roleHandler, organizationHandler, assetHandler, systemConfigHandler, monitorHandler, taskHandler, sslCertHandler, kubernetesHandler, auditHandler, iotHandler, broker)
+	metricsRepo := repo.NewMetricsRepo()
+	metricsBiz := biz.NewMetricsBiz(db, metricsRepo)
+	engine, cleanup2 := server.NewGinEngine(cfg, db, service, jwtManager, authHandler, dashboardHandler, userHandler, roleHandler, organizationHandler, assetHandler, systemConfigHandler, monitorHandler, taskHandler, sslCertHandler, kubernetesHandler, auditHandler, iotHandler, metricsBiz, broker)
 	httpServer, cleanup3, err := server.NewHTTPServer(engine, cfg)
 	if err != nil {
 		cleanup2()

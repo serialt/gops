@@ -260,6 +260,23 @@ func (h *AssetHandler) ConnectTerminal(c *gin.Context) {
 	defer ws.Close()
 	defer h.biz.CloseSSH(connection)
 	_ = ws.SetReadDeadline(time.Now().Add(terminalHeartbeatTimeout))
+	stopPings := make(chan struct{})
+	defer close(stopPings)
+	go func() {
+		ticker := time.NewTicker(20 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopPings:
+				return
+			case <-ticker.C:
+				if err := ws.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second)); err != nil {
+					_ = ws.Close()
+					return
+				}
+			}
+		}
+	}()
 
 	done := make(chan struct{})
 	go func() {
