@@ -19,7 +19,7 @@ import (
 	"gops/internal/pkg/casbinx"
 	"gops/internal/server"
 
-	"github.com/serialt/sugar/v3"
+	"github.com/krabt/sugar"
 )
 
 var (

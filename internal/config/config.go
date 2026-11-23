@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/serialt/sugar/v3"
+	"github.com/krabt/sugar"
 )
 
 type Config struct {
