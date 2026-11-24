@@ -67,8 +67,8 @@ SQLite 驱动采用纯 Go 实现，本地开发不需要安装 PostgreSQL，也�
 ### 1. 获取代码
 
 ```bash
-git clone <repository-url>
-cd gin-vue
+git clone git@github.com:serialt/gops.git
+cd gops
 ```
 
 ### 2. 配置后端
@@ -452,4 +452,4 @@ cd web && pnpm typecheck
 
 ## License
 
-仓库当前未提供开源许可证文件。如需对外发布或分发，请先补充明确的许可证。
+本项目采用 [MIT License](./LICENSE) 开源。
