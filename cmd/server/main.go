@@ -19,7 +19,7 @@ import (
 	"gops/internal/pkg/casbinx"
 	"gops/internal/server"
 
-	"github.com/serialt/sugar/v3"
+	"github.com/krabt/sugar"
 )
 
 var (
@@ -148,8 +148,8 @@ func main() {
 	stopSignals := make(chan os.Signal, 1)
 	signal.Notify(stopSignals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-stopSignals
-		log.Printf("Shutting down server")
+		receivedSignal := <-stopSignals
+		log.Printf("Shutting down server after receiving %s", receivedSignal)
 		cleanup()
 	}()
 	defer signal.Stop(stopSignals)

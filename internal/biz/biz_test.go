@@ -7,7 +7,7 @@ import (
 	"gops/internal/data/repo/rbac"
 	"gops/internal/pkg/casbinx"
 
-	"github.com/serialt/sugar/v3"
+	"github.com/krabt/sugar"
 	"gorm.io/gorm"
 )
 

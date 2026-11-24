@@ -26,6 +26,20 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Verify Docker
+        run: |
+          docker version
+          docker compose version
+          docker buildx version
+
+      - name: Set up Buildx
+        run: |
+          if ! docker buildx inspect gops-builder >/dev/null 2>&1; then
+            docker buildx create --name gops-builder --driver docker-container
+          fi
+          docker buildx use gops-builder
+          docker buildx inspect --bootstrap
+
       - name: Prepare image tag
         shell: sh
         env:
@@ -36,16 +50,17 @@ jobs:
           safe_branch="$(printf '%s' "$RAW_BRANCH" | sed 's/[^A-Za-z0-9_.-]/-/g')"
           test -n "$safe_branch"
           test -n "$COMMIT_SHA"
-          dependency_sha="$(sha256sum go.mod go.sum web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml | awk '{print $1}' | sha256sum | awk '{print $1}')"
+          dependency_sha="$(sha256sum "$GOPS_BASE_DOCKERFILE" .dockerignore go.mod go.sum web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml | awk '{print $1}' | sha256sum | awk '{print $1}')"
           test -n "$dependency_sha"
           commit_short_sha="$(printf '%s' "$COMMIT_SHA" | cut -c1-12)"
           dependency_short_sha="$(printf '%s' "$dependency_sha" | cut -c1-12)"
           GOPS_IMAGE_REPOSITORY="$ALI_ACR_REGISTRY/$ALI_ACR_USERNAME/gops"
           GOPS_BASE_IMAGE_REPOSITORY="$ALI_ACR_REGISTRY/$ALI_ACR_USERNAME/gops-base"
           printf 'GOPS_IMAGE_REPOSITORY=%s\n' "$GOPS_IMAGE_REPOSITORY" >> "$GITHUB_ENV"
-          printf 'GOPS_BASE_IMAGE_REPOSITORY=%s\n' "$GOPS_BASE_IMAGE_REPOSITORY" >> "$GITHUB_ENV"
           printf 'GOPS_IMAGE=%s:%s-%s\n' "$GOPS_IMAGE_REPOSITORY" "$safe_branch" "$commit_short_sha" >> "$GITHUB_ENV"
           printf 'GOPS_BASE_IMAGE=%s:%s\n' "$GOPS_BASE_IMAGE_REPOSITORY" "$dependency_short_sha" >> "$GITHUB_ENV"
+          printf 'GOPS_BASE_CACHE_IMAGE=%s:buildcache\n' "$GOPS_BASE_IMAGE_REPOSITORY" >> "$GITHUB_ENV"
+          printf 'GOPS_CACHE_IMAGE=%s:buildcache\n' "$GOPS_IMAGE_REPOSITORY" >> "$GITHUB_ENV"
 
       - name: Login to Aliyun Container Registry
         shell: sh
@@ -54,21 +69,25 @@ jobs:
         run: |
           set -eu
           test -n "$ALI_ACR_PASSWORD"
-          printf '%s' "$ALI_ACR_PASSWORD" | podman login --username "$ALI_ACR_USERNAME" --password-stdin "$ALI_ACR_REGISTRY"
+          printf '%s' "$ALI_ACR_PASSWORD" | docker login --username "$ALI_ACR_USERNAME" --password-stdin "$ALI_ACR_REGISTRY"
 
       - name: Prepare base image
         shell: sh
         run: |
           set -eu
           test -f "$GOPS_BASE_DOCKERFILE"
-          if podman manifest inspect "$GOPS_BASE_IMAGE" >/dev/null 2>&1; then
+          if docker manifest inspect "$GOPS_BASE_IMAGE" >/dev/null 2>&1; then
             echo "Base image exists: $GOPS_BASE_IMAGE"
-            podman pull "$GOPS_BASE_IMAGE"
+            docker pull "$GOPS_BASE_IMAGE"
           else
             echo "Base image not found, building: $GOPS_BASE_IMAGE"
-            podman build --pull=missing --tag "$GOPS_BASE_IMAGE" --file "$GOPS_BASE_DOCKERFILE" .
-            podman image exists "$GOPS_BASE_IMAGE"
-            podman push "$GOPS_BASE_IMAGE"
+            docker buildx build \
+              --pull \
+              --file "$GOPS_BASE_DOCKERFILE" \
+              --tag "$GOPS_BASE_IMAGE" \
+              --cache-from "type=registry,ref=$GOPS_BASE_CACHE_IMAGE" \
+              --cache-to "type=registry,ref=$GOPS_BASE_CACHE_IMAGE,mode=max" \
+              --push .
           fi
 
       - name: Build image
@@ -76,48 +95,27 @@ jobs:
         run: |
           set -eu
           test -f "$GOPS_DOCKERFILE"
-          podman build --pull=missing --build-arg "GOPS_BASE_IMAGE=$GOPS_BASE_IMAGE" --tag "$GOPS_IMAGE" --file "$GOPS_DOCKERFILE" .
-          podman image exists "$GOPS_IMAGE"
+          docker buildx build \
+            --pull \
+            --build-arg "GOPS_BASE_IMAGE=$GOPS_BASE_IMAGE" \
+            --tag "$GOPS_IMAGE" \
+            --file "$GOPS_DOCKERFILE" \
+            --cache-from "type=registry,ref=$GOPS_CACHE_IMAGE" \
+            --cache-to "type=registry,ref=$GOPS_CACHE_IMAGE,mode=max" \
+            --push .
 
-      - name: Push image
-        run: |
-          podman push "$GOPS_IMAGE"
+      # - name: Start service
+      #   shell: sh
+      #   run: |
+      #     set -eu
+      #     test -f "$GOPS_COMPOSE_FILE"
+      #     docker compose --file "$GOPS_COMPOSE_FILE" config --quiet
+      #     docker pull "$GOPS_IMAGE"
+      #     docker compose --file "$GOPS_COMPOSE_FILE" up -d --force-recreate --no-build --remove-orphans --wait --wait-timeout 180 gops
+      #     docker compose --file "$GOPS_COMPOSE_FILE" ps
 
-      - name: Start service
-        shell: sh
-        run: |
-          set -eu
-          test -f "$GOPS_COMPOSE_FILE"
-          container_name="${GOPS_CONTAINER_NAME:-gops}"
-          if podman container exists "$container_name"; then
-            podman container rm --force "$container_name"
-          fi
-          podman compose --file "$GOPS_COMPOSE_FILE" up -d --force-recreate --no-build --remove-orphans gops
-
-      - name: Wait for health check
-        shell: sh
-        run: |
-          set -eu
-          container_name="${GOPS_CONTAINER_NAME:-gops}"
-          container_id="$(podman container inspect --format '{{.Id}}' "$container_name")"
-          test -n "$container_id"
-          for attempt in $(seq 1 36); do
-            status="$(podman inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
-            if [ "$status" = "healthy" ]; then
-              podman compose --file "$GOPS_COMPOSE_FILE" ps
-              exit 0
-            fi
-            if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
-              podman compose --file "$GOPS_COMPOSE_FILE" logs gops
-              exit 1
-            fi
-            sleep 5
-          done
-          podman compose --file "$GOPS_COMPOSE_FILE" logs gops
-          exit 1
-
-      - name: Show logs on failure
-        if: failure()
-        shell: sh
-        run: |
-          podman compose --file "$GOPS_COMPOSE_FILE" logs --tail=200 gops || true
+      # - name: Show logs on failure
+      #   if: failure()
+      #   shell: sh
+      #   run: |
+      #     docker compose --file "$GOPS_COMPOSE_FILE" logs --tail=200 gops || true
